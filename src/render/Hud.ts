@@ -3,7 +3,7 @@ import type { GameState, MatchState, PlayerState, Scoreboard } from '../core';
 import { characterById } from '../characters/characters';
 import type { CharacterChoices } from '../characters/characters';
 import { drawItemPlate } from './ArenaRenderer';
-import { addCharacter } from './CharacterView';
+import { addCharacter, setFace } from './CharacterView';
 import { ARENA_WIDTH, SIDE_WIDTH, SCREEN_WIDTH, TOP_HEIGHT } from './layout';
 import { formatClock, isTeamGame, playerLabel } from './outcomeText';
 
@@ -98,11 +98,11 @@ export function createHud(scene: Phaser.Scene, state: GameState, choices: Charac
     back.fillRoundedRect(x, cardY, CARD_W, CARD_H, 12);
     back.fillStyle(accent);
     back.fillRoundedRect(x, cardY, 7, CARD_H, 4);
-    addCharacter(scene, characterOf(player), x + 34, cardY + CARD_H / 2, 17).setDepth(4);
+    const face = addCharacter(scene, characterOf(player), x + 34, cardY + CARD_H / 2, 17).setDepth(4);
     const name = scene.add.text(x + 58, cardY + 15, playerLabel(player, players), style(18, hex(accent), 3)).setOrigin(0, 0.5).setDepth(5);
     const info = scene.add.text(x + 58, cardY + 37, '', style(15, '#e3e7ff', 2)).setOrigin(0, 0.5).setDepth(5);
     const icons = scene.add.graphics().setDepth(5);
-    return { player, x, name, info, icons };
+    return { player, x, name, info, icons, face };
   });
 
   // Teclas gerais, no canto esquerdo da tela (o fundo colorido, ao lado da arena)
@@ -128,7 +128,7 @@ export function createHud(scene: Phaser.Scene, state: GameState, choices: Charac
 
       // Tudo que depende dos jogadores só é refeito se algo mudou (os efeitos com tempo, de 6 em 6 passos).
       const key = current.players
-        .map((p) => `${p.alive ? 1 : 0}${+p.canKick}${+p.piercing}${+p.remote}${+p.canThrow}${+p.vest}.${Math.ceil(p.ghostTicks / 6)}.${Math.ceil(p.invertTicks / 6)}.${Math.ceil(p.heroTicks / 6)}${p.sideline ?? 'x'}:${scores?.[p.id]?.points ?? 0}:${match.wins[p.team] ?? 0}`)
+        .map((p) => `${p.alive ? 1 : 0}${current.round.phase === 'playing' ? 'p' : 'e'}${+p.canKick}${+p.piercing}${+p.remote}${+p.canThrow}${+p.vest}.${Math.ceil(p.ghostTicks / 6)}.${Math.ceil(p.invertTicks / 6)}.${Math.ceil(p.heroTicks / 6)}${p.sideline ?? 'x'}:${scores?.[p.id]?.points ?? 0}:${match.wins[p.team] ?? 0}`)
         .join('|');
       if (key === lastKey) return;
       lastKey = key;
@@ -140,6 +140,8 @@ export function createHud(scene: Phaser.Scene, state: GameState, choices: Charac
         const wins = match.wins[live.team] ?? 0;
         const onSideline = live.sideline !== null;
         card.name.setAlpha(live.alive ? 1 : 0.55);
+        // Rosto: triste se foi eliminado, feliz para quem está de pé quando a rodada termina.
+        setFace(scene, card.face, !live.alive ? 'sad' : current.round.phase !== 'playing' ? 'happy' : 'normal');
         card.info
           .setText(live.alive ? `${points} pts · ${wins} vit.` : `${points} pts · ${onSideline ? 'repescagem' : 'eliminado'}`)
           .setColor(live.alive ? '#e3e7ff' : onSideline ? '#ffd43b' : '#ff8fa3');

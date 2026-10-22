@@ -13,6 +13,12 @@ export interface CharacterDef {
   hat: Hat;
   /** Personagem caricatura (usa public/characters/<id>.png se existir). */
   custom: boolean;
+  /**
+   * Tem arte de corpo inteiro em public/characters/<id>/ (poses de parado e correndo nas 4 direções, colocar bomba,
+   * vitória e derrota, rosto normal/feliz/triste e a arte grande da escolha). Veja characters/poses.ts. Sem os
+   * arquivos, o jogo cai no desenho provisório.
+   */
+  sprites?: boolean;
 }
 
 export const CHARACTERS: readonly CharacterDef[] = [
@@ -20,7 +26,7 @@ export const CHARACTERS: readonly CharacterDef[] = [
   { id: 'bolt', name: 'Bolt', color: 0x2dc7ff, hat: 'horns', custom: false },
   { id: 'musgo', name: 'Musgo', color: 0x7ed957, hat: 'leaf', custom: false },
   { id: 'violeta', name: 'Violeta', color: 0xb388ff, hat: 'crown', custom: false },
-  { id: 'fred', name: 'Fred', color: 0xffa94d, hat: 'cap', custom: true },
+  { id: 'fred', name: 'Fred', color: 0xffa94d, hat: 'cap', custom: true, sprites: true },
   { id: 'vanessa', name: 'Vanessa', color: 0xf06595, hat: 'flower', custom: true },
   { id: 'ana-julia', name: 'Ana Júlia', color: 0xffd43b, hat: 'bow', custom: true },
   { id: 'lucas', name: 'Lucas', color: 0x74c0fc, hat: 'none', custom: true },
@@ -35,7 +41,12 @@ export function characterById(id: string | undefined): CharacterDef {
 
 /** Caminho da imagem de um personagem caricatura, relativo à pasta `public/`. */
 export function characterImagePath(character: CharacterDef): string {
-  return `characters/${character.id}.png`;
+  return character.sprites ? `characters/${character.id}/face.png` : `characters/${character.id}.png`;
+}
+
+/** Caminho de uma imagem de um personagem com sprites (pose, rosto ou arte grande). */
+export function spriteImagePath(character: CharacterDef, name: string): string {
+  return `characters/${character.id}/${name}.png`;
 }
 
 /** Personagem de cada jogador (id do jogador -> id do personagem). */

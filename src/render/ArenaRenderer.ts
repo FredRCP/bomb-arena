@@ -1,4 +1,4 @@
-import { addCharacter } from './CharacterView';
+import { addCharacter, animateSprite, createSpriteView, hasSprites, isSpriteView } from './CharacterView';
 import type { CharacterDef } from '../characters/characters';
 import Phaser from 'phaser';
 import { getCell, ringCells } from '../core';
@@ -335,16 +335,25 @@ export function drawEffects(g: Graphics, state: GameState): void {
 type Movable = { setPosition(x: number, y: number): unknown; setVisible(value: boolean): unknown; setAlpha(value: number): unknown };
 
 /** Posiciona o desenho do jogador conforme o estado do core (que usa unidades de célula). */
-export function syncPlayerView(view: Movable, player: PlayerState, arena?: Arena, tick = 0): void {
+export function syncPlayerView(view: Movable, player: PlayerState, arena?: Arena, tick = 0, celebrate = false): void {
   // Quem foi eliminado e joga das laterais aparece sobre a casa do anel de borda, meio transparente.
   const ring = player.sideline !== null && arena ? ringCells(arena)[player.sideline] : undefined;
   if (ring) {
     view.setPosition((ring.col + 0.5) * TILE_SIZE, (ring.row + 0.5) * TILE_SIZE);
     view.setVisible(true);
     view.setAlpha(0.6);
+    // Personagem de corpo inteiro: quem está nas laterais fica sempre em pé, olhando para a arena.
+    if (isSpriteView(view)) animateSprite(view.scene, view, { x: ring.col, y: ring.row, facing: player.facing, alive: true }, tick, 'idle');
     return;
   }
   view.setPosition(player.x * TILE_SIZE, player.y * TILE_SIZE);
+  // Personagem de corpo inteiro: a pose (andando, bomba, vitória, derrota) vem do animateSprite, que também decide quando some.
+  if (isSpriteView(view)) {
+    view.setVisible(animateSprite(view.scene, view, player, tick, celebrate ? 'win' : 'play'));
+    if (player.shieldTicks > 0) view.setAlpha(tick % 10 < 5 ? 0.35 : 1);
+    else view.setAlpha(player.ghostTicks > 0 ? 0.5 : 1);
+    return;
+  }
   // Quem foi atingido some; o resultado da rodada aparece pela tela de resultado.
   view.setVisible(player.alive);
   // Fantasma (atravessando blocos): meio transparente. Recém-voltado à arena (proteção): pisca.
@@ -354,7 +363,7 @@ export function syncPlayerView(view: Movable, player: PlayerState, arena?: Arena
 
 /** Cria o desenho do jogador (o personagem escolhido) já na posição correta. */
 export function createPlayerView(scene: Phaser.Scene, player: PlayerState, character: CharacterDef): Phaser.GameObjects.Container {
-  const view = addCharacter(scene, character, 0, 0, 27);
+  const view = hasSprites(scene, character) ? createSpriteView(scene, character, 0, 0) : addCharacter(scene, character, 0, 0, 27);
   view.setDepth(10);
   syncPlayerView(view, player);
   return view;

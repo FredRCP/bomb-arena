@@ -5,7 +5,7 @@ import { COUNTDOWN_SECONDS } from '../config/round';
 import { TICKS_PER_SECOND } from '../config/simulation';
 import { characterById, defaultChoices } from '../characters/characters';
 import type { CharacterChoices } from '../characters/characters';
-import { applyItem, createAi, createScoreboard, rankPlayers, recordEvents, recordMatchScore, recordRoundScore, createFixedStepper, createGameState, createMatch, drainEvents, nextRound, recordRound, step } from '../core';
+import { applyItem, createAi, createScoreboard, rankPlayers, recordEvents, recordMatchScore, recordRoundScore, createFixedStepper, createGameState, createMatch, drainEvents, nextRound, recordRound, step, teamOfOutcome } from '../core';
 import type { AiController, GameState, MatchState, PlayerId, Scoreboard } from '../core';
 import type { HumanId } from '../input/controls';
 import { KeyboardInput } from '../input/keyboardInput';
@@ -25,6 +25,7 @@ import {
   redrawBlocks,
   syncPlayerView,
 } from '../render/ArenaRenderer';
+import { triggerBombPose } from '../render/CharacterView';
 import { createHud } from '../render/Hud';
 import { SIDE_WIDTH, TOP_HEIGHT, placeArena } from '../render/layout';
 import { addMenuBackground } from '../render/menuBackground';
@@ -312,6 +313,7 @@ export class GameScene extends Phaser.Scene {
         heard.add('tick');
       }
       if (event.type === 'bombPlaced' || event.type === 'bombKicked' || event.type === 'bombThrown') heard.add('place');
+      if (event.type === 'bombPlaced') triggerBombPose(this.playerViews.get(event.owner), this.gameState.tick);
       if (event.type === 'bombExploded') heard.add('explode');
       if (event.type === 'playerHit') heard.add('hit');
       if (event.type === 'itemPicked' || event.type === 'vestBroken') heard.add('pickup');
@@ -372,7 +374,12 @@ export class GameScene extends Phaser.Scene {
     drawEffects(this.effectsView, this.gameState);
     for (const player of this.gameState.players) {
       const view = this.playerViews.get(player.id);
-      if (view) syncPlayerView(view, player, this.gameState.arena, this.gameState.tick);
+      if (!view) continue;
+      // Na vitória, quem está de pé no time vencedor comemora (a pose só existe para personagens com sprites).
+      const round = this.gameState.round;
+      const winnerTeam = round.outcome ? teamOfOutcome(round.outcome, this.gameState.players) : null;
+      const celebrate = round.phase !== 'playing' && player.alive && (round.outcome === null || winnerTeam === player.team);
+      syncPlayerView(view, player, this.gameState.arena, this.gameState.tick, celebrate);
     }
     this.hud.update(this.gameState, this.session.match, this.session.scores);
   }

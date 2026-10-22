@@ -1,10 +1,15 @@
-# Imagens dos personagens
+# Arte dos personagens
 
-Coloque aqui as caricaturas, com **estes nomes exatos**:
+## Personagem de corpo inteiro (ex.: `fred/`)
+Pasta `public/characters/<id>/` com PNG de fundo transparente (se o personagem tem `sprites: true` em `src/characters/characters.ts`):
 
-`fred.png`  `vanessa.png`  `ana-julia.png`  `lucas.png`  `filippe.png`  `waleska.png`  `glaucio.png`
+- Poses (PNG transparente): `idle-down`, `idle-up`, `idle-right`, `win`, `lose`; corrida `run-down-1..8`, `run-up-1..8`, `run-right-1..8` (8 quadros por direção, em ciclo); colocar bomba `bomb-side-1..4` (de lado) e `bomb-front-1..4` (de frente). A esquerda é a direita espelhada pelo jogo.
+- Extras: `face` (rosto normal), `face-happy`, `face-sad`, `art` (arte grande da tela de escolha)
 
-- PNG com **fundo transparente**, quadrado, de preferência **256 x 256** pixels (a imagem é reduzida para caber).
-- Uma imagem parada por personagem (a mesma serve na partida, na seleção e nos painéis).
-- Sem a imagem, o jogo usa um desenho provisório com a inicial do nome. Não precisa mexer em código.
-- Para adicionar outro personagem: uma linha em `src/characters/characters.ts`.
+Todas as poses no mesmo tamanho de personagem (mesma escala de cabeça) e pés na base. O jogo escala pela altura da pose parada.
+Sem os arquivos, o jogo usa o desenho provisório.
+
+## Personagem simples
+`public/characters/<id>.png` (rosto ~512x512, fundo transparente), com `custom: true`.
+
+Não coloque fotos reais no repositório público: só as caricaturas.

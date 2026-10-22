@@ -49,3 +49,4 @@ resultado real. Não declare sucesso sem executar o comando.
 8.6 Organização das telas: Abertura → Menu (Jogar/Ranking/Opções) → Quem vai jogar → Regras → Personagens → Fase → partida; espaço para várias fases (src/config/stages.ts; só a Clássica jogável) — feita
 8.7 Fundos coloridos, menu Jogar/Opções/Ranking, dificuldades Fácil→Impossível, Repescagem, tela de times estilo Bomberman (menu/teamsModel.ts), HUD em barra superior fina, tela 1600x900 — feita
 9. Publicação e PWA (manifest, service worker rede-primeiro, ícones em public/; guia de publicação no README) — feita
+9.1 Piloto de arte: Fred de corpo inteiro (poses em src/characters/poses.ts, PNGs em public/characters/fred/, README ali) — feita

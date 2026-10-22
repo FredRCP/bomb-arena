@@ -5,7 +5,7 @@ import { CHARACTERS } from '../characters/characters';
 import { PICKER_COLUMNS, allConfirmed, cancelPick, confirmPick, createPicker, finalizeChoices, moveCursor } from '../characters/picker';
 import type { PickerState } from '../characters/picker';
 import type { GameSession } from './GameScene';
-import { addCharacter } from '../render/CharacterView';
+import { addCardArt } from '../render/CharacterView';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../render/layout';
 import { addMenuBackground } from '../render/menuBackground';
 import { needsTeamsScreen } from '../menu/teamsModel';
@@ -58,7 +58,7 @@ export class SelectScene extends Phaser.Scene {
       const { x, y } = this.cardCenter(index);
       const hex = `#${character.color.toString(16).padStart(6, '0')}`;
       this.add.rectangle(x, y, CARD_W, CARD_H, 0x1b1f3b, 0.8).setStrokeStyle(3, 0x8d99ff);
-      addCharacter(this, character, x, y - 22, 54);
+      addCardArt(this, character, x, y - 22, 54, 185);
       this.add.text(x, y + 82, character.name, { fontFamily: FONT, fontSize: '28px', fontStyle: 'bold', color: hex, stroke: '#0b0c1a', strokeThickness: 4 }).setOrigin(0.5);
     });
 
