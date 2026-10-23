@@ -38,8 +38,9 @@ export type SpriteExtra = (typeof SPRITE_EXTRAS)[number];
 
 /**
  * Distância (em casas) que o personagem percorre durante um ciclo completo de corrida (todos os quadros).
- * O quadro vem da distância andada, e não do relógio: assim os pés acompanham o chão (sem "patinar") e, com
- * mais velocidade, os passos ficam mais rápidos sozinhos.
+ * O quadro vem da distância andada, e não do relógio: com mais velocidade, os passos ficam mais rápidos sozinhos.
+ * Valor pequeno = pernas rápidas (parece correria sem sair do lugar); valor grande = pernas lentas (parece patinar).
+ * Dá para testar sem mexer no código: abra o jogo com ?cycle=1.0, ?cycle=2.0 etc. no endereço.
  */
 export const WALK_CYCLE_TILES = 0.9;
 /** Depois de eliminado, a pose de derrota fica na tela por este tempo (1,5 s) e vai sumindo. */

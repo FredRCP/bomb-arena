@@ -25,7 +25,7 @@ import {
   redrawBlocks,
   syncPlayerView,
 } from '../render/ArenaRenderer';
-import { triggerBombPose } from '../render/CharacterView';
+import { spriteDebug, triggerBombPose } from '../render/CharacterView';
 import { createHud } from '../render/Hud';
 import { SIDE_WIDTH, TOP_HEIGHT, placeArena } from '../render/layout';
 import { addMenuBackground } from '../render/menuBackground';
@@ -74,6 +74,7 @@ export class GameScene extends Phaser.Scene {
   /** Diagnóstico de velocidade (?debug=1): quantos passos de simulação rodaram no último segundo. */
   private debugText: Phaser.GameObjects.Text | null = null;
   private debugMs = 0;
+  private debugLine = '';
   private lastFrameMs = 0;
   private debugTicks = 0;
 
@@ -215,9 +216,10 @@ export class GameScene extends Phaser.Scene {
     if (this.debugText && !this.keyboardPausedOrOver(paused)) {
       this.debugMs += delta;
       this.debugTicks += ticks;
+      this.debugText.setText(`${this.debugLine}\n${spriteDebug.text}`);
       if (this.debugMs >= 1000) {
         const perSecond = Math.round((this.debugTicks * 1000) / this.debugMs);
-        this.debugText.setText(`passos/s: ${perSecond} (certo: 60)  quadros: ${Math.round(this.game.loop.actualFps)} fps`);
+        this.debugLine = `passos/s: ${perSecond} (certo: 60)  quadros: ${Math.round(this.game.loop.actualFps)} fps`;
         this.debugMs = 0;
         this.debugTicks = 0;
       }

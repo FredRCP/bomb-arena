@@ -176,6 +176,22 @@ interface SpriteData {
 }
 
 /** Cria o personagem de corpo inteiro da arena, centrado em (x, y), com pés na base da casa. */
+/** Distância de um ciclo de corrida. O endereço pode trazer ?cycle=NUMERO só para testar o ritmo dos passos. */
+let cachedCycle: number | null = null;
+/** Diagnóstico (?debug=1): última pose de corrida escolhida e o ritmo usado, para conferir na máquina de quem joga. */
+export const spriteDebug = { text: '' };
+function walkCycleTiles(): number {
+  if (cachedCycle !== null) return cachedCycle;
+  cachedCycle = WALK_CYCLE_TILES;
+  try {
+    const value = Number(new URLSearchParams(window.location.search).get('cycle'));
+    if (value >= 0.3 && value <= 6) cachedCycle = value;
+  } catch {
+    /* sem endereço (testes): usa o padrão */
+  }
+  return cachedCycle;
+}
+
 export function createSpriteView(scene: Phaser.Scene, character: CharacterDef, x: number, y: number): Phaser.GameObjects.Container {
   const shadow = scene.add.graphics();
   shadow.fillStyle(COLORS.shadow, 0.25);
@@ -221,7 +237,7 @@ export function animateSprite(scene: Phaser.Scene, view: Phaser.GameObjects.Cont
     data.lastMoveTick = tick;
     data.bombUntil = -1; // saiu andando: some a pose de colocar bomba (senão ele corre "carregando" a bomba)
     if (!wasMoving) data.walkPhase = 0; // recomeça sempre no primeiro quadro (pé no chão)
-    if (distance < 1) data.walkPhase += distance / WALK_CYCLE_TILES; // saltos grandes (volta à arena) não contam
+    if (distance < 1) data.walkPhase += distance / walkCycleTiles(); // saltos grandes (volta à arena) não contam
   }
   data.lastX = player.x;
   data.lastY = player.y;
@@ -236,13 +252,13 @@ export function animateSprite(scene: Phaser.Scene, view: Phaser.GameObjects.Cont
     data.pose = key;
   }
   data.image.setFlipX(frame.flipX);
-  // Os quadros já trazem a corrida e a bomba; por código ficam só um pulinho ao andar, a "respiração" parado
-  // e os pulos de alegria na vitória.
+  if (moving && mode === 'play') spriteDebug.text = `${frame.pose} fase ${data.walkPhase.toFixed(2)} cycle ${walkCycleTiles()}`;
+  // Os quadros já trazem a corrida e a bomba; por código ficam só um pulinho ao andar, a "respiração" parado e os pulos de alegria na vitória.
   let bounce = 0;
   let squash = 1 + Math.sin(tick / 14) * 0.012;
   if (frame.pose === 'win') bounce = Math.abs(Math.sin(tick / 5)) * 8;
   else if (moving && mode === 'play' && frame.pose.startsWith('run')) {
-    bounce = Math.abs(Math.sin(data.walkPhase * Math.PI * 4)) * 1.5;
+    bounce = Math.abs(Math.sin(data.walkPhase * Math.PI * 4)) * 1.5; // pulinho leve a cada passo
     squash = 1;
   }
   data.image.setScale(data.scale * (2 - squash), data.scale * squash);

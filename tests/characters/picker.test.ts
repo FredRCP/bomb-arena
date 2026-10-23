@@ -12,7 +12,7 @@ describe('personagens', () => {
 
   it('a família está na lista', () => {
     const custom = CHARACTERS.filter((c) => c.custom).map((c) => c.name);
-    expect(custom).toEqual(['Fred', 'Vanessa', 'Ana Júlia', 'Lucas', 'Filippe', 'Waleska', 'Gláucio']);
+    expect(custom).toEqual(['Fred', 'Van', 'Ana', 'Lucas', 'Filippe', 'Wal', 'Glauceste']);
   });
 
   it('escolha padrão: cada jogador um personagem diferente', () => {
