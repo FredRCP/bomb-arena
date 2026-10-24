@@ -32,7 +32,7 @@ export const CHARACTERS: readonly CharacterDef[] = [
   { id: 'lucas', name: 'Lucas', color: 0x74c0fc, hat: 'none', custom: true },
   { id: 'filippe', name: 'Filippe', color: 0x38d9a9, hat: 'headband', custom: true },
   { id: 'waleska', name: 'Wal', color: 0xe599f7, hat: 'crown', custom: true, sprites: true },
-  { id: 'glaucio', name: 'Glauceste', color: 0xadb5bd, hat: 'cap', custom: true },
+  { id: 'glaucio', name: 'Glauceste', color: 0xadb5bd, hat: 'cap', custom: true, sprites: true },
 ];
 
 export function characterById(id: string | undefined): CharacterDef {
