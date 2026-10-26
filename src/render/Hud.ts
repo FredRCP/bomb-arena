@@ -3,6 +3,7 @@ import type { GameState, MatchState, PlayerState, Scoreboard } from '../core';
 import { characterById } from '../characters/characters';
 import type { CharacterChoices } from '../characters/characters';
 import { drawItemPlate } from './ArenaRenderer';
+import { hasItemIcon, itemTexture } from './ItemSprites';
 import { addCharacter, setFace } from './CharacterView';
 import { ARENA_WIDTH, SIDE_WIDTH, SCREEN_WIDTH, TOP_HEIGHT } from './layout';
 import { formatClock, isTeamGame, playerLabel } from './outcomeText';
@@ -102,7 +103,7 @@ export function createHud(scene: Phaser.Scene, state: GameState, choices: Charac
     const name = scene.add.text(x + 58, cardY + 15, playerLabel(player, players), style(18, hex(accent), 3)).setOrigin(0, 0.5).setDepth(5);
     const info = scene.add.text(x + 58, cardY + 37, '', style(15, '#e3e7ff', 2)).setOrigin(0, 0.5).setDepth(5);
     const icons = scene.add.graphics().setDepth(5);
-    return { player, x, name, info, icons, face };
+    return { player, x, name, info, icons, face, iconImages: [] as Phaser.GameObjects.Image[] };
   });
 
   // Teclas gerais, no canto esquerdo da tela (o fundo colorido, ao lado da arena)
@@ -148,6 +149,7 @@ export function createHud(scene: Phaser.Scene, state: GameState, choices: Charac
 
         // Ícones pequenos: só o que o jogador tem agora.
         card.icons.clear();
+        card.iconImages.forEach((image) => image.setVisible(false));
         const owned: string[] = [];
         for (const item of PERMANENT) if (item.has(live)) owned.push(item.kind);
         for (const item of TIMED) if (item.left(live) > 0) owned.push(item.kind);
@@ -157,7 +159,15 @@ export function createHud(scene: Phaser.Scene, state: GameState, choices: Charac
           const scale = 0.38;
           // Cada ícone é desenhado em tamanho normal numa origem própria e reduzido; por isso o setScale na camada
           // não serve (reduziria tudo junto): desenhamos direto nas coordenadas já reduzidas.
-          drawSmallPlate(card.icons, kind as Parameters<typeof drawItemPlate>[1], card.x + CARD_W - 50 + col * 17, cardY + 14 + row * 20, scale);
+          const px = card.x + CARD_W - 50 + col * 17;
+          const py = cardY + 14 + row * 20;
+          if (hasItemIcon(scene, kind)) {
+            // Ícone em imagem (as imagens são criadas na primeira vez que aparecem e reaproveitadas depois).
+            const image = (card.iconImages[i] ??= scene.add.image(0, 0, itemTexture(kind)).setDepth(5));
+            image.setTexture(itemTexture(kind)).setDisplaySize(19, 19).setPosition(px, py).setVisible(true);
+          } else {
+            drawSmallPlate(card.icons, kind as Parameters<typeof drawItemPlate>[1], px, py, scale);
+          }
         });
       }
     },

@@ -13,6 +13,8 @@ import { parseGameConfig } from '../menu/gameConfig';
 import type { GameConfig } from '../menu/gameConfig';
 import {
   TILE_SIZE,
+  type BlocksView,
+  type ClosedView,
   createBlocksView,
   createClosedView,
   createEffectsView,
@@ -27,9 +29,13 @@ import {
 } from '../render/ArenaRenderer';
 import { spriteDebug, triggerBombPose } from '../render/CharacterView';
 import { Effects } from '../render/Effects';
+import { FlameSprites } from '../render/FlameSprites';
+import { ItemSprites, hasItemIcon } from '../render/ItemSprites';
+import { FLAME_TICKS } from '../config/bombs';
 import { createHud } from '../render/Hud';
-import { SIDE_WIDTH, TOP_HEIGHT, placeArena } from '../render/layout';
+import { SCREEN_HEIGHT, SCREEN_WIDTH, SIDE_WIDTH, TOP_HEIGHT, placeArena } from '../render/layout';
 import { addMenuBackground } from '../render/menuBackground';
+import { has, themeById, themeKey } from '../render/theme';
 import type { Hud } from '../render/Hud';
 import { showOutcomeOverlay } from '../render/OutcomeOverlay';
 import { describeRoundEnd, rankingLines, setCpuNames } from '../render/outcomeText';
@@ -56,12 +62,15 @@ export class GameScene extends Phaser.Scene {
   private characters: CharacterChoices = {};
   private keyboardInput!: KeyboardInput;
   private readonly stepper = createFixedStepper();
-  private blocksView!: Phaser.GameObjects.Graphics;
+  private blocksView!: BlocksView;
   private itemsView!: Phaser.GameObjects.Graphics;
   private effectsView!: Phaser.GameObjects.Graphics;
   /** Faíscas, fumaça, estilhaços e tremor (só visual; ?fx=0 desliga). */
   private fx!: Effects;
-  private closedView!: Phaser.GameObjects.Graphics;
+  /** Fogo em imagem (se as imagens existirem). */
+  private flameSprites!: FlameSprites;
+  private itemSprites!: ItemSprites;
+  private closedView!: ClosedView;
   private hud!: Hud;
   private readonly playerViews = new Map<PlayerId, Phaser.GameObjects.Container>();
   /** Jogadores controlados por pessoas (para os textos de resultado e para ligar as teclas certas). */
@@ -134,7 +143,13 @@ export class GameScene extends Phaser.Scene {
     }
 
     placeArena(this);
-    addMenuBackground(this, undefined, false); // fundo colorido da tela (sem bolhas, para não distrair)
+    const theme = themeById(config.stage);
+    if (theme.background && has(this, theme, 'background')) {
+      // Fundo da fase: uma imagem do tamanho da tela (a câmera desliza, por isso começa no canto da tela, e não em 0,0).
+      this.add.image(this.cameras.main.scrollX, this.cameras.main.scrollY, themeKey(theme, 'background')).setOrigin(0, 0).setDisplaySize(SCREEN_WIDTH, SCREEN_HEIGHT).setDepth(-100);
+    } else {
+      addMenuBackground(this, undefined, false); // fundo colorido da tela (sem bolhas, para não distrair)
+    }
     this.stepper.reset();
     this.lastFrameMs = performance.now();
     this.overlayShown = false;
@@ -144,12 +159,14 @@ export class GameScene extends Phaser.Scene {
     this.pauseObjects = [];
     this.playerViews.clear();
 
-    drawArena(this, this.gameState.arena);
-    this.blocksView = createBlocksView(this, this.gameState.arena);
+    drawArena(this, this.gameState.arena, theme.id);
+    this.blocksView = createBlocksView(this, this.gameState.arena, theme.id);
     this.itemsView = createItemsView(this);
     this.effectsView = createEffectsView(this);
-    this.fx = new Effects(this);
-    this.closedView = createClosedView(this);
+    this.fx = new Effects(this, theme.id);
+    this.flameSprites = new FlameSprites(this);
+    this.itemSprites = new ItemSprites(this);
+    this.closedView = createClosedView(this, theme.id);
     for (const player of this.gameState.players) {
       this.playerViews.set(player.id, createPlayerView(this, player, characterById(this.characters[player.id])));
     }
@@ -334,6 +351,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.fx.onEvents(events, this.gameState);
+    this.flameSprites.onEvents(events, this.gameState, FLAME_TICKS);
     if (blocksChanged) redrawBlocks(this.blocksView, this.gameState.arena);
     if (heard.has('tick')) sfx.play('tick');
     if (heard.has('place')) sfx.play('place');
@@ -383,8 +401,11 @@ export class GameScene extends Phaser.Scene {
 
   /** Copia o estado do core (jogadores, itens, bombas, chamas, placar) para os desenhos. */
   private syncViews(): void {
-    drawItems(this.itemsView, this.gameState);
-    drawEffects(this.effectsView, this.gameState);
+    drawItems(this.itemsView, this.gameState, (kind) => hasItemIcon(this, kind));
+    this.itemSprites.update(this.gameState);
+    const spriteFlames = this.flameSprites.ready;
+    if (spriteFlames) this.flameSprites.update(this.gameState);
+    drawEffects(this.effectsView, this.gameState, spriteFlames);
     for (const player of this.gameState.players) {
       const view = this.playerViews.get(player.id);
       if (!view) continue;

@@ -42,7 +42,7 @@ export type SpriteExtra = (typeof SPRITE_EXTRAS)[number];
  * Valor pequeno = pernas rápidas (parece correria sem sair do lugar); valor grande = pernas lentas (parece patinar).
  * Dá para testar sem mexer no código: abra o jogo com ?cycle=1.0, ?cycle=2.0 etc. no endereço.
  */
-export const WALK_CYCLE_TILES = 0.9;
+export const WALK_CYCLE_TILES = 2.4;
 /** Depois de eliminado, a pose de derrota fica na tela por este tempo (1,5 s) e vai sumindo. */
 export const LOSE_VISIBLE_TICKS = 90;
 /** Quanto tempo a pose de "colocar bomba" aparece depois de soltar a bomba (passos). */

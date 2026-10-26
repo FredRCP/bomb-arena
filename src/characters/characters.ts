@@ -31,7 +31,7 @@ export const CHARACTERS: readonly CharacterDef[] = [
   { id: 'cacau', name: 'Cacau', color: 0xa9744f, hat: 'tuft', custom: false },
   { id: 'fred', name: 'Fred', color: 0xffa94d, hat: 'cap', custom: true, sprites: true },
   { id: 'vanessa', name: 'Van', color: 0xf06595, hat: 'flower', custom: true },
-  { id: 'ana-julia', name: 'Ana', color: 0xffd43b, hat: 'bow', custom: true },
+  { id: 'ana-julia', name: 'Ana', color: 0xffd43b, hat: 'bow', custom: true, sprites: true },
   { id: 'lucas', name: 'Lucas', color: 0x74c0fc, hat: 'none', custom: true },
   { id: 'filippe', name: 'Filippe', color: 0x38d9a9, hat: 'headband', custom: true },
   { id: 'waleska', name: 'Wal', color: 0xe599f7, hat: 'crown', custom: true, sprites: true },

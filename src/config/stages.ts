@@ -1,5 +1,5 @@
 // Fases (arenas temáticas). Importado pelo menu: sem Phaser e sem navegador.
-// Por enquanto só a clássica existe; as outras já aparecem na escolha como "em breve" para a lista crescer sem
+// A clássica e a do gelo existem; as outras já aparecem na escolha como "em breve" para a lista crescer sem
 // mexer no menu. Para ativar uma fase, ponha `available: true` e implemente o tema dela.
 
 export interface StageDef {
@@ -10,7 +10,7 @@ export interface StageDef {
 
 export const STAGES: readonly StageDef[] = [
   { id: 'classic', name: 'Arena Clássica', available: true },
-  { id: 'ice', name: 'Fase do Gelo', available: false },
+  { id: 'ice', name: 'Fase do Gelo', available: true },
   { id: 'egypt', name: 'Fase do Egito', available: false },
   { id: 'train', name: 'Fase do Trenzinho', available: false },
 ];

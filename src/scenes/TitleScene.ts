@@ -8,6 +8,9 @@ import { loadSettings } from '../menu/settingsStorage';
 import { TILE_SIZE } from '../render/ArenaRenderer';
 import { addCharacter, preloadCharacters } from '../render/CharacterView';
 import { placeArena } from '../render/layout';
+import { preloadFlames } from '../render/FlameSprites';
+import { preloadItems } from '../render/ItemSprites';
+import { preloadThemes } from '../render/theme';
 import { addMenuBackground } from '../render/menuBackground';
 
 const FONT = 'system-ui, "Segoe UI", Roboto, sans-serif';
@@ -26,6 +29,9 @@ export class TitleScene extends Phaser.Scene {
   /** Pede as imagens dos personagens caricatura (se existirem em public/characters/). */
   preload(): void {
     preloadCharacters(this);
+    preloadThemes(this);
+    preloadFlames(this);
+    preloadItems(this);
   }
 
   create(): void {

@@ -1,7 +1,8 @@
 import Phaser from 'phaser';
 import type { GameEvent, GameState } from '../core';
 import { TILE_SIZE } from './ArenaRenderer';
-import { COLORS } from './palette';
+import { has, themeById, themeKey } from './theme';
+import type { ThemeDef } from './theme';
 import { ParticleSystem, alphaOf, fancyEffectsOn, sizeOf } from './particles';
 
 // Efeitos visuais da arena: faíscas e fumaça na célula da bomba que explode, estilhaços quando uma caixa quebra, brilho ao pegar item,
@@ -12,7 +13,6 @@ const rand = (a: number, b: number) => a + Math.random() * (b - a);
 const pick = <T>(list: readonly T[]): T => list[Math.floor(Math.random() * list.length)]!;
 
 const SPARK_COLORS = [0xffe66d, 0xffa94d, 0xff6b35, 0xffffff] as const;
-const CHIP_COLORS = [COLORS.blockFace, COLORS.blockShadow, COLORS.blockLine] as const;
 const SMOKE_COLORS = [0x6c6f7a, 0x8a8d99, 0xa4a7b3] as const;
 const DUST_COLOR = 0xe8dcc0;
 
@@ -23,7 +23,10 @@ export class Effects {
   private readonly lastPos = new Map<number, { x: number; y: number }>();
   private readonly dustClock = new Map<number, number>();
 
-  constructor(private readonly scene: Phaser.Scene) {
+  private readonly theme: ThemeDef;
+
+  constructor(private readonly scene: Phaser.Scene, themeId = 'classic') {
+    this.theme = themeById(themeId);
     this.g = scene.add.graphics().setDepth(12);
     let on = true;
     try {
@@ -100,9 +103,16 @@ export class Effects {
     for (let i = 0; i < 5; i++) {
       const angle = rand(-Math.PI, 0);
       const speed = rand(90, 240);
-      this.particles.spawn({ kind: 'chip', x: cx + rand(-14, 14), y: cy + rand(-10, 10), vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, gravity: 620, life: rand(0.5, 0.8), size0: rand(7, 12), size1: 5, color: pick(CHIP_COLORS) });
+      this.particles.spawn({ kind: 'chip', x: cx + rand(-14, 14), y: cy + rand(-10, 10), vx: Math.cos(angle) * speed, vy: Math.sin(angle) * speed, gravity: 620, life: rand(0.5, 0.8), size0: rand(7, 12), size1: 5, color: pick(this.theme.chips) });
     }
     this.puff(cx, cy, 2, 0.6);
+    // Fases com pedras (gelo): um montinho de pedaços que cresce um pouco e some.
+    if (this.theme.rubble && has(this.scene, this.theme, 'rubble')) {
+      const rubble = this.scene.add.image(cx, cy + 4, themeKey(this.theme, 'rubble')).setDepth(2);
+      rubble.setScale(58 / rubble.width);
+      const start = rubble.scale;
+      this.scene.tweens.add({ targets: rubble, scale: start * 1.25, alpha: 0, duration: 420, ease: 'Quad.easeOut', onComplete: () => rubble.destroy() });
+    }
   }
 
   private puff(x: number, y: number, count: number, life: number): void {

@@ -4,6 +4,8 @@ import Phaser from 'phaser';
 import { getCell, ringCells } from '../core';
 import type { Arena, BombState, FlameState, GameState, ItemState, PlayerState } from '../core';
 import { COLORS } from './palette';
+import { has, loadedBlockVariants, themeById, themeKey } from './theme';
+import type { ThemeDef } from './theme';
 
 // Aqui só se desenha o que o core já decidiu. Nenhuma regra do jogo mora neste arquivo.
 
@@ -40,16 +42,33 @@ function drawBlock(g: Graphics, x: number, y: number): void {
   g.lineBetween(x + s - 9, y + 9, x + 9, y + s - 13);
 }
 
-/** Desenha o piso e as paredes fixas (imagem estática: nada disso muda durante a partida). */
-export function drawArena(scene: Phaser.Scene, arena: Arena): Graphics {
+/** Põe uma parede em imagem: base alinhada ao pé da célula, subindo um pouco para cima (visão de frente). */
+function addWallImage(scene: Phaser.Scene, theme: ThemeDef, col: number, row: number, depth: number): Phaser.GameObjects.Image {
+  const image = scene.add.image((col + 0.5) * TILE_SIZE, (row + 1) * TILE_SIZE - 1, themeKey(theme, 'wall')).setOrigin(0.5, 1).setDepth(depth);
+  image.setScale(theme.wallWidth / image.width);
+  return image;
+}
+
+/**
+ * Desenha o piso e as paredes fixas (nada disso muda durante a partida). Com imagens da fase, o piso vira um tabuleiro
+ * de duas imagens e cada parede uma imagem; sem elas, o desenho provisório em código.
+ */
+export function drawArena(scene: Phaser.Scene, arena: Arena, themeId = 'classic'): Graphics {
+  const theme = themeById(themeId);
   const g = scene.add.graphics();
+  const floorImages = theme.floors && has(scene, theme, 'floorA') && has(scene, theme, 'floorB');
+  const wallImages = theme.wall && has(scene, theme, 'wall');
 
   for (let row = 0; row < arena.rows; row++) {
     for (let col = 0; col < arena.cols; col++) {
       const x = col * TILE_SIZE;
       const y = row * TILE_SIZE;
-      drawFloor(g, x, y, col, row);
-      if (getCell(arena, col, row) === 'wall') drawWall(g, x, y);
+      if (floorImages) scene.add.image(x + TILE_SIZE / 2, y + TILE_SIZE / 2, themeKey(theme, (col + row) % 2 === 0 ? 'floorA' : 'floorB')).setDisplaySize(TILE_SIZE, TILE_SIZE).setDepth(0);
+      else drawFloor(g, x, y, col, row);
+      if (getCell(arena, col, row) !== 'wall') continue;
+      // A parede em imagem é mais alta que a célula: fica na frente das chamas e das bombas (depth 6), para o fogo nunca cobri-la.
+      if (wallImages) addWallImage(scene, theme, col, row, 6);
+      else drawWall(g, x, y);
     }
   }
 
@@ -58,36 +77,76 @@ export function drawArena(scene: Phaser.Scene, arena: Arena): Graphics {
 }
 
 /** Camada dos blocos destrutíveis. Separada do piso porque blocos somem quando explodem. */
-export function createBlocksView(scene: Phaser.Scene, arena: Arena): Graphics {
-  const g = scene.add.graphics();
-  g.setDepth(1);
-  redrawBlocks(g, arena);
-  return g;
+export interface BlocksView {
+  scene: Phaser.Scene;
+  theme: ThemeDef;
+  g: Graphics;
+  images: Map<number, Phaser.GameObjects.Image>;
+  variants: number;
 }
 
-/** Apaga e redesenha todos os blocos que ainda existem no estado do core. */
-export function redrawBlocks(g: Graphics, arena: Arena): void {
-  g.clear();
+export function createBlocksView(scene: Phaser.Scene, arena: Arena, themeId = 'classic'): BlocksView {
+  const g = scene.add.graphics();
+  g.setDepth(1);
+  const theme = themeById(themeId);
+  const view: BlocksView = { scene, theme, g, images: new Map(), variants: loadedBlockVariants(scene, theme) };
+  redrawBlocks(view, arena);
+  return view;
+}
+
+/** Atualiza os blocos: desenha os que ainda existem no estado do core e tira os que sumiram. */
+export function redrawBlocks(view: BlocksView, arena: Arena): void {
+  view.g.clear();
   for (let row = 0; row < arena.rows; row++) {
     for (let col = 0; col < arena.cols; col++) {
-      if (getCell(arena, col, row) === 'block') drawBlock(g, col * TILE_SIZE, row * TILE_SIZE);
+      const index = row * arena.cols + col;
+      const isBlock = getCell(arena, col, row) === 'block';
+      const image = view.images.get(index);
+      if (!isBlock) {
+        if (image) {
+          image.destroy();
+          view.images.delete(index);
+        }
+      } else if (view.variants > 0) {
+        if (!image) {
+          // A variação depende só da posição (sem sorteio): o desenho é sempre o mesmo para a mesma célula.
+          const variant = 1 + ((col * 7 + row * 13) % view.variants);
+          const made = view.scene.add.image((col + 0.5) * TILE_SIZE, (row + 1) * TILE_SIZE - 1, themeKey(view.theme, `block${variant}`)).setOrigin(0.5, 1).setDepth(1);
+          made.setScale(view.theme.blockWidth / made.width);
+          view.images.set(index, made);
+        }
+      } else {
+        drawBlock(view.g, col * TILE_SIZE, row * TILE_SIZE);
+      }
     }
   }
 }
 
 /** Camada das paredes que fecham a arena na morte súbita (acima dos blocos e abaixo dos jogadores). */
-export function createClosedView(scene: Phaser.Scene): Graphics {
+export interface ClosedView {
+  scene: Phaser.Scene;
+  theme: ThemeDef;
+  g: Graphics;
+}
+
+export function createClosedView(scene: Phaser.Scene, themeId = 'classic'): ClosedView {
   const g = scene.add.graphics();
   g.setDepth(8);
-  return g;
+  return { scene, theme: themeById(themeId), g };
 }
 
 /** Desenha uma parede de morte súbita na célula. */
-export function drawClosedWall(g: Graphics, col: number, row: number): void {
+export function drawClosedWall(view: ClosedView, col: number, row: number): void {
   const x = col * TILE_SIZE;
   const y = row * TILE_SIZE;
-  drawFloor(g, x, y, col, row);
-  drawWall(g, x, y);
+  const { scene, theme, g } = view;
+  if (theme.floors && has(scene, theme, 'floorA') && has(scene, theme, 'floorB')) {
+    scene.add.image(x + TILE_SIZE / 2, y + TILE_SIZE / 2, themeKey(theme, (col + row) % 2 === 0 ? 'floorA' : 'floorB')).setDisplaySize(TILE_SIZE, TILE_SIZE).setDepth(7.5);
+  } else {
+    drawFloor(g, x, y, col, row);
+  }
+  if (theme.wall && has(scene, theme, 'wall')) addWallImage(scene, theme, col, row, 8);
+  else drawWall(g, x, y);
 }
 
 /** Camada dos itens no chão (entre os blocos e as bombas). */
@@ -116,13 +175,21 @@ const ITEM_COLORS: Record<ItemState['kind'], number> = {
 const BAD_KINDS: ReadonlyArray<ItemState['kind']> = ['invert', 'slow'];
 
 /** Desenha um item: uma plaquinha clara com o símbolo do tipo, que "flutua" de leve. */
-function drawItem(g: Graphics, item: ItemState, tick: number): void {
+function drawItem(g: Graphics, item: ItemState, tick: number, icon: boolean): void {
   const cx = (item.col + 0.5) * TILE_SIZE;
   const cy = (item.row + 0.5) * TILE_SIZE + Math.sin(tick / 12 + item.col + item.row) * 2.5;
 
   g.fillStyle(COLORS.shadow, 0.22);
   g.fillEllipse(cx, cy + 22, 34, 9);
-  drawItemPlate(g, item.kind, cx, cy);
+  if (!icon) {
+    drawItemPlate(g, item.kind, cx, cy);
+    return;
+  }
+  // Com ícone em imagem (ItemSprites.ts) só falta o aro vermelho dos itens ruins.
+  if (BAD_KINDS.includes(item.kind)) {
+    g.lineStyle(4, 0xe03131, 1);
+    g.strokeCircle(cx, cy, 26);
+  }
 }
 
 /** O símbolo de cada tipo de item (sem a plaquinha). Também usado pelos painéis laterais, para combinar com o que está no chão. */
@@ -239,9 +306,9 @@ export function drawItemPlate(g: Graphics, kind: ItemState['kind'], cx: number, 
 }
 
 /** Redesenha os itens que estão no chão. */
-export function drawItems(g: Graphics, state: GameState): void {
+export function drawItems(g: Graphics, state: GameState, hasIcon: (kind: ItemState['kind']) => boolean = () => false): void {
   g.clear();
-  for (const item of state.items) drawItem(g, item, state.tick);
+  for (const item of state.items) drawItem(g, item, state.tick, hasIcon(item.kind));
 }
 
 /** Camada de bombas e chamas, redesenhada do zero a cada passo (poucos objetos, custo desprezível). */
@@ -325,7 +392,11 @@ function flameOutline(cx: number, cy: number, inset: number, wobble: number, tic
     // Ondula para fora (ou para dentro), na direção do ponto em relação ao centro da célula.
     const length = Math.hypot(dx, dy) || 1;
     const push = fireNoise(cx + x, cy + y, tick) * wobble;
-    return { x: cx + x + (dx / length) * push, y: cy + y + (dy / length) * push };
+    // O fogo nunca passa da célula (nem das vizinhas em fogo): senão a ondulação cobriria as paredes ao lado.
+    const half = TILE_SIZE / 2;
+    const px = Math.min(Math.max(x + (dx / length) * push, -half - (links.left ? TILE_SIZE : 0)), half + (links.right ? TILE_SIZE : 0));
+    const py = Math.min(Math.max(y + (dy / length) * push, -half - (links.up ? TILE_SIZE : 0)), half + (links.down ? TILE_SIZE : 0));
+    return { x: cx + px, y: cy + py };
   });
 }
 
@@ -348,9 +419,9 @@ function drawFlames(g: Graphics, flames: readonly FlameState[], tick: number): v
 }
 
 /** Desenha as chamas e as bombas do estado atual. */
-export function drawEffects(g: Graphics, state: GameState): void {
+export function drawEffects(g: Graphics, state: GameState, spriteFlames = false): void {
   g.clear();
-  drawFlames(g, state.flames, state.tick);
+  if (!spriteFlames) drawFlames(g, state.flames, state.tick);
   for (const bomb of state.bombs) drawBomb(g, bomb, state.tick);
   // Em equipes, um anel fino na cor do time embaixo de cada jogador (azul = time 1, vermelho = time 2).
   const teamGame = state.players.some((a) => state.players.some((b) => b.id !== a.id && b.team === a.team));

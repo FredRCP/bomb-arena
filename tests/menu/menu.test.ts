@@ -309,14 +309,18 @@ describe('menu: níveis', () => {
 });
 
 describe('menu: fase e resumo', () => {
-  it('a fase percorre a lista; só a clássica pode ser jogada (as outras mostram "em breve")', () => {
+  it('a fase percorre a lista; clássica e gelo podem ser jogadas (as outras mostram "em breve")', () => {
     const menu = createMenu(DEFAULT_SETTINGS, 'stage');
     goTo(menu, 'stage');
     expect(describeRow(menu.settings, 'stage').value).toBe('Arena Clássica');
     expect(canStart(menu.settings)).toBe(true);
     changeValue(menu, 1);
-    expect(describeRow(menu.settings, 'stage').value).toBe('Fase do Gelo (em breve)');
+    expect(describeRow(menu.settings, 'stage').value).toBe('Fase do Gelo');
+    expect(canStart(menu.settings)).toBe(true);
+    changeValue(menu, 1);
+    expect(describeRow(menu.settings, 'stage').value).toBe('Fase do Egito (em breve)');
     expect(canStart(menu.settings)).toBe(false);
+    changeValue(menu, -1);
     changeValue(menu, -1);
     expect(menu.settings.stage).toBe('classic');
     for (let i = 0; i < 4; i++) changeValue(menu, 1);

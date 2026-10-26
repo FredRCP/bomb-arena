@@ -1,6 +1,7 @@
 import { AI_SETTINGS, DEFAULT_AI_DIFFICULTY } from '../config/ai';
 import type { AiDifficulty } from '../config/ai';
 import { DEFAULT_SEED } from '../config/arena';
+import { STAGES } from '../config/stages';
 import { TEAM_MODES } from '../core/state';
 import type { TeamMode } from '../core/state';
 
@@ -31,7 +32,7 @@ export interface GameConfig {
   wins?: number;
   /** Quem é eliminado joga das laterais e pode voltar (?sideline=0 desliga). Ausente: sim. */
   sideline?: boolean;
-  /** Fase escolhida (id de config/stages.ts). Por enquanto só muda o que o menu mostra. */
+  /** Fase escolhida (id de config/stages.ts). Muda o visual da arena (config/stages.ts, render/theme.ts). Por endereço: ?stage=ice */
   stage?: string;
   /** Contagem regressiva antes da rodada, em segundos (?countdown=0 pula, para testar). Ausente: 3. */
   countdown?: number;
@@ -43,7 +44,7 @@ export const ABILITY_NAMES = ['kick', 'pierce', 'remote', 'throw', 'ghost', 'inv
 export type AbilityName = (typeof ABILITY_NAMES)[number];
 
 /** Parâmetros do endereço que, se presentes, fazem o jogo pular o menu e começar direto. */
-const GAME_PARAMS = ['players', 'enemies', 'ai', 'seed', 'bombs', 'range', 'items', 'time', 'power', 'countdown', 'wins', 'sideline', 'teams'] as const;
+const GAME_PARAMS = ['players', 'enemies', 'ai', 'seed', 'bombs', 'range', 'items', 'time', 'power', 'countdown', 'wins', 'sideline', 'teams', 'stage'] as const;
 
 export function hasGameParams(search: string): boolean {
   const query = new URLSearchParams(search);
@@ -84,5 +85,7 @@ export function parseGameConfig(search: string): GameConfig {
   if (countdown !== undefined) config.countdown = countdown;
   const power = (query.get('power') ?? '').split(',').filter((name): name is AbilityName => (ABILITY_NAMES as readonly string[]).includes(name));
   if (power.length > 0) config.power = [...new Set(power)];
+  const stage = query.get('stage');
+  if (stage !== null && STAGES.some((entry) => entry.id === stage)) config.stage = stage;
   return config;
 }
