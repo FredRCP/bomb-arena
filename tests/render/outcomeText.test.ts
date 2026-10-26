@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { createGameState, createMatch, createPlayer, nextRound, recordRound } from '../../src/core';
 import type { PlayerState } from '../../src/core';
-import { describeOutcome, describeRoundEnd, formatClock, isTeamGame, playerLabel, rankingLines, scoreLine, teamName } from '../../src/render/outcomeText';
+import { describeOutcome, describeRoundEnd, formatClock, isTeamGame, playerLabel, rankingLines, scoreLine, setCpuNames, teamName } from '../../src/render/outcomeText';
 
 const cell = { col: 1, row: 1 };
 /** Uma pessoa contra um computador (cada um por si). */
@@ -164,5 +164,19 @@ describe('classificação e relógio', () => {
     expect(formatClock(1)).toBe('0:01');
     expect(formatClock(0)).toBe('0:00');
     expect(formatClock(-5)).toBe('0:00');
+  });
+});
+
+describe('nome do personagem do computador', () => {
+  it('com os nomes definidos, o computador aparece pelo nome do personagem (no painel e no placar)', () => {
+    const many = [createPlayer(1, cell), createPlayer(2, cell, 2, true), createPlayer(3, cell, 3, true)];
+    setCpuNames({ 2: 'Bolt', 3: 'Nimbo' });
+    try {
+      expect(many.map((p) => playerLabel(p, many))).toEqual(['Você', 'Bolt', 'Nimbo']);
+      expect(teamName(2, many)).toBe('Bolt');
+    } finally {
+      setCpuNames({});
+    }
+    expect(many.map((p) => playerLabel(p, many))).toEqual(['Você', 'CPU 1', 'CPU 2']);
   });
 });

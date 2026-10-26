@@ -2,6 +2,7 @@ import { BOMB_FUSE_TICKS, KICK_SLIDE_TICKS, REMOTE_FUSE_TICKS, THROW_DISTANCE } 
 import { cellIndex, getCell, inBounds } from './arena';
 import { PLAYER_HALF_SIZE } from '../config/simulation';
 import { bodyOverlapsCell } from './movement';
+import type { SoftCell } from './movement';
 import type { BombState, Direction, GameState, PlayerId, PlayerState } from './types';
 
 const VECTORS: Record<Direction, { dc: number; dr: number }> = {
@@ -26,6 +27,11 @@ export function blockedCellsFor(state: GameState, playerId: PlayerId): Set<numbe
     if (!bomb.walkThrough.includes(playerId)) blocked.add(cellIndex(state.arena, bomb.col, bomb.row));
   }
   return blocked;
+}
+
+/** Bombas em que este jogador ainda está em cima: ele pode sair delas, mas não atravessá-las. */
+export function walkThroughCellsFor(state: GameState, playerId: PlayerId): SoftCell[] {
+  return state.bombs.filter((bomb) => bomb.walkThrough.includes(playerId)).map((bomb) => ({ col: bomb.col, row: bomb.row }));
 }
 
 /**

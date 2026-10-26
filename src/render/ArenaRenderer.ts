@@ -284,22 +284,73 @@ function drawBomb(g: Graphics, bomb: BombState, tick: number): void {
   g.fillCircle(cx + 15, cy - r - 6, tick % 8 < 4 ? 5 : 3);
 }
 
-function drawFlame(g: Graphics, flame: FlameState): void {
-  const x = flame.col * TILE_SIZE;
-  const y = flame.row * TILE_SIZE;
-  // Esmaece no fim, para dar para ver que a chama está acabando.
-  const alpha = Math.min(1, flame.ticksLeft / 10);
+// ---------------------------------------------------------------------------------------------------------------
+// Fogo. Cada célula em chamas é um "corpo" de fogo com o contorno ondulando (por isso parece chama, e não um
+// quadrado) e quatro camadas de cor, de fora para dentro: vermelho, laranja, amarelo e um miolo quase branco.
+// Entre duas células vizinhas em fogo, as bordas se alongam até a vizinha e o fogo vira uma faixa contínua.
+// A ondulação depende da posição NO MAPA (e do tempo), não da célula: assim, as bordas de células vizinhas
+// combinam e a emenda não aparece.
+// ---------------------------------------------------------------------------------------------------------------
 
-  g.fillStyle(COLORS.flameOuter, 0.9 * alpha);
-  g.fillRoundedRect(x + 4, y + 4, TILE_SIZE - 8, TILE_SIZE - 8, 14);
-  g.fillStyle(COLORS.flameInner, alpha);
-  g.fillRoundedRect(x + 16, y + 16, TILE_SIZE - 32, TILE_SIZE - 32, 8);
+const FLAME_LAYERS = [
+  { color: 0xd9480f, inset: 3, wobble: 6 },
+  { color: 0xff8c1a, inset: 10, wobble: 5 },
+  { color: 0xffd43b, inset: 21, wobble: 4 },
+  { color: 0xfff9db, inset: 31, wobble: 3 },
+] as const;
+
+/** Ondulação suave, de -1 a 1, que muda com o lugar do mapa e com o tempo (o fogo "dança"). */
+function fireNoise(wx: number, wy: number, tick: number): number {
+  return 0.5 * Math.sin(wx * 0.17 + tick * 0.31 + Math.sin(wy * 0.09 + tick * 0.13) * 2) + 0.5 * Math.sin(wy * 0.15 - tick * 0.27 + wx * 0.06);
+}
+
+/** Contorno de uma camada do fogo de uma célula: pontos ao redor, ondulados, alongados para as vizinhas em fogo. */
+function flameOutline(cx: number, cy: number, inset: number, wobble: number, tick: number, links: { right: boolean; left: boolean; down: boolean; up: boolean }): Phaser.Types.Math.Vector2Like[] {
+  const h = TILE_SIZE / 2 - inset;
+  const steps = 6;
+  const raw: Array<[number, number]> = [];
+  for (let i = 0; i < steps; i++) raw.push([-h + (2 * h * i) / steps, -h]); // em cima, da esquerda para a direita
+  for (let i = 0; i < steps; i++) raw.push([h, -h + (2 * h * i) / steps]); // à direita, de cima para baixo
+  for (let i = 0; i < steps; i++) raw.push([h - (2 * h * i) / steps, h]); // embaixo, da direita para a esquerda
+  for (let i = 0; i < steps; i++) raw.push([-h, h - (2 * h * i) / steps]); // à esquerda, de baixo para cima
+  const eps = 1e-6;
+  return raw.map(([dx, dy]) => {
+    let x = dx;
+    let y = dy;
+    // Alonga o lado que tem vizinha em fogo: o ponto vai até a borda correspondente da vizinha.
+    if (links.right && dx >= h - eps) x += TILE_SIZE;
+    if (links.left && dx <= -h + eps) x -= TILE_SIZE;
+    if (links.down && dy >= h - eps) y += TILE_SIZE;
+    if (links.up && dy <= -h + eps) y -= TILE_SIZE;
+    // Ondula para fora (ou para dentro), na direção do ponto em relação ao centro da célula.
+    const length = Math.hypot(dx, dy) || 1;
+    const push = fireNoise(cx + x, cy + y, tick) * wobble;
+    return { x: cx + x + (dx / length) * push, y: cy + y + (dy / length) * push };
+  });
+}
+
+/** Desenha todas as chamas: primeiro todo o vermelho, depois o laranja, o amarelo e o miolo (para as camadas não se cruzarem). */
+function drawFlames(g: Graphics, flames: readonly FlameState[], tick: number): void {
+  if (flames.length === 0) return;
+  const byCell = new Map<string, FlameState>();
+  for (const flame of flames) byCell.set(`${flame.col},${flame.row}`, flame);
+  const has = (col: number, row: number): boolean => byCell.has(`${col},${row}`);
+  for (const layer of FLAME_LAYERS) {
+    for (const flame of flames) {
+      const cx = (flame.col + 0.5) * TILE_SIZE;
+      const cy = (flame.row + 0.5) * TILE_SIZE;
+      const links = { right: has(flame.col + 1, flame.row), left: has(flame.col - 1, flame.row), down: has(flame.col, flame.row + 1), up: has(flame.col, flame.row - 1) };
+      // Esmaece no fim, para dar para ver que a chama está acabando.
+      g.fillStyle(layer.color, Math.min(1, flame.ticksLeft / 10));
+      g.fillPoints(flameOutline(cx, cy, layer.inset, layer.wobble, tick, links), true);
+    }
+  }
 }
 
 /** Desenha as chamas e as bombas do estado atual. */
 export function drawEffects(g: Graphics, state: GameState): void {
   g.clear();
-  for (const flame of state.flames) drawFlame(g, flame);
+  drawFlames(g, state.flames, state.tick);
   for (const bomb of state.bombs) drawBomb(g, bomb, state.tick);
   // Em equipes, um anel fino na cor do time embaixo de cada jogador (azul = time 1, vermelho = time 2).
   const teamGame = state.players.some((a) => state.players.some((b) => b.id !== a.id && b.team === a.team));

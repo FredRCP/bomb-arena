@@ -4,7 +4,7 @@
 // quando existir, a imagem `public/characters/<id>.png` (PNG com fundo transparente, quadrada, de preferência
 // 256x256); sem a imagem, aparece o desenho provisório com a inicial do nome. Trocar a imagem não exige mexer em código.
 
-export type Hat = 'none' | 'bow' | 'cap' | 'crown' | 'antenna' | 'horns' | 'headband' | 'leaf' | 'flower';
+export type Hat = 'none' | 'bow' | 'cap' | 'crown' | 'antenna' | 'horns' | 'headband' | 'leaf' | 'flower' | 'star' | 'ears' | 'tuft';
 
 export interface CharacterDef {
   id: string;
@@ -26,6 +26,9 @@ export const CHARACTERS: readonly CharacterDef[] = [
   { id: 'bolt', name: 'Bolt', color: 0x2dc7ff, hat: 'horns', custom: false },
   { id: 'musgo', name: 'Musgo', color: 0x7ed957, hat: 'leaf', custom: false },
   { id: 'violeta', name: 'Violeta', color: 0xb388ff, hat: 'crown', custom: false },
+  { id: 'fagulha', name: 'Fagulha', color: 0xff6b35, hat: 'star', custom: false },
+  { id: 'nimbo', name: 'Nimbo', color: 0x5c7cfa, hat: 'ears', custom: false },
+  { id: 'cacau', name: 'Cacau', color: 0xa9744f, hat: 'tuft', custom: false },
   { id: 'fred', name: 'Fred', color: 0xffa94d, hat: 'cap', custom: true, sprites: true },
   { id: 'vanessa', name: 'Van', color: 0xf06595, hat: 'flower', custom: true },
   { id: 'ana-julia', name: 'Ana', color: 0xffd43b, hat: 'bow', custom: true },

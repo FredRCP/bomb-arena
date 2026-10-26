@@ -31,6 +31,31 @@ const VECTORS: Record<Direction, { dx: number; dy: number }> = {
   right: { dx: 1, dy: 0 },
 };
 
+/** Uma célula de bomba em que o jogador ainda está "em cima": ele pode sair dela, mas não atravessá-la. */
+export interface SoftCell {
+  col: number;
+  row: number;
+}
+
+/**
+ * Verdadeiro se andar de (x, y) para (nx, ny) aprofundaria o jogador numa das bombas em que ele está em cima
+ * (o centro dele chegaria mais perto do centro da bomba, em algum dos eixos), estando o centro dele fora da célula.
+ * Sair da bomba é sempre permitido; atravessá-la, não: antes, quem estava só com a pontinha do corpo sobre a bomba (por exemplo, encurralado por ela
+ * logo depois de colocada) podia andar por dentro da célula e sair do outro lado.
+ */
+export function goesDeeperIntoBomb(x: number, y: number, nx: number, ny: number, soft: readonly SoftCell[]): boolean {
+  for (const cell of soft) {
+    // Quem tem o CENTRO dentro da célula (quem acabou de colocar a bomba) anda livre: é assim que ele corre para a saída.
+    // A trava vale para quem está só com a pontinha do corpo sobre a bomba, com o centro ainda fora dela.
+    if (Math.floor(x) === cell.col && Math.floor(y) === cell.row) continue;
+    const cx = cell.col + 0.5;
+    const cy = cell.row + 0.5;
+    if (Math.abs(nx - cx) < Math.abs(x - cx) - EPS) return true;
+    if (Math.abs(ny - cy) < Math.abs(y - cy) - EPS) return true;
+  }
+  return false;
+}
+
 /** Verdadeiro se o corpo do jogador, com centro em (x, y), invade (mesmo que só um pouco) a célula (col, row). */
 export function bodyOverlapsCell(x: number, y: number, col: number, row: number): boolean {
   return (
@@ -74,6 +99,7 @@ function slideAroundCorner(
   blocked: ReadonlySet<number> | undefined,
   stepDistance: number,
   ghost: boolean,
+  soft: readonly SoftCell[],
 ): boolean {
   // Andando na horizontal, o que importa é a linha (y); andando na vertical, a coluna (x).
   const horizontal = dx !== 0;
@@ -94,6 +120,7 @@ function slideAroundCorner(
   const nextX = horizontal ? player.x : target;
   const nextY = horizontal ? target : player.y;
   if (collidesAt(arena, nextX, nextY, blocked, ghost)) return false;
+  if (goesDeeperIntoBomb(player.x, player.y, nextX, nextY, soft)) return false;
 
   player.x = nextX;
   player.y = nextY;
@@ -116,12 +143,14 @@ function snapToObstacle(player: PlayerState, dx: number, dy: number, stepDistanc
  * 2) bateu numa quina: a ajuda de canto o empurra para a faixa livre;
  * 3) bateu de frente: encosta no obstáculo e para.
  * `blocked`: células de bombas que bloqueiam ESTE jogador (veja blockedCellsFor em bombs.ts).
+ * `soft`: bombas em que ele ainda está em cima (walkThrough): ele pode se afastar delas, mas não ir mais fundo.
  */
 export function movePlayer(
   arena: Arena,
   player: PlayerState,
   direction: Direction,
   blocked?: ReadonlySet<number>,
+  soft: readonly SoftCell[] = [],
 ): void {
   const { dx, dy } = VECTORS[direction];
 
@@ -130,12 +159,13 @@ export function movePlayer(
   const nextX = player.x + dx * stepDistance;
   const nextY = player.y + dy * stepDistance;
   if (!collidesAt(arena, nextX, nextY, blocked, ghost)) {
+    if (goesDeeperIntoBomb(player.x, player.y, nextX, nextY, soft)) return;
     player.x = nextX;
     player.y = nextY;
     return;
   }
 
-  if (slideAroundCorner(arena, player, dx, dy, blocked, stepDistance, ghost)) return;
+  if (slideAroundCorner(arena, player, dx, dy, blocked, stepDistance, ghost, soft)) return;
 
   const snapped = snapToObstacle(player, dx, dy, stepDistance);
   if (!collidesAt(arena, snapped.x, snapped.y, blocked, ghost)) {

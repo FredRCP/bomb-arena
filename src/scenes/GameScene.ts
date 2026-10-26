@@ -26,12 +26,13 @@ import {
   syncPlayerView,
 } from '../render/ArenaRenderer';
 import { spriteDebug, triggerBombPose } from '../render/CharacterView';
+import { Effects } from '../render/Effects';
 import { createHud } from '../render/Hud';
 import { SIDE_WIDTH, TOP_HEIGHT, placeArena } from '../render/layout';
 import { addMenuBackground } from '../render/menuBackground';
 import type { Hud } from '../render/Hud';
 import { showOutcomeOverlay } from '../render/OutcomeOverlay';
-import { describeRoundEnd, rankingLines } from '../render/outcomeText';
+import { describeRoundEnd, rankingLines, setCpuNames } from '../render/outcomeText';
 import { addToRanking, rankingPosition } from '../menu/ranking';
 import { loadRanking, saveRanking } from '../menu/rankingStorage';
 import type { RankedPlayer } from '../core';
@@ -58,6 +59,8 @@ export class GameScene extends Phaser.Scene {
   private blocksView!: Phaser.GameObjects.Graphics;
   private itemsView!: Phaser.GameObjects.Graphics;
   private effectsView!: Phaser.GameObjects.Graphics;
+  /** Faíscas, fumaça, estilhaços e tremor (só visual; ?fx=0 desliga). */
+  private fx!: Effects;
   private closedView!: Phaser.GameObjects.Graphics;
   private hud!: Hud;
   private readonly playerViews = new Map<PlayerId, Phaser.GameObjects.Container>();
@@ -109,6 +112,10 @@ export class GameScene extends Phaser.Scene {
     // O core decide o que existe; a cena só pede o estado e manda desenhar.
     this.gameState = createGameState({ seed, players: config.players, enemies: config.enemies, items: config.items, sideline: config.sideline ?? true, teams: config.teams, ...(config.teamAssignment && { teamAssignment: config.teamAssignment }), enemySpeedScale: AI_SETTINGS[config.difficulty].speedScale, ...(config.time !== undefined && { roundTicks: config.time * TICKS_PER_SECOND }) });
     this.characters = this.session.characters ?? defaultChoices(this.gameState.players.length);
+    // O computador aparece com o nome do personagem que está jogando (e não "CPU 1", "CPU 2"...).
+    const cpuNames: Record<number, string> = {};
+    for (const player of this.gameState.players) if (player.cpu) cpuNames[player.id] = characterById(this.characters[player.id]).name;
+    setCpuNames(cpuNames);
     this.session.scores ??= createScoreboard(this.gameState.players);
     this.humans = this.gameState.players.filter((player) => !player.cpu).map((player) => player.id);
     this.ais = this.gameState.players
@@ -141,6 +148,7 @@ export class GameScene extends Phaser.Scene {
     this.blocksView = createBlocksView(this, this.gameState.arena);
     this.itemsView = createItemsView(this);
     this.effectsView = createEffectsView(this);
+    this.fx = new Effects(this);
     this.closedView = createClosedView(this);
     for (const player of this.gameState.players) {
       this.playerViews.set(player.id, createPlayerView(this, player, characterById(this.characters[player.id])));
@@ -212,6 +220,8 @@ export class GameScene extends Phaser.Scene {
       this.keyboardInput.getIntents(); // descarta apertos de bomba feitos durante a pausa
       return;
     }
+
+    this.fx.update(delta, this.gameState);
 
     if (this.debugText && !this.keyboardPausedOrOver(paused)) {
       this.debugMs += delta;
@@ -323,6 +333,7 @@ export class GameScene extends Phaser.Scene {
       if (event.type === 'roundEnded') this.showResult(event.outcome);
     }
 
+    this.fx.onEvents(events, this.gameState);
     if (blocksChanged) redrawBlocks(this.blocksView, this.gameState.arena);
     if (heard.has('tick')) sfx.play('tick');
     if (heard.has('place')) sfx.play('place');

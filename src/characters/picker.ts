@@ -5,7 +5,8 @@ import type { Rng } from '../core/random';
 // Lógica da tela de escolha de personagem (sem Phaser, com teste). Cada pessoa tem um cursor sobre a grade
 // de personagens e confirma o seu. Duas pessoas não podem ficar com o mesmo personagem.
 
-export const PICKER_COLUMNS = 6;
+// 7 colunas: com 14 personagens a grade fica em duas fileiras de 7 e cabe na tela (1600 x 900).
+export const PICKER_COLUMNS = 7;
 
 export interface PickerState {
   /** Posição do cursor de cada pessoa (índice em CHARACTERS). */

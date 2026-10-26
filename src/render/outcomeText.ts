@@ -30,8 +30,18 @@ export function humansOf(players: Roster): PlayerId[] {
   return players.filter((player) => !player.cpu).map((player) => player.id);
 }
 
-/** Nome de um jogador nos painéis e no placar: "Você" (uma pessoa só), "Jogador N" ou "CPU k". */
+/**
+ * Nomes dos personagens que o computador está jogando nesta partida (id do jogador -> nome do personagem).
+ * A tela da partida preenche isto ao começar; sem isso (ou nos testes), o computador aparece como "CPU k".
+ */
+let cpuNames: Readonly<Record<number, string>> = {};
+export function setCpuNames(names: Readonly<Record<number, string>>): void {
+  cpuNames = names;
+}
+
+/** Nome de um jogador nos painéis e no placar: "Você" (uma pessoa só), "Jogador N", o nome do personagem do computador ou "CPU k". */
 export function playerLabel(player: Pick<PlayerState, 'id' | 'cpu'>, players: Roster): string {
+  if (player.cpu && cpuNames[player.id]) return cpuNames[player.id]!;
   if (player.cpu) return `CPU ${players.filter((p) => p.cpu).findIndex((p) => p.id === player.id) + 1}`;
   return humansOf(players).length === 1 ? 'Você' : `Jogador ${player.id}`;
 }
