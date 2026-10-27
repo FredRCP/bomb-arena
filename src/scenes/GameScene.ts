@@ -9,6 +9,8 @@ import { applyItem, createAi, createScoreboard, rankPlayers, recordEvents, recor
 import type { AiController, GameState, MatchState, PlayerId, Scoreboard } from '../core';
 import type { HumanId } from '../input/controls';
 import { KeyboardInput } from '../input/keyboardInput';
+import { TouchControls } from '../input/touchControls';
+import { wantsTouchControls } from '../input/touchUi';
 import { parseGameConfig } from '../menu/gameConfig';
 import type { GameConfig } from '../menu/gameConfig';
 import {
@@ -61,6 +63,7 @@ export class GameScene extends Phaser.Scene {
   private session!: GameSession;
   private characters: CharacterChoices = {};
   private keyboardInput!: KeyboardInput;
+  private touchControls: TouchControls | null = null;
   private readonly stepper = createFixedStepper();
   private blocksView!: BlocksView;
   private itemsView!: Phaser.GameObjects.Graphics;
@@ -180,6 +183,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.keyboardInput = new KeyboardInput(this, this.humans as HumanId[]);
+    this.touchControls = this.humans.includes(1) && wantsTouchControls() ? new TouchControls(this, this.keyboardInput) : null;
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.keyboardInput.destroy());
 
     this.syncViews();
@@ -209,6 +213,7 @@ export class GameScene extends Phaser.Scene {
     this.keyboardInput.pollGamepads();
     const roundOver = this.gameState.round.phase === 'over';
     const paused = this.pauseObjects.length > 0;
+    this.touchControls?.setState(paused, roundOver);
 
     // Start do controle: pausa/continua; com a rodada acabada, vai para a próxima (como a tecla R).
     if (this.keyboardInput.consumeStart()) {

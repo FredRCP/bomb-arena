@@ -19,6 +19,8 @@ interface PlayerInput {
   padSpecial: boolean;
   /** Direção pedida pelo controle neste quadro. */
   padMove: Direction | null;
+  /** Direção pedida pela alavanca de toque. */
+  touchMove: Direction | null;
 }
 
 export class KeyboardInput {
@@ -42,6 +44,7 @@ export class KeyboardInput {
       input.bombPressed = false;
       input.specialPressed = false;
       input.padMove = null;
+      input.touchMove = null;
     }
   };
 
@@ -53,7 +56,7 @@ export class KeyboardInput {
     // addKey também impede que as setas e o espaço rolem a página do navegador.
     if (this.keyboard) {
       for (const id of playerIds) {
-        const input: PlayerInput = { stack: new DirectionStack(), bombPressed: false, specialPressed: false, padBomb: false, padSpecial: false, padMove: null };
+        const input: PlayerInput = { stack: new DirectionStack(), bombPressed: false, specialPressed: false, padBomb: false, padSpecial: false, padMove: null, touchMove: null };
         this.players.set(id, input);
         const controls = PLAYER_CONTROLS[id];
 
@@ -116,7 +119,7 @@ export class KeyboardInput {
     for (const [id, input] of this.players) {
       // O teclado tem prioridade; sem tecla apertada, vale o controle de videogame.
       const intent: PlayerIntent = {
-        move: input.stack.current() ?? input.padMove,
+        move: input.stack.current() ?? input.padMove ?? input.touchMove,
         placeBomb: input.bombPressed,
         special: input.specialPressed,
       };
@@ -161,6 +164,28 @@ export class KeyboardInput {
       this.padStartHeld[index] = start;
       this.padBackHeld[index] = back;
     }
+  }
+
+  // ---- Controle por toque (celular): a TouchControls chama estes métodos ----
+  setTouchMove(id: HumanId, direction: Direction | null): void {
+    const input = this.players.get(id);
+    if (input) input.touchMove = direction;
+  }
+  touchBomb(id: HumanId): void {
+    const input = this.players.get(id);
+    if (input) input.bombPressed = true;
+  }
+  touchSpecial(id: HumanId): void {
+    const input = this.players.get(id);
+    if (input) input.specialPressed = true;
+  }
+  /** Como o Start do controle: pausa/continua, ou próxima rodada. */
+  touchStart(): void {
+    this.startPressed = true;
+  }
+  /** Como a tecla Q: volta ao menu (vale com o jogo pausado ou a rodada acabada). */
+  touchQuit(): void {
+    this.quitPressed = true;
   }
 
   /** Verdadeiro uma vez a cada aperto de Start no controle (a cena decide: pausar/continuar ou próxima rodada). */
