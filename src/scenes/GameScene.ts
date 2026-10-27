@@ -349,7 +349,7 @@ export class GameScene extends Phaser.Scene {
       if (event.type === 'bombPlaced' || event.type === 'bombKicked' || event.type === 'bombThrown') heard.add('place');
       if (event.type === 'bombPlaced') triggerBombPose(this.playerViews.get(event.owner), this.gameState.tick);
       if (event.type === 'bombExploded') heard.add('explode');
-      if (event.type === 'playerHit') heard.add('hit');
+      if (event.type === 'playerHit' || event.type === 'thrownHit') heard.add('hit');
       if (event.type === 'itemPicked' || event.type === 'vestBroken') heard.add('pickup');
       if (event.type === 'playerRevived') heard.add('pickup');
       if (event.type === 'roundEnded') this.showResult(event.outcome);

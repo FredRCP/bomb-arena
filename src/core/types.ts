@@ -152,6 +152,8 @@ export type GameEvent =
   | { type: 'itemPicked'; playerId: PlayerId; kind: ItemKind; col: number; row: number; changed: boolean }
   | { type: 'bombKicked'; col: number; row: number }
   | { type: 'bombThrown'; fromCol: number; fromRow: number; col: number; row: number }
+  /** Uma bomba arremessada caiu em cima de um jogador; `lost` é o item que ele perdeu (null = não tinha nenhum). */
+  | { type: 'thrownHit'; playerId: PlayerId; lost: ItemKind | null }
   /** Morte súbita: a célula virou parede. */
   | { type: 'cellClosed'; col: number; row: number }
   | { type: 'roundEnded'; outcome: RoundOutcome };

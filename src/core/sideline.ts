@@ -1,6 +1,6 @@
 import { BOMB_FUSE_TICKS, REVIVE_SHIELD_TICKS, SIDELINE_MOVE_TICKS, SIDELINE_THROW_DISTANCE } from '../config/bombs';
 import { cellIndex, getCell, inBounds } from './arena';
-import { findLanding } from './bombs';
+import { findLanding, hitByThrownBomb } from './bombs';
 import { bodyOverlapsCell } from './movement';
 import type { Arena, Cell, Direction, GameState, PlayerIntent, PlayerState } from './types';
 
@@ -98,6 +98,7 @@ export function sidelineAct(state: GameState, player: PlayerState, intent: Playe
     });
     state.events.push({ type: 'bombPlaced', col: landing.col, row: landing.row, owner: player.id });
     state.events.push({ type: 'bombThrown', fromCol: from.col, fromRow: from.row, col: landing.col, row: landing.row });
+    hitByThrownBomb(state, landing.col, landing.row);
   }
 }
 

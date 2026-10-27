@@ -1,6 +1,7 @@
 import { BOMB_FUSE_TICKS, KICK_SLIDE_TICKS, REMOTE_FUSE_TICKS, THROW_DISTANCE } from '../config/bombs';
 import { cellIndex, getCell, inBounds } from './arena';
 import { PLAYER_HALF_SIZE } from '../config/simulation';
+import { loseRandomPowerup } from './items';
 import { bodyOverlapsCell } from './movement';
 import type { SoftCell } from './movement';
 import type { BombState, Direction, GameState, PlayerId, PlayerState } from './types';
@@ -178,6 +179,7 @@ export function throwBomb(state: GameState, player: PlayerState): boolean {
   // Quem estiver embaixo de onde a bomba caiu pode sair de lá.
   bomb.walkThrough = state.players.filter((p) => p.alive && bodyOverlapsCell(p.x, p.y, landing.col, landing.row)).map((p) => p.id);
   state.events.push({ type: 'bombThrown', fromCol: col, fromRow: row, col: landing.col, row: landing.row });
+  hitByThrownBomb(state, landing.col, landing.row);
   return true;
 }
 
@@ -204,6 +206,14 @@ export function findLanding(
     if (inBounds(state.arena, toCol, toRow) && isFreeForBomb(state, toCol, toRow)) return { col: toCol, row: toRow };
   }
   return null;
+}
+
+/** Quem está embaixo de onde uma bomba arremessada caiu é acertado: perde um item aleatório (veja `loseRandomPowerup`). */
+export function hitByThrownBomb(state: GameState, col: number, row: number): void {
+  for (const victim of state.players) {
+    if (!victim.alive || !bodyOverlapsCell(victim.x, victim.y, col, row)) continue;
+    state.events.push({ type: 'thrownHit', playerId: victim.id, lost: loseRandomPowerup(state, victim) });
+  }
 }
 
 /** Bomba-relógio: detona a bomba-relógio mais antiga do jogador (explode neste mesmo passo). */

@@ -144,6 +144,23 @@ export function dropPowerups(state: GameState, player: PlayerState): void {
   player.heroTicks = 0;
   if (drops.length === 0) return;
 
+  const free = freeItemCells(state);
+
+  const { arena } = state;
+  const rng = createRng(state.tick * 7919 + player.id * 104729 + 12345);
+  for (const kind of drops) {
+    if (free.length === 0) return;
+    const pick = Math.floor(rng() * free.length);
+    const [index] = free.splice(pick, 1);
+    const col = index! % arena.cols;
+    const row = Math.floor(index! / arena.cols);
+    state.items.push({ col, row, kind });
+    state.events.push({ type: 'itemSpawned', col, row, kind });
+  }
+}
+
+/** Casas onde um item pode cair: livres, sem bomba, sem chama e sem outro item (índices de célula). */
+function freeItemCells(state: GameState): number[] {
   const { arena } = state;
   const taken = new Set<number>();
   for (const bomb of state.bombs) taken.add(cellIndex(arena, bomb.col, bomb.row));
@@ -155,17 +172,42 @@ export function dropPowerups(state: GameState, player: PlayerState): void {
     const row = Math.floor(index / arena.cols);
     if (getCell(arena, col, row) === 'empty' && !taken.has(index)) free.push(index);
   }
+  return free;
+}
 
-  const rng = createRng(state.tick * 7919 + player.id * 104729 + 12345);
-  for (const kind of drops) {
-    if (free.length === 0) return;
-    const pick = Math.floor(rng() * free.length);
-    const [index] = free.splice(pick, 1);
-    const col = index! % arena.cols;
-    const row = Math.floor(index! / arena.cols);
-    state.items.push({ col, row, kind });
-    state.events.push({ type: 'itemSpawned', col, row, kind });
+/**
+ * Jogador acertado por uma bomba arremessada: perde UM item permanente (colete, bomba, alcance, velocidade ou uma
+ * habilidade; cada tipo que ele tem tem a mesma chance) e o item cai numa casa livre sorteada da arena, para qualquer
+ * um pegar. Devolve o tipo perdido (ou null se ele não tinha nada, ou se não há casa livre: então nada se perde).
+ * Itens temporários (fantasma, herói, controles invertidos) não contam. O sorteio usa só o passo e o id do jogador.
+ */
+export function loseRandomPowerup(state: GameState, player: PlayerState): ItemKind | null {
+  const owned: ItemKind[] = [];
+  if (player.vest) owned.push('vest');
+  if (player.maxBombs > DEFAULT_MAX_BOMBS) owned.push('bomb');
+  if (player.bombRange > DEFAULT_BOMB_RANGE) owned.push('range');
+  if (player.speedBonus > 0) owned.push('speed');
+  for (const [kind, flag] of Object.entries(ABILITY_FLAG) as Array<[keyof typeof ABILITY_FLAG, (typeof ABILITY_FLAG)[keyof typeof ABILITY_FLAG]]>) {
+    if (player[flag]) owned.push(kind);
   }
+  if (owned.length === 0) return null;
+  const free = freeItemCells(state);
+  if (free.length === 0) return null;
+
+  const rng = createRng(state.tick * 6151 + player.id * 7919 + 4242);
+  const kind = owned[Math.floor(rng() * owned.length)]!;
+  if (kind === 'vest') player.vest = false;
+  else if (kind === 'bomb') player.maxBombs -= 1;
+  else if (kind === 'range') player.bombRange -= 1;
+  else if (kind === 'speed') player.speedBonus -= 1;
+  else player[ABILITY_FLAG[kind as keyof typeof ABILITY_FLAG]] = false;
+
+  const index = free[Math.floor(rng() * free.length)]!;
+  const col = index % state.arena.cols;
+  const row = Math.floor(index / state.arena.cols);
+  state.items.push({ col, row, kind });
+  state.events.push({ type: 'itemSpawned', col, row, kind });
+  return kind;
 }
 
 /** Quem está em cima de um item o pega. Roda uma vez por passo, depois do movimento. */
