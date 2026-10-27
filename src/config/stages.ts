@@ -6,13 +6,15 @@ export interface StageDef {
   id: string;
   name: string;
   available: boolean;
+  /** Frase curta que acompanha a fase na tela de escolha. */
+  tagline: string;
 }
 
 export const STAGES: readonly StageDef[] = [
-  { id: 'classic', name: 'Arena Clássica', available: true },
-  { id: 'ice', name: 'Fase do Gelo', available: true },
-  { id: 'egypt', name: 'Fase do Egito', available: false },
-  { id: 'train', name: 'Fase do Trenzinho', available: false },
+  { id: 'classic', name: 'Arena Clássica', available: true, tagline: 'Caixotes de madeira e blocos de pedra: o jeito clássico de jogar.' },
+  { id: 'ice', name: 'Fase do Gelo', available: true, tagline: 'Piso gelado, blocos de neve e uma aurora no céu.' },
+  { id: 'egypt', name: 'Fase do Egito', available: false, tagline: 'Areia, pedras antigas e tesouros escondidos.' },
+  { id: 'train', name: 'Fase do Trenzinho', available: false, tagline: 'Trilhos, vagões e muita fumaça.' },
 ];
 
 export const DEFAULT_STAGE = 'classic';

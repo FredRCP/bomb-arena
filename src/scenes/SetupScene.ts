@@ -1,9 +1,10 @@
 import Phaser from 'phaser';
 import { sfx } from '../audio/sfx';
 import { ARENA_COLS, ARENA_ROWS } from '../config/arena';
+import { STAGES, stageById } from '../config/stages';
 import { createMatch } from '../core';
 import { PadNav } from '../input/padNav';
-import { DIFFICULTY_TAGLINES, NEXT_LABELS, SCREEN_TITLES, canStart, changeValue, createMenu, describeRow, moveSelection, selectedRow, stepNumber, summaryLines, toGameConfig, totalSteps, visibleRows } from '../menu/menuModel';
+import { DIFFICULTY_TAGLINES, NEXT_LABELS, SCREEN_TITLES, canStart, changeValue, createMenu, describeRow, moveSelection, selectedRow, stepNumber, toGameConfig, totalSteps, visibleRows } from '../menu/menuModel';
 import type { MenuScreen, MenuState } from '../menu/menuModel';
 import { needsTeamsScreen } from '../menu/teamsModel';
 import { loadSettings, saveSettings } from '../menu/settingsStorage';
@@ -32,7 +33,7 @@ interface SetupData {
 export class SetupScene extends Phaser.Scene {
   private menu!: MenuState;
   private session: GameSession | undefined;
-  private texts: Phaser.GameObjects.Text[] = [];
+  private texts: Phaser.GameObjects.GameObject[] = [];
   private arrow!: Phaser.GameObjects.Text;
   private padNav!: PadNav;
 
@@ -45,12 +46,20 @@ export class SetupScene extends Phaser.Scene {
     this.session = data?.session;
   }
 
+  /** Imagens de prévia das fases (public/stages/<id>.jpg). Fase sem imagem aparece como cartão "?". */
+  preload(): void {
+    if (this.menu.screen !== 'stage') return;
+    this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, () => undefined);
+    for (const stage of STAGES) if (!this.textures.exists(`stage-${stage.id}`)) this.load.image(`stage-${stage.id}`, `stages/${stage.id}.jpg`);
+  }
+
   create(): void {
     placeArena(this);
     sfx.setLevel(this.menu.settings.volume);
     this.texts = [];
     addMenuBackground(this);
-    addPanel(this, WIDTH / 2, 470, WIDTH - 200, 440);
+    if (this.menu.screen === 'stage') addPanel(this, WIDTH / 2, 470, WIDTH - 120, 560);
+    else addPanel(this, WIDTH / 2, 470, WIDTH - 200, 440);
     this.add
       .text(WIDTH / 2, 100, SCREEN_TITLES[this.menu.screen], { fontFamily: FONT, fontSize: '64px', fontStyle: 'bold', color: '#ffe66d', stroke: '#1b1f3b', strokeThickness: 8 })
       .setOrigin(0.5);
@@ -59,7 +68,7 @@ export class SetupScene extends Phaser.Scene {
     if (step) this.add.text(WIDTH / 2, 160, `Passo ${step} de ${total}`, { fontFamily: FONT, fontSize: '24px', color: '#e3e7ff' }).setOrigin(0.5);
     this.arrow = this.add.text(0, 0, '▶', { fontFamily: FONT, fontSize: '34px', color: '#ffe66d' }).setOrigin(0.5);
     this.add
-      .text(WIDTH / 2, HEIGHT - 70, '↑ ↓ escolher     ← → mudar     Enter continuar     Esc voltar     (ou use o controle)', { fontFamily: FONT, fontSize: '24px', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 4 })
+      .text(WIDTH / 2, HEIGHT - 50, this.menu.screen === 'stage' ? '← → trocar de fase     Enter jogar     Esc voltar     (ou use o controle)' : '↑ ↓ escolher     ← → mudar     Enter continuar     Esc voltar     (ou use o controle)', { fontFamily: FONT, fontSize: '24px', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 4 })
       .setOrigin(0.5);
 
     this.bindKeys();
@@ -99,12 +108,14 @@ export class SetupScene extends Phaser.Scene {
   }
 
   private navigate(delta: -1 | 1): void {
+    if (this.menu.screen === 'stage') return; // na escolha da fase só existe o carrossel
     moveSelection(this.menu, delta);
     sfx.play('tick');
     this.render();
   }
 
   private change(delta: -1 | 1): void {
+    if (this.menu.screen === 'stage') this.menu.selected = 0; // setas sempre giram o carrossel (a linha 0 é a fase)
     if (!changeValue(this.menu, delta)) return;
     sfx.setLevel(this.menu.settings.volume);
     sfx.play('tick');
@@ -144,9 +155,85 @@ export class SetupScene extends Phaser.Scene {
     } else this.scene.start('Menu');
   }
 
+  /** Carrossel de fases: a escolhida grande no meio, as vizinhas menores e apagadas dos lados. */
+  private renderStage(): void {
+    this.arrow.setVisible(false);
+    const ids = STAGES.map((stage) => stage.id);
+    const at = ids.indexOf(stageById(this.menu.settings.stage).id);
+    const stage = STAGES[at]!;
+    const prev = STAGES[(at - 1 + STAGES.length) % STAGES.length]!;
+    const next = STAGES[(at + 1) % STAGES.length]!;
+    const cardY = 362;
+
+    const card = (def: (typeof STAGES)[number], x: number, height: number, alpha: number, onTap: () => void): void => {
+      const key = `stage-${def.id}`;
+      const has = this.textures.exists(key);
+      let width = height * (640 / 555);
+      if (has) {
+        const image = this.add.image(x, cardY, key).setAlpha(alpha);
+        image.setScale(height / image.height);
+        width = image.displayWidth;
+        if (!def.available) image.setTint(0x666b88);
+        image.setInteractive({ useHandCursor: true }).on('pointerdown', onTap);
+        this.texts.push(image);
+      } else {
+        const g = this.add.graphics().setAlpha(alpha);
+        g.fillStyle(0x2b3350, 1).fillRoundedRect(x - width / 2, cardY - height / 2, width, height, 14);
+        const q = this.add.text(x, cardY, '?', { fontFamily: FONT, fontSize: `${Math.round(height * 0.45)}px`, fontStyle: 'bold', color: '#8a93c4' }).setOrigin(0.5).setAlpha(alpha);
+        const hit = this.add.rectangle(x, cardY, width, height, 0xffffff, 0).setInteractive({ useHandCursor: true }).on('pointerdown', onTap);
+        this.texts.push(g, q, hit);
+      }
+      const frame = this.add.graphics();
+      frame.lineStyle(height > 250 ? 6 : 3, height > 250 ? 0xffe66d : 0xffffff, height > 250 ? 1 : 0.35);
+      frame.strokeRoundedRect(x - width / 2, cardY - height / 2, width, height, 10);
+      this.texts.push(frame);
+      if (!def.available) {
+        const badge = this.add
+          .text(x, cardY, 'EM BREVE', { fontFamily: FONT, fontSize: height > 250 ? '48px' : '22px', fontStyle: 'bold', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 7 })
+          .setOrigin(0.5)
+          .setAngle(-12);
+        this.texts.push(badge);
+      }
+    };
+
+    card(prev, 200, 170, 0.45, () => this.change(-1));
+    card(next, WIDTH - 200, 170, 0.45, () => this.change(1));
+    card(stage, WIDTH / 2, 300, 1, () => this.confirm());
+
+    const arrowStyle = { fontFamily: FONT, fontSize: '56px', fontStyle: 'bold', color: '#ffe66d', stroke: '#1b1f3b', strokeThickness: 6 };
+    this.texts.push(
+      this.add.text(68, cardY, '◀', arrowStyle).setOrigin(0.5).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.change(-1)),
+      this.add.text(WIDTH - 68, cardY, '▶', arrowStyle).setOrigin(0.5).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.change(1)),
+    );
+
+    // Bolinhas: qual das fases está na tela.
+    STAGES.forEach((def, index) => {
+      const x = WIDTH / 2 + (index - (STAGES.length - 1) / 2) * 28;
+      this.texts.push(this.add.circle(x, 532, index === at ? 8 : 5, index === at ? 0xffe66d : 0xffffff, index === at ? 1 : 0.5));
+      void def;
+    });
+
+    this.texts.push(
+      this.add.text(WIDTH / 2, 572, stage.name, { fontFamily: FONT, fontSize: '42px', fontStyle: 'bold', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 6 }).setOrigin(0.5),
+      this.add.text(WIDTH / 2, 616, stage.available ? stage.tagline : `${stage.tagline} (em breve)`, { fontFamily: FONT, fontSize: '23px', color: '#e3e7ff' }).setOrigin(0.5),
+    );
+    const blocked = !stage.available;
+    this.texts.push(
+      this.add
+        .text(WIDTH / 2, 686, NEXT_LABELS.stage, { fontFamily: FONT, fontSize: '50px', fontStyle: 'bold', color: blocked ? '#6c7293' : '#ffe66d', stroke: '#1b1f3b', strokeThickness: 6 })
+        .setOrigin(0.5)
+        .setInteractive({ useHandCursor: true })
+        .on('pointerdown', () => this.confirm()),
+    );
+  }
+
   private render(): void {
     for (const text of this.texts) text.destroy();
     this.texts = [];
+    if (this.menu.screen === 'stage') {
+      this.renderStage();
+      return;
+    }
     const rows = visibleRows(this.menu.settings, this.menu.screen);
     const current = selectedRow(this.menu);
     rows.forEach((row, index) => {
@@ -174,14 +261,6 @@ export class SetupScene extends Phaser.Scene {
     if (this.menu.screen === 'participants' && rows.includes('difficulty')) {
       const top = ROW_TOP + rows.length * ROW_STEP + 30;
       this.texts.push(this.add.text(WIDTH / 2, top, `“${DIFFICULTY_TAGLINES[this.menu.settings.difficulty]}”`, { fontFamily: FONT, fontSize: '28px', fontStyle: 'italic', color: '#ffe66d', stroke: '#1b1f3b', strokeThickness: 4 }).setOrigin(0.5));
-    }
-
-    // Na tela da fase, o resumo da partida logo abaixo das linhas.
-    if (this.menu.screen === 'stage') {
-      const top = ROW_TOP + rows.length * ROW_STEP + 40;
-      summaryLines(this.menu.settings).forEach((line, index) => {
-        this.texts.push(this.add.text(WIDTH / 2, top + index * 36, line, { fontFamily: FONT, fontSize: '26px', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 4 }).setOrigin(0.5));
-      });
     }
   }
 }
