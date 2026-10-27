@@ -330,11 +330,21 @@ function drawBomb(g: Graphics, bomb: BombState, tick: number): void {
   g.fillStyle(COLORS.shadow, 0.25);
   g.fillEllipse(cx, cy + 20, 40, 12);
   if (bomb.pierce) {
-    // perfurante: aro laranja em volta
-    g.lineStyle(4, 0xe03131, 1);
-    g.strokeCircle(cx, cy + 3, r + 4);
+    // perfurante: mina marítima (como o ícone do item): corpo azul-marinho com oito pontas
+    const spike = 8;
+    for (let k = 0; k < 8; k++) {
+      const angle = (k * Math.PI) / 4 + Math.PI / 8;
+      const ux = Math.cos(angle);
+      const uy = Math.sin(angle);
+      const base = r - 3;
+      const tip = r + 8;
+      g.fillStyle(0x3b4468);
+      g.fillTriangle(cx - uy * spike * 0.5 + ux * base, cy + 3 + ux * spike * 0.5 + uy * base, cx + uy * spike * 0.5 + ux * base, cy + 3 - ux * spike * 0.5 + uy * base, cx + ux * tip, cy + 3 + uy * tip);
+      g.fillStyle(0x9aa6cf);
+      g.fillCircle(cx + ux * (tip - 1), cy + 3 + uy * (tip - 1), 2.4);
+    }
   }
-  g.fillStyle(COLORS.bombBody);
+  g.fillStyle(bomb.pierce ? 0x232a45 : COLORS.bombBody);
   g.fillCircle(cx, cy + 3, r);
   if (bomb.remote) {
     // bomba-relógio: luz roxa piscando no meio

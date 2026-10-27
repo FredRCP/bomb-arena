@@ -8,7 +8,7 @@ import { SetupScene } from './scenes/SetupScene';
 import { TeamsScene } from './scenes/TeamsScene';
 import { TitleScene } from './scenes/TitleScene';
 
-new Phaser.Game({
+const game = new Phaser.Game({
   type: Phaser.AUTO,
   parent: 'game',
   // Tamanho lógico = arena + barra superior + painéis laterais (veja render/layout.ts). Tudo cabe numa tela só.
@@ -32,4 +32,30 @@ if (import.meta.env.PROD && 'serviceWorker' in navigator) {
   window.addEventListener('load', () => {
     navigator.serviceWorker.register('./sw.js').catch(() => undefined);
   });
+}
+
+// Celular: depois de girar o aparelho (ou de a barra do navegador aparecer/sumir) o tamanho disponível muda depois do
+// evento; recalcula o ajuste da tela algumas vezes para ela sempre ocupar toda a área visível.
+const refreshScale = (): void => {
+  for (const delay of [50, 250, 700]) window.setTimeout(() => game.scale.refresh(), delay);
+};
+window.addEventListener('orientationchange', refreshScale);
+window.addEventListener('resize', refreshScale);
+window.visualViewport?.addEventListener('resize', refreshScale);
+
+// Na primeira toque (só em telas de toque), tenta tela cheia e trava deitado onde o navegador permite
+// (Android/Chrome e iPad). O iPhone no Safari não permite: lá vale "Adicionar à Tela de Início".
+if (window.matchMedia('(pointer: coarse)').matches) {
+  window.addEventListener(
+    'pointerdown',
+    () => {
+      const root = document.documentElement;
+      if (document.fullscreenElement || !root.requestFullscreen) return;
+      root
+        .requestFullscreen()
+        .then(() => (screen.orientation as unknown as { lock?: (o: string) => Promise<void> }).lock?.('landscape'))
+        .catch(() => undefined);
+    },
+    { once: true },
+  );
 }
