@@ -27,11 +27,11 @@ import { stateFromText } from '../helpers/stateFromText';
 const HALL = ['#########', '#.......#', '#.#.#.#.#', '#.......#', '#.#.#.#.#', '#.......#', '#########'];
 
 describe('níveis de dificuldade e velocidade', () => {
-  it('cinco níveis com 50, 60, 80, 100 e 120% da velocidade base', () => {
+  it('cinco níveis com 50, 55, 72, 100 e 110% da velocidade base', () => {
     const levels = ['easy', 'normal', 'hard', 'expert', 'ultra'] as const;
-    expect(levels.map((level) => AI_SETTINGS[level].speedScale)).toEqual([0.5, 0.6, 0.8, 1, 1.2]);
+    expect(levels.map((level) => AI_SETTINGS[level].speedScale)).toEqual([0.5, 0.55, 0.72, 1, 1.1]);
     const cellsPerSecond = levels.map((level) => stepDistanceOf({ speedBonus: 0, speedScale: AI_SETTINGS[level].speedScale }) * TICKS_PER_SECOND);
-    cellsPerSecond.forEach((speed, i) => expect(speed).toBeCloseTo(PLAYER_SPEED * [0.5, 0.6, 0.8, 1, 1.2][i]!, 9));
+    cellsPerSecond.forEach((speed, i) => expect(speed).toBeCloseTo(PLAYER_SPEED * [0.5, 0.55, 0.72, 1, 1.1][i]!, 9));
   });
 
   it('o teto de velocidade vale para todos: nem o nível mais alto com 5 itens passa do passo de uma pessoa com 5 itens', () => {

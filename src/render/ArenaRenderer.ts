@@ -1,7 +1,7 @@
 import { addCharacter, animateSprite, createSpriteView, hasSprites, isSpriteView } from './CharacterView';
 import type { CharacterDef } from '../characters/characters';
 import Phaser from 'phaser';
-import { getCell, ringCells } from '../core';
+import { getCell, inwardDirection, ringCells } from '../core';
 import type { Arena, BombState, FlameState, GameState, ItemState, PlayerState } from '../core';
 import { COLORS } from './palette';
 import { has, loadedBlockVariants, themeById, themeKey } from './theme';
@@ -465,7 +465,7 @@ export function syncPlayerView(view: Movable, player: PlayerState, arena?: Arena
     view.setVisible(true);
     view.setAlpha(0.6);
     // Personagem de corpo inteiro: quem está nas laterais fica sempre em pé, olhando para a arena.
-    if (isSpriteView(view)) animateSprite(view.scene, view, { x: ring.col, y: ring.row, facing: player.facing, alive: true }, tick, 'idle');
+    if (isSpriteView(view)) animateSprite(view.scene, view, { x: ring.col, y: ring.row, facing: inwardDirection(arena!, player.sideline!), alive: true }, tick, 'idle');
     return;
   }
   view.setPosition(player.x * TILE_SIZE, player.y * TILE_SIZE);

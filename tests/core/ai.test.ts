@@ -299,7 +299,7 @@ describe('IA: velocidade por dificuldade e morte súbita', () => {
 
   it('as dificuldades mais fáceis andam mais devagar, e a difícil anda como uma pessoa', () => {
     const scales = (['easy', 'normal', 'hard', 'expert', 'ultra'] as const).map((d) => AI_SETTINGS[d].speedScale);
-    expect(scales).toEqual([0.5, 0.6, 0.8, 1, 1.2]);
+    expect(scales).toEqual([0.5, 0.55, 0.72, 1, 1.1]);
   });
 
   it('mesmo devagar a IA joga bem: elimina um alvo parado na maioria das sementes e não treme', () => {

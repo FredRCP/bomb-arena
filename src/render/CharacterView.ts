@@ -220,7 +220,7 @@ export function createSpriteView(scene: Phaser.Scene, character: CharacterDef, x
   shadow.fillStyle(COLORS.shadow, 0.25);
   shadow.fillEllipse(0, SPRITE_FEET_OFFSET - 2, 40, 13);
   const image = scene.add.image(0, SPRITE_FEET_OFFSET, `${textureKey(character)}-idle-down`).setOrigin(0.5, 1);
-  const scale = SPRITE_BODY_HEIGHT / image.height;
+  const scale = (SPRITE_BODY_HEIGHT * (character.spriteScale ?? 1)) / image.height;
   image.setScale(scale);
   const container = scene.add.container(x, y, [shadow, image]);
   const data: SpriteData = { id: character.id, image, pose: 'idle-down', scale, lastX: Number.NaN, lastY: Number.NaN, lastMoveTick: -100, walkPhase: 0, bombUntil: -1, deadTicks: 0 };
