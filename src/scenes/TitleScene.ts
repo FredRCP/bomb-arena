@@ -1,13 +1,13 @@
 import Phaser from 'phaser';
 import { sfx } from '../audio/sfx';
 import { ARENA_COLS, ARENA_ROWS } from '../config/arena';
-import { characterById } from '../characters/characters';
+import { CHARACTERS, characterById } from '../characters/characters';
 import { PadNav } from '../input/padNav';
 import { hasGameParams } from '../menu/gameConfig';
 import { loadSettings } from '../menu/settingsStorage';
 import { TILE_SIZE } from '../render/ArenaRenderer';
-import { addCharacter, preloadCharacters } from '../render/CharacterView';
-import { placeArena } from '../render/layout';
+import { addCardArt, preloadCharacters } from '../render/CharacterView';
+import { placeArena, SCREEN_HEIGHT, SCREEN_WIDTH } from '../render/layout';
 import { preloadFlames } from '../render/FlameSprites';
 import { preloadItems } from '../render/ItemSprites';
 import { preloadThemes } from '../render/theme';
@@ -45,20 +45,24 @@ export class TitleScene extends Phaser.Scene {
     sfx.setLevel(loadSettings().volume);
     addMenuBackground(this);
 
-    const ids = ['pipoca', 'bolt', 'musgo', 'violeta'];
+    // Os personagens de corpo inteiro (a arte da tela de escolha), em fila embaixo do nome do jogo.
+    const ids = CHARACTERS.filter((c) => c.custom && c.sprites).map((c) => c.id);
+    const step = SCREEN_WIDTH / (ids.length + 0.4);
     ids.forEach((id, index) => {
-      const x = WIDTH * (0.17 + index * 0.22);
-      const view = addCharacter(this, characterById(id), x, HEIGHT * 0.72, 52);
-      this.tweens.add({ targets: view, y: view.y - 26, duration: 520 + index * 90, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: index * 130 });
+      const art = addCardArt(this, characterById(id), 0, 0, 52, 400);
+      art.setScrollFactor(0).setPosition(step * (index + 0.7), SCREEN_HEIGHT - 215);
+      art.setAlpha(0);
+      this.tweens.add({ targets: art, alpha: 1, duration: 450, delay: 200 + index * 160 });
+      this.tweens.add({ targets: art, y: art.y - 14, duration: 650 + index * 60, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: 900 + index * 110 });
     });
 
     this.add
-      .text(WIDTH / 2, HEIGHT * 0.3, 'BOMB ARENA', { fontFamily: FONT, fontSize: '110px', fontStyle: 'bold', color: '#ffe66d', stroke: '#1b1f3b', strokeThickness: 12 })
+      .text(WIDTH / 2, HEIGHT * 0.22, 'BOMB ARENA', { fontFamily: FONT, fontSize: '110px', fontStyle: 'bold', color: '#ffe66d', stroke: '#1b1f3b', strokeThickness: 12 })
       .setOrigin(0.5);
-    this.add.text(WIDTH / 2, HEIGHT * 0.3 + 78, 'nome provisório', { fontFamily: FONT, fontSize: '24px', color: '#e3e7ff' }).setOrigin(0.5);
+    this.add.text(WIDTH / 2, HEIGHT * 0.22 + 78, 'nome provisório', { fontFamily: FONT, fontSize: '24px', color: '#e3e7ff' }).setOrigin(0.5);
 
     const prompt = this.add
-      .text(WIDTH / 2, HEIGHT * 0.52, 'Pressione qualquer tecla', { fontFamily: FONT, fontSize: '36px', fontStyle: 'bold', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 5 })
+      .text(WIDTH / 2, HEIGHT * 0.41, 'Pressione qualquer tecla', { fontFamily: FONT, fontSize: '36px', fontStyle: 'bold', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 5 })
       .setOrigin(0.5);
     this.tweens.add({ targets: prompt, alpha: 0.25, duration: 700, yoyo: true, repeat: -1 });
 

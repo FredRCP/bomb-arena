@@ -297,9 +297,9 @@ describe('IA: velocidade por dificuldade e morte súbita', () => {
     expect(state.players.map((p) => p.speedScale)).toEqual([1, 0.6, 0.6]);
   });
 
-  it('as dificuldades mais fáceis andam mais devagar, e a difícil anda como uma pessoa', () => {
+  it('as dificuldades mais fáceis andam mais devagar, e só a mais difícil anda como uma pessoa', () => {
     const scales = (['easy', 'normal', 'hard', 'expert', 'ultra'] as const).map((d) => AI_SETTINGS[d].speedScale);
-    expect(scales).toEqual([0.5, 0.55, 0.72, 1, 1.1]);
+    expect(scales).toEqual([0.5, 0.53, 0.62, 0.85, 1]);
   });
 
   it('mesmo devagar a IA joga bem: elimina um alvo parado na maioria das sementes e não treme', () => {

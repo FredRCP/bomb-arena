@@ -61,8 +61,8 @@ describe('todos começam iguais', () => {
         });
       }
     }
-    // Na dificuldade difícil nem a velocidade difere.
-    const hard = createGameState({ seed: 5, players: 1, enemies: 2, enemySpeedScale: AI_SETTINGS.expert.speedScale });
+    // Na dificuldade mais difícil nem a velocidade difere.
+    const hard = createGameState({ seed: 5, players: 1, enemies: 2, enemySpeedScale: AI_SETTINGS.ultra.speedScale });
     expect(new Set(hard.players.map((p) => stepDistanceOf(p))).size).toBe(1);
   });
 });
