@@ -46,6 +46,11 @@ export class Sfx {
     if (this.master) this.master.gain.value = this.volume;
   }
 
+  /** Volume atual, de 0 a 1 (já com a curva do menu). */
+  get volumeNow(): number {
+    return this.volume;
+  }
+
   /** Alterna entre som ligado e desligado. Devolve o novo estado de `muted`. */
   toggleMute(): boolean {
     this.muted = !this.muted;

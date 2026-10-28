@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { music } from '../audio/music';
 import { sfx } from '../audio/sfx';
 import { AI_SETTINGS } from '../config/ai';
 import { COUNTDOWN_SECONDS } from '../config/round';
@@ -184,7 +185,11 @@ export class GameScene extends Phaser.Scene {
 
     this.keyboardInput = new KeyboardInput(this, this.humans as HumanId[]);
     this.touchControls = this.humans.includes(1) && wantsTouchControls() ? new TouchControls(this, this.keyboardInput) : null;
-    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => this.keyboardInput.destroy());
+    music.play(theme.id);
+    this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.keyboardInput.destroy();
+      music.release();
+    });
 
     this.syncViews();
 
@@ -208,6 +213,7 @@ export class GameScene extends Phaser.Scene {
 
     if (this.keyboardInput.consumeMuteToggle()) {
       console.info(`[Bomb Arena] Som ${sfx.toggleMute() ? 'desligado' : 'ligado'}.`);
+      music.sync();
     }
 
     this.keyboardInput.pollGamepads();
