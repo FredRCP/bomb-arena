@@ -48,6 +48,11 @@ export function cellIndex(arena: Arena, col: number, row: number): number {
   return row * arena.cols + col;
 }
 
+/** A célula é do túnel da pirâmide? (Ali ninguém coloca bomba: ficaria escondida.) */
+export function isTunnel(tunnel: readonly number[] | undefined, arena: Arena, col: number, row: number): boolean {
+  return !!tunnel && tunnel.includes(cellIndex(arena, col, row));
+}
+
 /** Conteúdo da célula. Fora da arena conta como parede, então ninguém "vaza" pelas bordas. */
 export function getCell(arena: Arena, col: number, row: number): CellType {
   if (!inBounds(arena, col, row)) return 'wall';

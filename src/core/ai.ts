@@ -1,6 +1,6 @@
 import { AI_SETTINGS, DEFAULT_AI_DIFFICULTY } from '../config/ai';
 import type { AiDifficulty } from '../config/ai';
-import { cellIndex, getCell } from './arena';
+import { cellIndex, getCell, isTunnel } from './arena';
 import { stepDistanceOf } from './movement';
 import { REMOTE_FUSE_TICKS, SIDELINE_THROW_DISTANCE } from '../config/bombs';
 import { BAD_ITEMS } from '../config/items';
@@ -147,7 +147,7 @@ function planRoute(
     const from = { col: best % arena.cols, row: Math.floor(best / arena.cols) };
     for (const n of neighborsOf(from)) {
       const kind = getCell(arena, n.col, n.row);
-      if (kind === 'wall' || (kind === 'block' && !mode.throughBlocks)) continue;
+      if (kind === 'wall' || kind === 'hole' || (kind === 'block' && !mode.throughBlocks)) continue;
       const index = cellIndex(arena, n.col, n.row);
       if (hazards.bombs.some((bomb) => bomb.col === n.col && bomb.row === n.row)) continue;
       if (hasHazard(hazards, index)) continue;
@@ -430,7 +430,7 @@ export function createAi(
 
       // 2. BOMBARDEAR (só com saída garantida)
       const ownBombs = state.bombs.filter((bomb) => bomb.owner === me.id).length;
-      if (state.tick >= nextBombTick && ownBombs < me.maxBombs) {
+      if (state.tick >= nextBombTick && ownBombs < me.maxBombs && !isTunnel(state.hazards?.tunnel, arena, here.col, here.row)) {
         const bomb: BombState = hypotheticalBomb(here, me.id, me.bombRange, me.piercing);
         const byCell = new Map<number, BombState>();
         for (const existing of state.bombs) byCell.set(cellIndex(arena, existing.col, existing.row), existing);

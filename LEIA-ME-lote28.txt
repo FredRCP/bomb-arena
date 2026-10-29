@@ -1,2 +1,0 @@
-Lote 28: extrair na raiz do projeto, sobrescrevendo.
-Apague (não são mais usados): public/themes/egypt/block4.png ... block22.png e public/themes/egypt/pillar.png

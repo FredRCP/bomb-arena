@@ -3,7 +3,7 @@ import type { CharacterDef } from '../characters/characters';
 import Phaser from 'phaser';
 import { getCell, inwardDirection, ringCells } from '../core';
 import type { Arena, BombState, FlameState, GameState, HazardsState, ItemState, PlayerState } from '../core';
-import { pyramidAnchors, pyramidCells, sphinxCells } from '../core';
+import { iglooCells, pyramidOrigin, pyramidWallCells, sphinxCells } from '../core';
 import { COLORS } from './palette';
 import { has, loadedBlockVariants, themeById, themeKey } from './theme';
 import type { ThemeDef } from './theme';
@@ -63,8 +63,13 @@ export function drawArena(scene: Phaser.Scene, arena: Arena, themeId = 'classic'
   const sphinxOn = !!theme.sphinx && has(scene, theme, 'sphinx') && !!hazards;
   const glyphs = theme.borderGlyphs ?? 0;
   const glyphImages = glyphs > 0 && has(scene, theme, 'glyph1');
-  const pyramidOn = !!theme.pyramids && has(scene, theme, 'pyramid') && !!hazards;
-  const pyramidAt = new Set(pyramidOn ? pyramidCells(arena.cols, arena.rows).map((c) => c.row * arena.cols + c.col) : []);
+  const pyramidOn = !!theme.pyramid && has(scene, theme, 'pyramid') && !!hazards?.tunnel;
+  const iglooOn = !!theme.igloo && has(scene, theme, 'igloo') && !!hazards;
+  // Células que ficam sob uma imagem grande (pirâmide, iglu): a parede delas não é desenhada uma a uma.
+  const pyramidAt = new Set([
+    ...(pyramidOn ? pyramidWallCells(arena.cols, arena.rows) : []),
+    ...(iglooOn ? iglooCells(arena.cols, arena.rows) : []),
+  ].map((c) => c.row * arena.cols + c.col));
   const sphinxAt = new Set(sphinxOn ? sphinxCells(arena.cols, arena.rows).map((c) => c.row * arena.cols + c.col) : []);
 
   for (let row = 0; row < arena.rows; row++) {
@@ -78,9 +83,13 @@ export function drawArena(scene: Phaser.Scene, arena: Arena, themeId = 'classic'
       const inner = col > 0 && row > 0 && col < arena.cols - 1 && row < arena.rows - 1;
       if (!inner && glyphImages) {
         // Borda em blocos de hieróglifo (a variação depende só da posição).
-        const n = 1 + ((col * 5 + row * 11) % glyphs);
-        const image = scene.add.image((col + 0.5) * TILE_SIZE, (row + 1) * TILE_SIZE - 1, themeKey(theme, `glyph${n}`)).setOrigin(0.5, 1).setDepth(6);
+        // Alterna blocos de areia (maioria) com blocos de hieróglifo (1 a cada 4): a variação depende só da posição.
+        const pick = col * 5 + row * 11;
+        const sand = loadedBlockVariants(scene, theme) > 0 && (col + row) % 4 !== 0;
+        const key = sand ? themeKey(theme, `block${1 + (pick % loadedBlockVariants(scene, theme))}`) : themeKey(theme, `glyph${1 + (pick % glyphs)}`);
+        const image = scene.add.image((col + 0.5) * TILE_SIZE, (row + 1) * TILE_SIZE - 1, key).setOrigin(0.5, 1).setDepth(6);
         image.setScale(theme.wallWidth / image.width);
+        if (sand) image.setTint(0xd8c9a8); // um pouco mais escuro que o bloco destrutível
         continue;
       }
       // A parede em imagem é mais alta que a célula: fica na frente das chamas e das bombas (depth 6), para o fogo nunca cobri-la.
@@ -91,10 +100,15 @@ export function drawArena(scene: Phaser.Scene, arena: Arena, themeId = 'classic'
   }
 
   if (pyramidOn) {
-    for (const a of pyramidAnchors(arena.cols, arena.rows)) {
-      const image = scene.add.image((a.col + 1) * TILE_SIZE, (a.row + 2) * TILE_SIZE - 1, themeKey(theme, 'pyramid')).setOrigin(0.5, 1).setDepth(6);
-      image.setScale((2 * TILE_SIZE - 4) / image.width);
-    }
+    // 5 x 5 células, por cima dos jogadores: quem anda no túnel some enquanto passa por dentro.
+    const o = pyramidOrigin(arena.cols, arena.rows);
+    scene.add.image((o.col + 2.5) * TILE_SIZE, (o.row + 2.5) * TILE_SIZE, themeKey(theme, 'pyramid')).setDisplaySize(5 * TILE_SIZE, 5 * TILE_SIZE).setDepth(10.5);
+  }
+
+  if (iglooOn) {
+    const centre = iglooCells(arena.cols, arena.rows)[4]!;
+    const image = scene.add.image((centre.col + 0.5) * TILE_SIZE, (centre.row + 2) * TILE_SIZE - 2, themeKey(theme, 'igloo')).setOrigin(0.5, 1).setDepth(6);
+    image.setScale((3 * TILE_SIZE + 24) / image.width);
   }
 
   if (sphinxOn) {

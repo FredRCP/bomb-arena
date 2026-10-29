@@ -1,3 +1,4 @@
+import { cellIndex } from './arena';
 import { advanceSlidingBombs, blockedCellsFor, placeBomb, releaseBombs, tryKick, useSpecial, walkThroughCellsFor } from './bombs';
 import { advanceExplosions, applyFlameDamage } from './explosions';
 import { speedFactorAt, updateHazards } from './hazards';
@@ -42,11 +43,13 @@ export function step(state: GameState, intents: Intents = {}): void {
     let move = intents[player.id]?.move ?? null;
     // Controles invertidos (item ruim): esquerda vira direita, cima vira baixo.
     if (move !== null && player.invertTicks > 0) move = OPPOSITE[move];
-    // Piso de gelo: ao começar a andar, o jogador desliza na mesma direção até bater em algo (parede, bloco, bomba, buraco).
-    const slippery = state.hazards?.slippery === true;
+    // Faixas de gelo: andando em cima de uma, o jogador desliza na direção em que começou até bater em algo (parede,
+    // bloco, bomba, buraco) ou sair da faixa. Fora das faixas o piso é normal.
+    const strips = state.hazards?.slippery;
     if (!player.alive) player.slide = null;
-    if (player.alive && slippery) {
-      if (player.slide) move = player.slide;
+    if (player.alive && strips) {
+      if (!strips.includes(cellIndex(state.arena, Math.floor(player.x), Math.floor(player.y)))) player.slide = null;
+      else if (player.slide) move = player.slide;
       else if (move !== null) player.slide = move;
     }
     if (player.alive && move !== null) {
@@ -55,7 +58,7 @@ export function step(state: GameState, intents: Intents = {}): void {
       const beforeY = player.y;
       movePlayer(state.arena, player, move, blockedCellsFor(state, player.id), walkThroughCellsFor(state, player.id), speedFactorAt(state, player));
       tryKick(state, player, move);
-      if (slippery && player.x === beforeX && player.y === beforeY) player.slide = null;
+      if (strips && player.x === beforeX && player.y === beforeY) player.slide = null;
     }
   }
 

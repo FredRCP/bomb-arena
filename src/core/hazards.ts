@@ -10,42 +10,76 @@ import type { Arena, Cell, GameState, HazardsState, PlayerState } from './types'
 // - Areia movediça: células em que o jogador anda bem mais devagar.
 // - Armadilha de dardos: uma fileira SEM blocos; de tempos em tempos pisca um aviso nas bordas e, 2 s depois, dardos
 //   varrem a fileira de um lado a outro (alternando o lado). Quem estiver na frente é atingido (colete e escudo valem).
-// - Esfinge: três células de parede no centro da arena.
+// - Esfinge: três células de parede no alto da arena. Pirâmide: quadrado 5 x 5 no centro com túnel em cruz. Iglu: 3 x 3.
+// - Gelo escorregadio: só em poucas faixas marcadas (veja slipperyCells).
 
 export interface HazardOptions {
   /** Espalha manchas de areia movediça. */
   quicksand?: boolean;
   /** Linha (ímpar) da armadilha de dardos; a fileira fica livre de blocos. */
   dartRow?: number;
-  /** Esfinge no centro: três paredes na linha do meio. */
+  /** Esfinge no alto da arena, no meio: três paredes na primeira fileira. */
   sphinx?: boolean;
-  /** Quatro pirâmides de 2 x 2 células, uma em cada região da arena (simétricas). */
-  pyramids?: boolean;
-  /** Piso de gelo escorregadio. */
+  /** Pirâmide de 5 x 5 no centro, com um túnel em cruz (quatro portais) por onde os jogadores passam escondidos. */
+  pyramid?: boolean;
+  /** Iglu de 3 x 3 no centro (parede). */
+  igloo?: boolean;
+  /** Faixas de gelo escorregadio (poucas, em volta do centro). */
   slippery?: boolean;
   /** Gelo fino: células que racham a cada passagem e viram buraco. */
   thinIce?: boolean;
 }
 
-/** Canto superior esquerdo de cada uma das 4 pirâmides (2 x 2), simétricas em relação ao centro da arena. */
-export function pyramidAnchors(cols: number, rows: number): Cell[] {
-  const left = Math.round(cols / 4);
-  const right = cols - 2 - left;
-  const top = 3;
-  const bottom = rows - 2 - top;
-  return [{ col: left, row: top }, { col: right, row: top }, { col: left, row: bottom }, { col: right, row: bottom }];
+/** Células da esfinge: três na horizontal, na fileira de cima, no meio da arena. */
+export function sphinxCells(cols: number, _rows: number): Cell[] {
+  const col = Math.floor(cols / 2);
+  return [-1, 0, 1].map((d) => ({ col: col + d, row: 1 }));
 }
 
-/** As 16 células ocupadas pelas pirâmides. */
-export function pyramidCells(cols: number, rows: number): Cell[] {
-  return pyramidAnchors(cols, rows).flatMap((a) => [0, 1].flatMap((dr) => [0, 1].map((dc) => ({ col: a.col + dc, row: a.row + dr }))));
+/** Canto superior esquerdo da pirâmide (5 x 5, centrada na arena). */
+export function pyramidOrigin(cols: number, rows: number): Cell {
+  return { col: Math.floor(cols / 2) - 2, row: Math.floor(rows / 2) - 2 };
 }
 
-/** Células da esfinge (três na horizontal, no centro da arena). */
-export function sphinxCells(cols: number, rows: number): Cell[] {
+/**
+ * Túnel da pirâmide: uma cruz pelo meio (linha e coluna centrais). Os quatro portais ficam nas pontas, em células
+ * ligadas às fileiras livres do mapa (a de cima, a de baixo e as colunas dos lados).
+ */
+export function pyramidTunnelCells(cols: number, rows: number): Cell[] {
+  const o = pyramidOrigin(cols, rows);
+  const out: Cell[] = [];
+  for (let d = 0; d < 5; d++) {
+    out.push({ col: o.col + d, row: o.row + 2 });
+    if (d !== 2) out.push({ col: o.col + 2, row: o.row + d });
+  }
+  return out;
+}
+
+/** As 16 células de parede da pirâmide (as 25 do quadrado, menos o túnel). */
+export function pyramidWallCells(cols: number, rows: number): Cell[] {
+  const o = pyramidOrigin(cols, rows);
+  const tunnel = new Set(pyramidTunnelCells(cols, rows).map((c) => c.row * cols + c.col));
+  const out: Cell[] = [];
+  for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) if (!tunnel.has((o.row + r) * cols + o.col + c)) out.push({ col: o.col + c, row: o.row + r });
+  return out;
+}
+
+/** Células do iglu (3 x 3 no centro). */
+export function iglooCells(cols: number, rows: number): Cell[] {
   const col = Math.floor(cols / 2);
   const row = Math.floor(rows / 2);
-  return [-1, 0, 1].map((d) => ({ col: col + d, row }));
+  return [-1, 0, 1].flatMap((dr) => [-1, 0, 1].map((dc) => ({ col: col + dc, row: row + dr })));
+}
+
+/** Faixas de gelo escorregadio: quatro trechos de 5 células em volta do centro (duas fileiras e duas colunas livres). */
+export function slipperyCells(cols: number, rows: number): Cell[] {
+  const cx = Math.floor(cols / 2);
+  const cy = Math.floor(rows / 2);
+  const out: Cell[] = [];
+  for (let d = -2; d <= 2; d++) {
+    out.push({ col: cx + d, row: cy - 3 }, { col: cx + d, row: cy + 3 }, { col: cx - 4, row: cy + d }, { col: cx + 4, row: cy + d });
+  }
+  return out;
 }
 
 function nearSpawn(cell: Cell, cols: number, rows: number): boolean {
@@ -76,14 +110,24 @@ export function createHazards(arena: Arena, options: HazardOptions | undefined, 
     dartTrap = { row, phase: 'idle', timer: DART_FIRST_DELAY_TICKS - DART_WARN_TICKS, dir: 1, x: 0 };
   }
 
-  if (options.pyramids) {
-    for (const cell of pyramidCells(cols, rows)) arena.cells[cellIndex(arena, cell.col, cell.row)] = 'wall';
+  let tunnel: number[] | undefined;
+  if (options.pyramid) {
+    for (const cell of pyramidWallCells(cols, rows)) arena.cells[cellIndex(arena, cell.col, cell.row)] = 'wall';
+    tunnel = pyramidTunnelCells(cols, rows).map((cell) => cellIndex(arena, cell.col, cell.row));
+    for (const index of tunnel) arena.cells[index] = 'empty';
+  }
+
+  if (options.igloo) {
+    for (const cell of iglooCells(cols, rows)) arena.cells[cellIndex(arena, cell.col, cell.row)] = 'wall';
   }
 
   const rng = createRng(seed * 7 + 13);
+  // Células que não recebem areia movediça nem gelo fino: o túnel da pirâmide e as faixas escorregadias.
+  const reserved = new Set<number>(tunnel ?? []);
+  if (options.slippery) for (const cell of slipperyCells(cols, rows)) reserved.add(cellIndex(arena, cell.col, cell.row));
   const taken = new Set<number>();
   const free = (cell: Cell): boolean =>
-    getCell(arena, cell.col, cell.row) !== 'wall' && cell.row !== options.dartRow && !nearSpawn(cell, cols, rows) && !taken.has(cellIndex(arena, cell.col, cell.row));
+    getCell(arena, cell.col, cell.row) !== 'wall' && !reserved.has(cellIndex(arena, cell.col, cell.row)) && cell.row !== options.dartRow && !nearSpawn(cell, cols, rows) && !taken.has(cellIndex(arena, cell.col, cell.row));
   /** Espalha `patches` manchas de 1 a 2 células (sem bloco por cima, à mostra desde o começo). */
   const scatter = (patches: number, pair: boolean): number[] => {
     const out: number[] = [];
@@ -107,7 +151,12 @@ export function createHazards(arena: Arena, options: HazardOptions | undefined, 
 
   const quicksand = options.quicksand ? scatter(QUICKSAND_PATCHES, true) : [];
   const hazards: HazardsState = { quicksand, dartTrap };
-  if (options.slippery) hazards.slippery = true;
+  if (tunnel) hazards.tunnel = tunnel;
+  if (options.slippery) {
+    // As faixas ficam sem blocos (aparecem inteiras desde o começo).
+    hazards.slippery = slipperyCells(cols, rows).map((cell) => cellIndex(arena, cell.col, cell.row));
+    for (const index of hazards.slippery) if (arena.cells[index] === 'block') arena.cells[index] = 'empty';
+  }
   if (options.thinIce) {
     hazards.thinIce = scatter(ICE_PATCHES, true);
     hazards.cracks = {};

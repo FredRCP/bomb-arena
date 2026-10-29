@@ -1,5 +1,5 @@
 import { BOMB_FUSE_TICKS, KICK_SLIDE_TICKS, REMOTE_FUSE_TICKS, THROW_DISTANCE } from '../config/bombs';
-import { cellIndex, getCell, inBounds } from './arena';
+import { cellIndex, getCell, inBounds, isTunnel } from './arena';
 import { PLAYER_HALF_SIZE } from '../config/simulation';
 import { loseRandomPowerup } from './items';
 import { bodyOverlapsCell } from './movement';
@@ -44,7 +44,7 @@ export function placeBomb(state: GameState, player: PlayerState): boolean {
 
   const col = Math.floor(player.x);
   const row = Math.floor(player.y);
-  if (getCell(state.arena, col, row) !== 'empty') return false;
+  if (getCell(state.arena, col, row) !== 'empty' || isTunnel(state.hazards?.tunnel, state.arena, col, row)) return false;
   if (state.bombs.some((bomb) => bomb.col === col && bomb.row === row)) return false;
   if (state.flames.some((flame) => flame.col === col && flame.row === row)) return false;
   if (state.bombs.filter((bomb) => bomb.owner === player.id).length >= player.maxBombs) return false;
@@ -83,7 +83,7 @@ export function releaseBombs(state: GameState): void {
 
 /** A célula aceita uma bomba que chega (chutada ou arremessada)? Vazia, sem outra bomba. */
 function isFreeForBomb(state: GameState, col: number, row: number): boolean {
-  return getCell(state.arena, col, row) === 'empty' && !state.bombs.some((bomb) => bomb.col === col && bomb.row === row);
+  return getCell(state.arena, col, row) === 'empty' && !isTunnel(state.hazards?.tunnel, state.arena, col, row) && !state.bombs.some((bomb) => bomb.col === col && bomb.row === row);
 }
 
 /**
@@ -128,7 +128,7 @@ export function slideProjection(state: GameState, bomb: BombState, ticks: number
   for (let k = 0; k < wanted; k++) {
     const nextCol = col + dc;
     const nextRow = row + dr;
-    if (getCell(state.arena, nextCol, nextRow) !== 'empty') break;
+    if (getCell(state.arena, nextCol, nextRow) !== 'empty' || isTunnel(state.hazards?.tunnel, state.arena, nextCol, nextRow)) break;
     if (state.bombs.some((other) => other !== bomb && other.col === nextCol && other.row === nextRow)) break;
     col = nextCol;
     row = nextRow;

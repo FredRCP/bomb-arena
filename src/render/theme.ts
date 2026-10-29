@@ -26,9 +26,11 @@ export interface ThemeDef {
   pillarWidth?: number;
   /** Quantas imagens de hieróglifo (glyph1.png...) formam a borda da arena? 0 = a borda usa a imagem de parede. */
   borderGlyphs?: number;
-  /** Pirâmides 2 x 2 (pyramid.png)? */
-  pyramids?: boolean;
-  /** Esfinge do centro (sphinx.png, 3 células de largura)? */
+  /** Pirâmide central 5 x 5 com túnel (pyramid.png)? */
+  pyramid?: boolean;
+  /** Iglu central 3 x 3 (igloo.png)? */
+  igloo?: boolean;
+  /** Esfinge do alto da arena (sphinx.png, 3 células de largura)? */
   sphinx?: boolean;
   /** Areia movediça em imagem (quicksand.png)? */
   quicksand?: boolean;
@@ -36,8 +38,8 @@ export interface ThemeDef {
 
 export const THEMES: Record<string, ThemeDef> = {
   classic: { id: 'classic', floors: false, wall: true, wallWidth: 62, blockVariants: 1, blockWidth: 62, rubble: false, background: false, chips: [0xd9822b, 0xa65a1c, 0x6e3a12] },
-  egypt: { id: 'egypt', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xf3d896, 0xe0b868, 0xb88f46], borderGlyphs: 22, pyramids: true, sphinx: true, quicksand: true },
-  ice: { id: 'ice', floors: true, wall: true, wallWidth: 56, blockVariants: 3, blockWidth: 62, rubble: true, background: true, chips: [0xe3f6ff, 0xb9e3f7, 0x7fc4e8] },
+  egypt: { id: 'egypt', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xf3d896, 0xe0b868, 0xb88f46], borderGlyphs: 22, pyramid: true, sphinx: true, quicksand: true },
+  ice: { id: 'ice', floors: true, wall: true, wallWidth: 56, blockVariants: 3, blockWidth: 62, rubble: true, background: true, chips: [0xe3f6ff, 0xb9e3f7, 0x7fc4e8], igloo: true },
 };
 
 export function themeById(id: string | undefined): ThemeDef {
@@ -61,7 +63,8 @@ export function preloadThemes(scene: Phaser.Scene): void {
     if (theme.rubble) add('rubble', 'rubble.png');
     if (theme.pillar) add('pillar', 'pillar.png');
     for (let i = 1; i <= (theme.borderGlyphs ?? 0); i++) add(`glyph${i}`, `glyph${i}.png`);
-    if (theme.pyramids) add('pyramid', 'pyramid.png');
+    if (theme.pyramid) add('pyramid', 'pyramid.png');
+    if (theme.igloo) add('igloo', 'igloo.png');
     if (theme.sphinx) add('sphinx', 'sphinx.png');
     if (theme.quicksand) add('quicksand', 'quicksand.png');
     if (theme.background) add('background', 'background.jpg');

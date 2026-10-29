@@ -11,10 +11,14 @@ export class HazardsView {
   /** Gelo fino (manchas, rachaduras e buracos): redesenhado só quando algo muda. */
   private readonly ice: Phaser.GameObjects.Graphics;
   private iceKey = '';
+  /** Brilho de fogo por cima da pirâmide (para ninguém ser pego por uma chama escondida no túnel). */
+  private readonly glow: Phaser.GameObjects.Graphics;
 
   constructor(private readonly scene: Phaser.Scene, state: GameState) {
     this.g = scene.add.graphics().setDepth(9);
     this.ice = scene.add.graphics().setDepth(0.8);
+    this.glow = scene.add.graphics().setDepth(11);
+    this.drawSlippery(state);
     const trap = state.hazards?.dartTrap;
     if (!trap) return;
     // Aviso escrito, nas bordas da fileira (fica fora da arena, no fundo da tela).
@@ -35,6 +39,36 @@ export class HazardsView {
     strip.fillRect(TILE_SIZE, y + 22, (state.arena.cols - 2) * TILE_SIZE, 20);
     strip.fillStyle(0x3a2208, 0.85);
     for (const x of [TILE_SIZE - 14, (state.arena.cols - 1) * TILE_SIZE + 2]) strip.fillRoundedRect(x, y + 24, 12, 16, 3);
+  }
+
+  /** Faixas escorregadias: piso claro, levemente embaçado e riscado no sentido do deslize. */
+  private drawSlippery(state: GameState): void {
+    const strips = state.hazards?.slippery;
+    if (!strips || strips.length === 0) return;
+    const arena = state.arena;
+    const set = new Set(strips);
+    const g = this.scene.add.graphics().setDepth(0.6);
+    for (const index of strips) {
+      const col = index % arena.cols;
+      const row = Math.floor(index / arena.cols);
+      const x = col * TILE_SIZE;
+      const y = row * TILE_SIZE;
+      const horizontal = set.has(index - 1) || set.has(index + 1);
+      // Véu claro (o "embaçado") com bordas mais suaves e riscos finos.
+      g.fillStyle(0xeaf8ff, 0.3).fillRect(x, y, TILE_SIZE, TILE_SIZE);
+      g.fillStyle(0xffffff, 0.16).fillRect(x + 4, y + 4, TILE_SIZE - 8, TILE_SIZE - 8);
+      g.lineStyle(2, 0xffffff, 0.6);
+      for (const o of [12, 26, 40, 54]) {
+        const wobble = ((col * 7 + row * 3 + o) % 5) * 2;
+        if (horizontal) g.lineBetween(x + 4 + wobble, y + o, x + TILE_SIZE - 4 - (8 - wobble), y + o);
+        else g.lineBetween(x + o, y + 4 + wobble, x + o, y + TILE_SIZE - 4 - (8 - wobble));
+      }
+      g.lineStyle(1, 0x9fd6f0, 0.7);
+      for (const o of [19, 47]) {
+        if (horizontal) g.lineBetween(x + 8, y + o, x + TILE_SIZE - 8, y + o);
+        else g.lineBetween(x + o, y + 8, x + o, y + TILE_SIZE - 8);
+      }
+    }
   }
 
   /** Gelo fino: mancha clara com rachaduras por nível; célula quebrada vira um buraco escuro. */
@@ -74,6 +108,15 @@ export class HazardsView {
 
   update(state: GameState): void {
     this.drawIce(state);
+    const tunnel = state.hazards?.tunnel;
+    if (tunnel) {
+      this.glow.clear();
+      for (const flame of state.flames) {
+        if (!tunnel.includes(flame.row * state.arena.cols + flame.col)) continue;
+        this.glow.fillStyle(0xff7a1a, 0.85).fillRoundedRect(flame.col * TILE_SIZE + 6, flame.row * TILE_SIZE + 6, TILE_SIZE - 12, TILE_SIZE - 12, 12);
+        this.glow.fillStyle(0xffe066, 0.9).fillRoundedRect(flame.col * TILE_SIZE + 18, flame.row * TILE_SIZE + 18, TILE_SIZE - 36, TILE_SIZE - 36, 8);
+      }
+    }
     const trap = state.hazards?.dartTrap;
     const g = this.g;
     g.clear();

@@ -1,4 +1,4 @@
-import { ELEPHANT_SPEED, POWER_CHARGE_TICKS } from '../config/powers';
+import { ELEPHANT_MAX_BLOCKS, ELEPHANT_SPEED, POWER_CHARGE_TICKS } from '../config/powers';
 import { cellIndex, getCell } from './arena';
 import { revealItem } from './items';
 import type { Direction, GameState, PlayerState, PowerKind } from './types';
@@ -37,7 +37,7 @@ export function usePower(state: GameState, player: PlayerState): void {
   const row = Math.floor(player.y);
   const elephants = (state.elephants ??= []);
   const id = state.tick * 8 + player.id; // único por jogador e passo
-  elephants.push({ id, owner: player.id, x: col + 0.5, y: row + 0.5, dir: player.facing });
+  elephants.push({ id, owner: player.id, x: col + 0.5, y: row + 0.5, dir: player.facing, broken: 0 });
   state.events.push({ type: 'powerUsed', playerId: player.id, kind: player.power.kind, col, row, dir: player.facing });
 }
 
@@ -61,13 +61,18 @@ export function updatePowers(state: GameState): void {
     const frontCol = Math.floor(elephant.x + dx * 0.45);
     const frontRow = Math.floor(elephant.y + dy * 0.45);
     const cell = getCell(arena, frontCol, frontRow);
-    if (cell === 'wall') {
+    if (cell === 'wall' || cell === 'hole') {
       elephants.splice(elephants.indexOf(elephant), 1);
       state.events.push({ type: 'elephantGone', id: elephant.id, col: Math.floor(elephant.x), row: Math.floor(elephant.y) });
     } else if (cell === 'block') {
       arena.cells[cellIndex(arena, frontCol, frontRow)] = 'empty';
       state.events.push({ type: 'blockDestroyed', col: frontCol, row: frontRow });
       revealItem(state, frontCol, frontRow);
+      elephant.broken = (elephant.broken ?? 0) + 1;
+      if (elephant.broken >= ELEPHANT_MAX_BLOCKS) {
+        elephants.splice(elephants.indexOf(elephant), 1);
+        state.events.push({ type: 'elephantGone', id: elephant.id, col: Math.floor(elephant.x), row: Math.floor(elephant.y) });
+      }
     }
   }
 }

@@ -107,6 +107,8 @@ export interface ElephantState {
   x: number;
   y: number;
   dir: Direction;
+  /** Quantos blocos já quebrou. */
+  broken?: number;
 }
 
 /**
@@ -232,7 +234,10 @@ export interface HazardsState {
   quicksand: number[];
   dartTrap: DartTrap | null;
   /** Piso escorregadio: quem começa a andar desliza até bater em algo. */
-  slippery?: boolean;
+  /** Células (índices) do gelo escorregadio. */
+  slippery?: number[];
+  /** Células (índices) do túnel da pirâmide: escondem quem passa e não aceitam bombas. */
+  tunnel?: number[];
   /** Células de gelo fino (índices de `arena.cells`): racham a cada passagem e, na terceira, viram buraco. */
   thinIce?: number[];
   /** Nível de rachadura (1 a 3) de cada célula de gelo fino já pisada. */

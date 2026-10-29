@@ -36,7 +36,7 @@ export class TitleScene extends Phaser.Scene {
   }
 
   create(): void {
-    music.playMenu();
+    music.release(); // a tela de início fica sem música
     // Aberto com parâmetros de teste no endereço (?players=1...): pula tudo e começa a jogar direto.
     if (hasGameParams(window.location.search)) {
       this.scene.start('Game');
