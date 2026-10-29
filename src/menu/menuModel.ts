@@ -12,7 +12,7 @@ import { needsTeamsScreen } from './teamsModel';
 
 export const MAX_VOLUME = 10;
 export const DEFAULT_VOLUME = 7;
-export const DEFAULT_MUSIC = 6;
+export const DEFAULT_MUSIC = 5;
 
 export interface MenuSettings {
   /** Pessoas: 1 (sozinho), 2 (mesmo teclado) ou 3 a 5 (com controles de videogame). */

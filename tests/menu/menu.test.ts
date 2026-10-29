@@ -322,16 +322,16 @@ describe('menu: níveis', () => {
 });
 
 describe('menu: fase e resumo', () => {
-  it('a fase percorre a lista; só o trenzinho ainda mostra "em breve"', () => {
+  it('a fase percorre a lista (4 fases, todas jogáveis)', () => {
     const menu = createMenu(DEFAULT_SETTINGS, 'stage');
     goTo(menu, 'stage');
-    const expected: Array<[string, boolean]> = [['Arena Clássica', true], ['Arena Clássica Grande', true], ['Fase do Gelo', true], ['Fase do Egito', true], ['Fase do Trenzinho (em breve)', false]];
+    const expected: Array<[string, boolean]> = [['Arena Clássica', true], ['Arena Clássica Grande', true], ['Fase do Gelo', true], ['Fase do Egito', true]];
     for (const [name, playable] of expected) {
       expect(describeRow(menu.settings, 'stage').value).toBe(name);
       expect(canStart(menu.settings)).toBe(playable);
       changeValue(menu, 1);
     }
-    expect(menu.settings.stage).toBe('classic'); // deu a volta nas 5 fases
+    expect(menu.settings.stage).toBe('classic'); // deu a volta nas 4 fases
   });
 
   it('stageIssue: celular não joga arena grande; fase pequena demais não comporta todos', () => {
@@ -340,7 +340,6 @@ describe('menu: fase e resumo', () => {
     expect(stageIssue(big, 2, true)).toMatch(/grande demais para celular/);
     expect(stageIssue(big, 5, false)).toMatch(/até 4 jogadores/);
     expect(stageIssue(stageById('classic'), 5, true)).toBeNull();
-    expect(stageIssue(stageById('train'), 2, false)).toBe('Em breve!');
   });
 
   it('a fase vai na configuração da partida e é guardada; fase desconhecida volta à clássica', () => {

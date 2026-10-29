@@ -1,10 +1,13 @@
-import { ELEPHANT_MAX_BLOCKS, ELEPHANT_SPEED, POWER_CHARGE_TICKS } from '../config/powers';
+import { AIRPLANE_DROP_TICKS, AIRPLANE_SPEED, AIRPLANE_SPREAD, ELEPHANT_MAX_BLOCKS, ELEPHANT_SPEED, POWER_CHARGE_TICKS } from '../config/powers';
 import { cellIndex, getCell } from './arena';
+import { dropBomb } from './bombs';
+import { createRng } from './random';
 import { revealItem } from './items';
 import type { Direction, GameState, PlayerState, PowerKind } from './types';
 
 // Superpoderes. Cada jogador pode ter um poder (veja `givePower`) que carrega sozinho em POWER_CHARGE_TICKS e é
 // disparado pela intenção `power`. Poder atual:
+// - airplane (Lucas): um avião cruza a arena na linha do jogador largando bombas em células aleatórias perto dela.
 // - elephant (Ana): um elefantinho sai correndo na direção para onde o jogador olha, em linha reta, e quebra todos os
 //   blocos do caminho (os itens escondidos aparecem). Ele não machuca ninguém e para ao bater numa parede.
 
@@ -35,6 +38,16 @@ export function usePower(state: GameState, player: PlayerState): void {
   player.power.charge = 0;
   const col = Math.floor(player.x);
   const row = Math.floor(player.y);
+  if (player.power.kind === 'airplane') {
+    // O avião entra pela borda de trás e cruza a arena na linha (ou coluna) do jogador, na direção em que ele olha.
+    const { dx, dy } = VECTORS[player.facing];
+    const planes = (state.planes ??= []);
+    const x = dx === 0 ? col + 0.5 : dx > 0 ? -1.5 : state.arena.cols + 1.5;
+    const y = dy === 0 ? row + 0.5 : dy > 0 ? -1.5 : state.arena.rows + 1.5;
+    planes.push({ id: state.tick * 8 + player.id, owner: player.id, x, y, dir: player.facing, nextDrop: 1 });
+    state.events.push({ type: 'powerUsed', playerId: player.id, kind: 'airplane', col, row, dir: player.facing });
+    return;
+  }
   const elephants = (state.elephants ??= []);
   const id = state.tick * 8 + player.id; // único por jogador e passo
   elephants.push({ id, owner: player.id, x: col + 0.5, y: row + 0.5, dir: player.facing, broken: 0 });
@@ -50,6 +63,7 @@ export function updatePowers(state: GameState): void {
       if (player.alive && player.power && player.power.charge < POWER_CHARGE_TICKS) player.power.charge += 1;
     }
   }
+  updatePlanes(state);
   const elephants = state.elephants;
   if (!elephants || elephants.length === 0) return;
   const arena = state.arena;
@@ -77,12 +91,48 @@ export function updatePowers(state: GameState): void {
   }
 }
 
+/** Aviões: voam e, de tempos em tempos, largam uma bomba numa célula livre aleatória perto da linha de voo. */
+function updatePlanes(state: GameState): void {
+  const planes = state.planes;
+  if (!planes || planes.length === 0) return;
+  const arena = state.arena;
+  for (const plane of [...planes]) {
+    const { dx, dy } = VECTORS[plane.dir];
+    plane.x += dx * AIRPLANE_SPEED;
+    plane.y += dy * AIRPLANE_SPEED;
+    const along = dx !== 0 ? plane.x : plane.y;
+    const length = dx !== 0 ? arena.cols : arena.rows;
+    if (along < -2 || along > length + 2) {
+      planes.splice(planes.indexOf(plane), 1);
+      state.events.push({ type: 'planeGone', id: plane.id });
+      continue;
+    }
+    plane.nextDrop -= 1;
+    if (plane.nextDrop > 0 || along < 0.5 || along > length - 0.5) continue;
+    plane.nextDrop = AIRPLANE_DROP_TICKS;
+    const owner = state.players.find((p) => p.id === plane.owner);
+    if (!owner) continue;
+    const rng = createRng(state.tick * 131 + plane.id);
+    for (let attempt = 0; attempt < 8; attempt++) {
+      const offset = Math.floor(rng() * (2 * AIRPLANE_SPREAD + 1)) - AIRPLANE_SPREAD;
+      const col = dx !== 0 ? Math.floor(plane.x) + (rng() < 0.5 ? 0 : 1) : Math.floor(plane.x) + offset;
+      const row = dx !== 0 ? Math.floor(plane.y) + offset : Math.floor(plane.y) + (rng() < 0.5 ? 0 : 1);
+      if (Math.abs(col - Math.floor(owner.x)) + Math.abs(row - Math.floor(owner.y)) <= 1) continue; // nada colado no dono
+      if (dropBomb(state, owner, col, row)) break;
+    }
+  }
+}
+
 /**
  * Para o computador: vale a pena soltar o poder? Sim se, na linha à frente dele (até 8 células, sem parede no meio),
  * há pelo menos 2 blocos.
  */
 export function aiShouldUsePower(state: GameState, player: PlayerState): boolean {
   if (!powerReady(player)) return false;
+  if (player.power?.kind === 'airplane') {
+    // Avião: vale a pena com algum inimigo por perto (as bombas caem perto da linha de voo).
+    return state.players.some((p) => p.alive && p.team !== player.team && Math.abs(p.x - player.x) + Math.abs(p.y - player.y) <= 7);
+  }
   const { dx, dy } = VECTORS[player.facing];
   let col = Math.floor(player.x);
   let row = Math.floor(player.y);

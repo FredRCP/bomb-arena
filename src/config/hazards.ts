@@ -16,6 +16,17 @@ export const DART_SPEED = 0.4;
 /** Meia largura da zona de acerto do dardo, em células. */
 export const DART_HIT_HALF = 0.55;
 
-/** Gelo fino: quantas manchas (de 1 a 2 células) e quantas passagens até virar buraco. */
-export const ICE_PATCHES = 9;
-export const ICE_CRACK_LEVELS = 3;
+/** Gelo fino: quantas manchas (de 1 a 2 células) e quantas passagens (4) até virar buraco. */
+export const ICE_PATCHES = 5;
+export const ICE_CRACK_LEVELS = 4;
+
+/** Iglu: a cada 20 s (cada iglu; o segundo sai 10 s depois do primeiro) desce uma bola de neve ou um pinguim (alternando), em linha reta, empurrando quem estiver no caminho. */
+export const ROLLER_PERIOD_TICKS = 20 * 60;
+
+/** A neve faz crescer, aos poucos e em lugares sorteados, os blocos que tinham sido quebrados: um a cada 8 s. */
+export const BLOCK_REGROW_TICKS = 8 * 60;
+/** Velocidade em células por passo: bola de neve 0,07 (4,2 células/s) e pinguim 0,11 (6,6 células/s). */
+export const ROLLER_SPEED = { snowball: 0.07, penguin: 0.11 } as const;
+
+/** A bola de neve e o pinguim quebram os blocos pelo caminho (senão parariam no primeiro bloco, que é quase sempre logo abaixo da porta). */
+export const ROLLER_BREAKS_BLOCKS = true;

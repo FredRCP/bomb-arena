@@ -98,9 +98,39 @@ export interface PlayerState {
 }
 
 /** Superpoderes que existem: o elefantinho da Ana. */
-export type PowerKind = 'elephant';
+export type PowerKind = 'elephant' | 'airplane';
 
 /** Elefantinho em disparada: o centro dele (em células) e a direção. */
+/** Porta de um iglu: de onde saem as bolas de neve e os pinguins, com os passos até a próxima saída e quantas já saíram. */
+export interface IglooDoor {
+  col: number;
+  row: number;
+  timer: number;
+  count: number;
+}
+
+export type RollerKind = 'snowball' | 'penguin';
+
+/** Bola de neve ou pinguim que desce do iglu: (x, y) é o centro, em células. */
+export interface RollerState {
+  id: number;
+  kind: RollerKind;
+  x: number;
+  y: number;
+}
+
+/** Avião do Lucas (superpoder): voa em linha reta pela arena largando bombas em células aleatórias perto da linha de voo. */
+export interface PlaneState {
+  id: number;
+  owner: PlayerId;
+  /** Posição do centro, em células (pode estar fora da arena, na entrada e na saída). */
+  x: number;
+  y: number;
+  dir: Direction;
+  /** Passos até a próxima bomba. */
+  nextDrop: number;
+}
+
 export interface ElephantState {
   id: number;
   owner: PlayerId;
@@ -181,9 +211,15 @@ export type GameEvent =
   /** Gelo fino: a célula rachou (nível 1 a 3) ou virou buraco. */
   | { type: 'iceCracked'; col: number; row: number; level: number }
   | { type: 'iceBroken'; col: number; row: number }
+  /** Do iglu: saiu uma bola de neve ou um pinguim; e ele parou (bateu em algo). */
+  | { type: 'rollerSpawned'; id: number; kind: RollerKind; col: number; row: number }
+  /** A neve fez crescer um bloco destrutível. */
+  | { type: 'blockGrown'; col: number; row: number }
+  | { type: 'rollerGone'; id: number; col: number; row: number }
   /** Um jogador soltou o superpoder (a carga zerou). */
   | { type: 'powerUsed'; playerId: PlayerId; kind: PowerKind; col: number; row: number; dir: Direction }
   | { type: 'elephantGone'; id: number; col: number; row: number }
+  | { type: 'planeGone'; id: number }
   /** Morte súbita: a célula virou parede. */
   | { type: 'cellClosed'; col: number; row: number }
   | { type: 'roundEnded'; outcome: RoundOutcome };
@@ -236,6 +272,13 @@ export interface HazardsState {
   /** Piso escorregadio: quem começa a andar desliza até bater em algo. */
   /** Células (índices) do gelo escorregadio. */
   slippery?: number[];
+  /** Portas dos iglus (célula de onde saem a bola de neve e o pinguim), cada uma com o seu relógio. */
+  doors?: IglooDoor[];
+  rollers?: RollerState[];
+  /** Células (índices) que começaram com bloco: é nelas que a neve faz blocos novos crescerem. */
+  blockSpots?: number[];
+  /** Passos até crescer o próximo bloco de neve. */
+  regrowTimer?: number;
   /** Células (índices) do túnel da pirâmide: escondem quem passa e não aceitam bombas. */
   tunnel?: number[];
   /** Células de gelo fino (índices de `arena.cells`): racham a cada passagem e, na terceira, viram buraco. */
@@ -263,6 +306,7 @@ export interface GameState {
   hazards?: HazardsState;
   /** Elefantinhos em disparada (poder da Ana). */
   elephants?: ElephantState[];
+  planes?: PlaneState[];
   /** Quem é eliminado pode jogar das laterais e tentar voltar (veja sideline.ts)? Ausente = sim. */
   sidelineEnabled?: boolean;
   /** Quantos passos de simulação já aconteceram. Será a base dos temporizadores (bombas, chamas). */

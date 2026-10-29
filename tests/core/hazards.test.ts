@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DART_FIRST_DELAY_TICKS, DART_PERIOD_TICKS, DART_WARN_TICKS, QUICKSAND_SPEED_FACTOR } from '../../src/config/hazards';
 import { STAGES, stageById } from '../../src/config/stages';
-import { cellIndex, createGameState, drainEvents, getCell, recordEvents, createScoreboard, speedFactorAt, sphinxCells, step, STEP_DISTANCE } from '../../src/core';
+import { cellIndex, createGameState, drainEvents, getCell, recordEvents, createScoreboard, speedFactorAt, step, STEP_DISTANCE } from '../../src/core';
 import type { GameState } from '../../src/core';
 
 const EGYPT = stageById('egypt');
@@ -49,9 +49,9 @@ describe('arenas por fase: tamanho e jogadores', () => {
 });
 
 describe('Egito: terreno', () => {
-  it('esfinge de 3 paredes no centro, fileira de dardos sem blocos e itens só dentro de blocos', () => {
+  it('sem esfinge (centro é a pirâmide), fileira de dardos sem blocos e itens só dentro de blocos', () => {
     const state = egypt();
-    for (const cell of sphinxCells(17, 13)) expect(getCell(state.arena, cell.col, cell.row)).toBe('wall');
+    expect(getCell(state.arena, 8, 1)).not.toBe('wall');
     const row = state.hazards!.dartTrap!.row;
     for (let col = 1; col < 16; col++) expect(getCell(state.arena, col, row)).not.toBe('block');
     for (const item of state.hiddenItems) expect(getCell(state.arena, item.col, item.row)).toBe('block');

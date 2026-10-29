@@ -38,7 +38,7 @@ export class ElephantView {
 
   onEvents(events: readonly GameEvent[]): void {
     for (const event of events) {
-      if (event.type === 'powerUsed') this.puff(event.col, event.row);
+      if (event.type === 'powerUsed' && event.kind === 'elephant') this.puff(event.col, event.row);
       else if (event.type === 'elephantGone') this.puff(event.col, event.row, 0.8);
     }
   }

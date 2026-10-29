@@ -57,7 +57,9 @@ function addWallImage(scene: Phaser.Scene, theme: ThemeDef, col: number, row: nu
 export function drawArena(scene: Phaser.Scene, arena: Arena, themeId = 'classic', hazards?: HazardsState): Graphics {
   const theme = themeById(themeId);
   const g = scene.add.graphics();
-  const floorImages = theme.floors && has(scene, theme, 'floorA') && has(scene, theme, 'floorB');
+  const floorFull = !!theme.floorFull && has(scene, theme, 'floorFull');
+  const floorImages = !floorFull && theme.floors && has(scene, theme, 'floorA') && has(scene, theme, 'floorB');
+  if (floorFull) scene.add.image(0, 0, themeKey(theme, 'floorFull')).setOrigin(0, 0).setDisplaySize(arena.cols * TILE_SIZE, arena.rows * TILE_SIZE).setDepth(0);
   const wallImages = theme.wall && has(scene, theme, 'wall');
   const pillarImages = !!theme.pillar && has(scene, theme, 'pillar');
   const sphinxOn = !!theme.sphinx && has(scene, theme, 'sphinx') && !!hazards;
@@ -77,19 +79,18 @@ export function drawArena(scene: Phaser.Scene, arena: Arena, themeId = 'classic'
       const x = col * TILE_SIZE;
       const y = row * TILE_SIZE;
       if (floorImages) scene.add.image(x + TILE_SIZE / 2, y + TILE_SIZE / 2, themeKey(theme, (col + row) % 2 === 0 ? 'floorA' : 'floorB')).setDisplaySize(TILE_SIZE, TILE_SIZE).setDepth(0);
-      else drawFloor(g, x, y, col, row);
+      else if (!floorFull) drawFloor(g, x, y, col, row);
       if (getCell(arena, col, row) !== 'wall') continue;
       if (sphinxAt.has(row * arena.cols + col) || pyramidAt.has(row * arena.cols + col)) continue; // imagens grandes, desenhadas depois
       const inner = col > 0 && row > 0 && col < arena.cols - 1 && row < arena.rows - 1;
       if (!inner && glyphImages) {
         // Borda em blocos de hieróglifo (a variação depende só da posição).
-        // Alterna blocos de areia (maioria) com blocos de hieróglifo (1 a cada 4): a variação depende só da posição.
+        // Alterna os blocos indestrutíveis da fase (maioria) com blocos de hieróglifo (1 a cada 4); só depende da posição.
         const pick = col * 5 + row * 11;
-        const sand = loadedBlockVariants(scene, theme) > 0 && (col + row) % 4 !== 0;
-        const key = sand ? themeKey(theme, `block${1 + (pick % loadedBlockVariants(scene, theme))}`) : themeKey(theme, `glyph${1 + (pick % glyphs)}`);
+        const glyph = (col + row) % 4 === 0 || !wallImages;
+        const key = glyph ? themeKey(theme, `glyph${1 + (pick % glyphs)}`) : themeKey(theme, 'wall');
         const image = scene.add.image((col + 0.5) * TILE_SIZE, (row + 1) * TILE_SIZE - 1, key).setOrigin(0.5, 1).setDepth(6);
         image.setScale(theme.wallWidth / image.width);
-        if (sand) image.setTint(0xd8c9a8); // um pouco mais escuro que o bloco destrutível
         continue;
       }
       // A parede em imagem é mais alta que a célula: fica na frente das chamas e das bombas (depth 6), para o fogo nunca cobri-la.
@@ -106,15 +107,26 @@ export function drawArena(scene: Phaser.Scene, arena: Arena, themeId = 'classic'
   }
 
   if (iglooOn) {
-    const centre = iglooCells(arena.cols, arena.rows)[4]!;
-    const image = scene.add.image((centre.col + 0.5) * TILE_SIZE, (centre.row + 2) * TILE_SIZE - 2, themeKey(theme, 'igloo')).setOrigin(0.5, 1).setDepth(6);
-    image.setScale((3 * TILE_SIZE + 24) / image.width);
+    // Dois iglus na lateral de cima, simétricos, com a porta para baixo e voltada para o meio (o da esquerda é espelhado).
+    const cells = iglooCells(arena.cols, arena.rows); // [esq, esq, dir, dir]
+    [{ first: cells[0]!, flip: true }, { first: cells[2]!, flip: false }].forEach(({ first, flip }) => {
+      const image = scene.add.image(first.col * TILE_SIZE - 11 + 75, (first.row + 1) * TILE_SIZE, themeKey(theme, 'igloo')).setOrigin(0.5, 1).setDepth(6);
+      image.setScale(150 / image.width).setFlipX(flip);
+    });
   }
 
   if (sphinxOn) {
     const centre = sphinxCells(arena.cols, arena.rows)[1]!;
     const image = scene.add.image((centre.col + 0.5) * TILE_SIZE, (centre.row + 1) * TILE_SIZE - 1, themeKey(theme, 'sphinx')).setOrigin(0.5, 1).setDepth(6);
     image.setScale((3 * TILE_SIZE) / image.width);
+  }
+
+  if (theme.columns && has(scene, theme, 'column')) {
+    // Colunas egípcias nos quatro cantos, com o dobro da altura de um bloco (por cima da borda).
+    for (const [col, row] of [[0, 0], [arena.cols - 1, 0], [0, arena.rows - 1], [arena.cols - 1, arena.rows - 1]] as const) {
+      const image = scene.add.image((col + 0.5) * TILE_SIZE, (row + 1) * TILE_SIZE - 1, themeKey(theme, 'column')).setOrigin(0.5, 1).setDepth(6.5);
+      image.setScale(theme.wallWidth / image.width); // 124 x 248 desenhados em 62 x 124
+    }
   }
 
   if (hazards && theme.quicksand && has(scene, theme, 'quicksand')) {
@@ -200,7 +212,9 @@ export function drawClosedWall(view: ClosedView, col: number, row: number): void
   const x = col * TILE_SIZE;
   const y = row * TILE_SIZE;
   const { scene, theme, g } = view;
-  if (theme.floors && has(scene, theme, 'floorA') && has(scene, theme, 'floorB')) {
+  if (theme.floorFull && has(scene, theme, 'floorFull')) {
+    // o piso inteiro já está embaixo: nada a acrescentar
+  } else if (theme.floors && has(scene, theme, 'floorA') && has(scene, theme, 'floorB')) {
     scene.add.image(x + TILE_SIZE / 2, y + TILE_SIZE / 2, themeKey(theme, (col + row) % 2 === 0 ? 'floorA' : 'floorB')).setDisplaySize(TILE_SIZE, TILE_SIZE).setDepth(7.5);
   } else {
     drawFloor(g, x, y, col, row);

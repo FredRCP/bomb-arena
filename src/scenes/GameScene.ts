@@ -45,6 +45,8 @@ import { createHud } from '../render/Hud';
 import { SCREEN_HEIGHT, SCREEN_WIDTH, TOP_HEIGHT, placeArena, sideWidthFor } from '../render/layout';
 import { HazardsView } from '../render/HazardsView';
 import { ElephantView } from '../render/ElephantView';
+import { PlaneView } from '../render/PlaneView';
+import { SnowView } from '../render/SnowView';
 import { addMenuBackground } from '../render/menuBackground';
 import { has, themeById, themeKey } from '../render/theme';
 import type { Hud } from '../render/Hud';
@@ -91,6 +93,8 @@ export class GameScene extends Phaser.Scene {
   private closedView!: ClosedView;
   private hazardsView!: HazardsView;
   private elephantView!: ElephantView;
+  private planeView!: PlaneView;
+  private snowView: SnowView | null = null;
   /** A música da morte súbita já começou nesta rodada? */
   private suddenMusic = false;
   private hud!: Hud;
@@ -205,6 +209,8 @@ export class GameScene extends Phaser.Scene {
     this.closedView = createClosedView(this, theme.id);
     this.hazardsView = new HazardsView(this, this.gameState);
     this.elephantView = new ElephantView(this);
+    this.planeView = new PlaneView(this);
+    this.snowView = theme.snow ? new SnowView(this) : null;
     this.suddenMusic = false;
     for (const player of this.gameState.players) {
       this.playerViews.set(player.id, createPlayerView(this, player, characterById(this.characters[player.id])));
@@ -503,7 +509,7 @@ export class GameScene extends Phaser.Scene {
     let blocksChanged = false;
     recordEvents(this.session.scores!, events, this.gameState.players);
     for (const event of events) {
-      if (event.type === 'blockDestroyed') blocksChanged = true;
+      if (event.type === 'blockDestroyed' || event.type === 'blockGrown') blocksChanged = true;
       if (event.type === 'cellClosed') {
         blocksChanged = true;
         drawClosedWall(this.closedView, event.col, event.row);
@@ -582,6 +588,8 @@ export class GameScene extends Phaser.Scene {
     }
     this.hazardsView.update(this.gameState);
     this.elephantView.update(this.gameState);
+    this.planeView.update(this.gameState);
+    this.snowView?.update();
     drawItems(this.itemsView, this.gameState, (kind) => hasItemIcon(this, kind));
     this.itemSprites.update(this.gameState);
     const spriteFlames = this.flameSprites.ready;

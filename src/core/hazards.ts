@@ -1,8 +1,8 @@
-import { ICE_CRACK_LEVELS, ICE_PATCHES, DART_FIRST_DELAY_TICKS, DART_HIT_HALF, DART_PERIOD_TICKS, DART_SPEED, DART_WARN_TICKS, QUICKSAND_PATCHES, QUICKSAND_SPEED_FACTOR } from '../config/hazards';
+import { BLOCK_REGROW_TICKS, ROLLER_BREAKS_BLOCKS, ROLLER_PERIOD_TICKS, ROLLER_SPEED, ICE_CRACK_LEVELS, ICE_PATCHES, DART_FIRST_DELAY_TICKS, DART_HIT_HALF, DART_PERIOD_TICKS, DART_SPEED, DART_WARN_TICKS, QUICKSAND_PATCHES, QUICKSAND_SPEED_FACTOR } from '../config/hazards';
 import { VEST_BREAK_SHIELD_TICKS } from '../config/items';
-import { cellIndex, getCell } from './arena';
-import { dropPowerups } from './items';
-import { bodyOverlapsCell } from './movement';
+import { cellIndex, getCell, isTunnel } from './arena';
+import { dropPowerups, revealItem } from './items';
+import { bodyOverlapsCell, collidesAt } from './movement';
 import { createRng } from './random';
 import type { Arena, Cell, GameState, HazardsState, PlayerState } from './types';
 
@@ -22,9 +22,11 @@ export interface HazardOptions {
   sphinx?: boolean;
   /** Pirâmide de 5 x 5 no centro, com um túnel em cruz (quatro portais) por onde os jogadores passam escondidos. */
   pyramid?: boolean;
-  /** Iglu de 3 x 3 no centro (parede). */
+  /** Iglu de 3 x 1 (mais a borda de cima) no meio do alto da arena, com a porta para baixo. */
   igloo?: boolean;
-  /** Faixas de gelo escorregadio (poucas, em volta do centro). */
+  /** A neve faz crescer de novo, aos poucos, os blocos destrutíveis que foram quebrados. */
+  regrow?: boolean;
+  /** Faixas de gelo escorregadio (duas, de 4 células). */
   slippery?: boolean;
   /** Gelo fino: células que racham a cada passagem e viram buraco. */
   thinIce?: boolean;
@@ -64,21 +66,27 @@ export function pyramidWallCells(cols: number, rows: number): Cell[] {
   return out;
 }
 
-/** Células do iglu (3 x 3 no centro). */
-export function iglooCells(cols: number, rows: number): Cell[] {
-  const col = Math.floor(cols / 2);
-  const row = Math.floor(rows / 2);
-  return [-1, 0, 1].flatMap((dr) => [-1, 0, 1].map((dc) => ({ col: col + dc, row: row + dr })));
+/**
+ * Células dos dois iglus dentro da arena: dois pares na fileira 1 (a borda de cima completa cada iglu), simétricos e
+ * com o mesmo espaço entre eles e as laterais. Em 15 colunas: colunas 4-5 e 9-10.
+ */
+export function iglooCells(cols: number, _rows: number): Cell[] {
+  const c = Math.floor(cols / 2);
+  return [c - 3, c - 2, c + 2, c + 3].map((col) => ({ col, row: 1 }));
 }
 
-/** Faixas de gelo escorregadio: quatro trechos de 5 células em volta do centro (duas fileiras e duas colunas livres). */
+/** Portas dos iglus: logo abaixo, nas colunas (livres) 5 e 9; elas ficam voltadas uma para a outra. */
+export function iglooDoors(cols: number, _rows: number): Cell[] {
+  const c = Math.floor(cols / 2);
+  return [c - 2, c + 2].map((col) => ({ col, row: 2 }));
+}
+
+/** Faixas de gelo escorregadio: duas, de 4 células cada, em fileiras livres e opostas em relação ao centro. */
 export function slipperyCells(cols: number, rows: number): Cell[] {
   const cx = Math.floor(cols / 2);
   const cy = Math.floor(rows / 2);
   const out: Cell[] = [];
-  for (let d = -2; d <= 2; d++) {
-    out.push({ col: cx + d, row: cy - 3 }, { col: cx + d, row: cy + 3 }, { col: cx - 4, row: cy + d }, { col: cx + 4, row: cy + d });
-  }
+  for (let d = 2; d <= 5; d++) out.push({ col: cx - d, row: cy - 1 }, { col: cx + d, row: cy + 1 });
   return out;
 }
 
@@ -117,14 +125,18 @@ export function createHazards(arena: Arena, options: HazardOptions | undefined, 
     for (const index of tunnel) arena.cells[index] = 'empty';
   }
 
+  let doors: Cell[] | undefined;
   if (options.igloo) {
     for (const cell of iglooCells(cols, rows)) arena.cells[cellIndex(arena, cell.col, cell.row)] = 'wall';
+    doors = iglooDoors(cols, rows);
+    for (const door of doors) arena.cells[cellIndex(arena, door.col, door.row)] = 'empty'; // a porta nunca nasce tapada
   }
 
   const rng = createRng(seed * 7 + 13);
   // Células que não recebem areia movediça nem gelo fino: o túnel da pirâmide e as faixas escorregadias.
   const reserved = new Set<number>(tunnel ?? []);
   if (options.slippery) for (const cell of slipperyCells(cols, rows)) reserved.add(cellIndex(arena, cell.col, cell.row));
+  for (const door of doors ?? []) reserved.add(cellIndex(arena, door.col, door.row));
   const taken = new Set<number>();
   const free = (cell: Cell): boolean =>
     getCell(arena, cell.col, cell.row) !== 'wall' && !reserved.has(cellIndex(arena, cell.col, cell.row)) && cell.row !== options.dartRow && !nearSpawn(cell, cols, rows) && !taken.has(cellIndex(arena, cell.col, cell.row));
@@ -152,6 +164,11 @@ export function createHazards(arena: Arena, options: HazardOptions | undefined, 
   const quicksand = options.quicksand ? scatter(QUICKSAND_PATCHES, true) : [];
   const hazards: HazardsState = { quicksand, dartTrap };
   if (tunnel) hazards.tunnel = tunnel;
+  if (doors) {
+    // O segundo iglu sai 10 s depois do primeiro e começa pelo pinguim.
+    hazards.doors = doors.map((door, i) => ({ col: door.col, row: door.row, timer: i === 0 ? ROLLER_PERIOD_TICKS : ROLLER_PERIOD_TICKS / 2, count: i }));
+    hazards.rollers = [];
+  }
   if (options.slippery) {
     // As faixas ficam sem blocos (aparecem inteiras desde o começo).
     hazards.slippery = slipperyCells(cols, rows).map((cell) => cellIndex(arena, cell.col, cell.row));
@@ -161,6 +178,13 @@ export function createHazards(arena: Arena, options: HazardOptions | undefined, 
     hazards.thinIce = scatter(ICE_PATCHES, true);
     hazards.cracks = {};
     hazards.lastCell = {};
+  }
+  if (options.regrow) {
+    hazards.blockSpots = [];
+    arena.cells.forEach((cell, index) => {
+      if (cell === 'block') hazards.blockSpots!.push(index);
+    });
+    hazards.regrowTimer = BLOCK_REGROW_TICKS;
   }
   return hazards;
 }
@@ -177,6 +201,8 @@ export function updateHazards(state: GameState): void {
   if (state.round.phase === 'over') return;
   updateThinIce(state);
   updateDartTrap(state);
+  updateRollers(state);
+  updateRegrow(state);
 }
 
 /** Gelo fino: cada entrada numa célula racha um nível; no último nível a célula vira buraco assim que ficar livre. */
@@ -209,6 +235,91 @@ function updateThinIce(state: GameState): void {
     state.items = state.items.filter((item) => !(item.col === col && item.row === row));
     state.events.push({ type: 'iceBroken', col, row });
   }
+}
+
+/**
+ * Iglu: a cada 20 s (com a rodada em disputa) sai pela porta de cada iglu uma bola de neve ou um pinguim (alternando) que desce em
+ * linha reta. Quem estiver no caminho é empurrado junto, sem dano. Quebra os blocos do caminho e para ao bater em parede, bomba ou buraco
+ * (ou se o jogador empurrado não puder andar mais).
+ */
+function updateRollers(state: GameState): void {
+  const hz = state.hazards;
+  if (!hz?.doors || !hz.rollers) return;
+  const arena = state.arena;
+  if (state.round.phase === 'playing') {
+    for (const door of hz.doors) {
+      door.timer -= 1;
+      if (door.timer > 0) continue;
+      door.timer = ROLLER_PERIOD_TICKS;
+      const kind = door.count % 2 === 0 ? 'snowball' : 'penguin';
+      const id = state.tick * 16 + door.col;
+      door.count += 1;
+      hz.rollers.push({ id, kind, x: door.col + 0.5, y: door.row + 0.5 });
+      state.events.push({ type: 'rollerSpawned', id, kind, col: door.col, row: door.row });
+    }
+  }
+  for (const roller of [...hz.rollers]) {
+    const speed = ROLLER_SPEED[roller.kind];
+    const y = roller.y + speed;
+    const col = Math.floor(roller.x);
+    const frontRow = Math.floor(y + 0.5);
+    if (ROLLER_BREAKS_BLOCKS && getCell(arena, col, frontRow) === 'block') {
+      arena.cells[cellIndex(arena, col, frontRow)] = 'empty';
+      state.events.push({ type: 'blockDestroyed', col, row: frontRow });
+      revealItem(state, col, frontRow);
+    }
+    const stop =
+      getCell(arena, col, frontRow) !== 'empty' || state.bombs.some((b) => b.col === col && b.row === frontRow && frontRow > Math.floor(roller.y));
+    let stopped = stop;
+    if (!stop) {
+      roller.y = y;
+      // Empurra quem está na frente: o jogador fica sempre a ~0,9 célula à frente do rolo.
+      for (const player of state.players) {
+        if (!player.alive || Math.abs(player.x - roller.x) > 0.8) continue;
+        const ahead = player.y - roller.y;
+        if (ahead < -0.1 || ahead > 0.95) continue;
+        const target = roller.y + 0.9;
+        if (target <= player.y) continue;
+        const blocked = new Set(state.bombs.map((b) => cellIndex(arena, b.col, b.row)));
+        if (collidesAt(arena, player.x, target, blocked)) {
+          stopped = true;
+          break;
+        }
+        player.y = target;
+      }
+    }
+    if (stopped) {
+      hz.rollers.splice(hz.rollers.indexOf(roller), 1);
+      state.events.push({ type: 'rollerGone', id: roller.id, col, row: Math.floor(roller.y) });
+    }
+  }
+}
+
+/** Neve: a cada BLOCK_REGROW_TICKS cresce um bloco numa casa sorteada entre as que começaram com bloco e hoje estão livres. */
+function updateRegrow(state: GameState): void {
+  const hz = state.hazards;
+  if (!hz?.blockSpots || state.round.phase !== 'playing') return;
+  hz.regrowTimer = (hz.regrowTimer ?? BLOCK_REGROW_TICKS) - 1;
+  if (hz.regrowTimer > 0) return;
+  hz.regrowTimer = BLOCK_REGROW_TICKS;
+  const arena = state.arena;
+  const spots = hz.blockSpots.filter((index) => {
+    if (arena.cells[index] !== 'empty') return false;
+    const col = index % arena.cols;
+    const row = Math.floor(index / arena.cols);
+    if (isTunnel(hz.tunnel, arena, col, row) || hz.slippery?.includes(index)) return false;
+    if (state.players.some((p) => bodyOverlapsCell(p.x, p.y, col, row) || (p.alive && Math.abs(Math.floor(p.x) - col) + Math.abs(Math.floor(p.y) - row) <= 1))) return false;
+    if (state.bombs.some((b) => b.col === col && b.row === row)) return false;
+    if (state.flames.some((f) => f.col === col && f.row === row)) return false;
+    if (state.items.some((item) => item.col === col && item.row === row)) return false;
+    if (hz.rollers?.some((r) => Math.floor(r.x) === col && Math.abs(r.y - row - 0.5) < 1.5)) return false;
+    return true;
+  });
+  if (spots.length === 0) return;
+  const rng = createRng(state.tick * 7 + spots.length);
+  const index = spots[Math.floor(rng() * spots.length)]!;
+  arena.cells[index] = 'block';
+  state.events.push({ type: 'blockGrown', col: index % arena.cols, row: Math.floor(index / arena.cols) });
 }
 
 function updateDartTrap(state: GameState): void {

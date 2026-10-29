@@ -1,0 +1,3 @@
+Lote 30: extrair na raiz do projeto, sobrescrevendo.
+Apague (não são mais usados): public/themes/egypt/sphinx.png (a esfinge saiu da arena).
+Opções fáceis de ajustar: src/config/hazards.ts (ROLLER_PERIOD_TICKS, ROLLER_SPEED, ROLLER_BREAKS_BLOCKS, ICE_PATCHES, ICE_CRACK_LEVELS).

@@ -27,22 +27,21 @@ export interface StageDef {
 }
 
 export const STAGES: readonly StageDef[] = [
-  { id: 'classic', name: 'Arena Clássica', available: true, tagline: 'Caixotes de madeira e blocos de pedra: o jeito clássico de jogar.', cols: 15, rows: 13, maxPlayers: 5, mobileOk: true, music: ['audio/classic.ogg'] },
-  { id: 'classic17', name: 'Arena Clássica Grande', theme: 'classic', available: true, tagline: 'A clássica em tamanho família (17 x 13), com mais espaço para fugir.', cols: 17, rows: 13, maxPlayers: 5, mobileOk: false, music: ['audio/classic.ogg'] },
-  { id: 'ice', name: 'Fase do Gelo', available: true, tagline: 'Faixas escorregadias, gelo fino que racha e um iglu no meio. Três passagens e vira buraco!', cols: 15, rows: 13, maxPlayers: 4, mobileOk: true, hazards: { slippery: true, thinIce: true, igloo: true }, music: [] },
+  { id: 'classic', name: 'Arena Clássica', available: true, tagline: 'Caixotes de madeira e blocos de pedra: o jeito clássico de jogar.', cols: 15, rows: 13, maxPlayers: 5, mobileOk: true, music: ['audio/100_victories.ogg'] },
+  { id: 'classic17', name: 'Arena Clássica Grande', theme: 'classic', available: true, tagline: 'A clássica em tamanho família (17 x 13), com mais espaço para fugir.', cols: 17, rows: 13, maxPlayers: 5, mobileOk: false, music: ['audio/100_victories.ogg'] },
+  { id: 'ice', name: 'Fase do Gelo', available: true, tagline: 'Neve caindo, faixas escorregadias, gelo fino que racha e dois iglus que soltam bola de neve e pinguim!', cols: 15, rows: 13, maxPlayers: 5, mobileOk: true, hazards: { slippery: true, thinIce: true, igloo: true, regrow: true }, music: ['audio/gelo_loop.ogg', 'audio/gelo_intro.ogg'] },
   {
     id: 'egypt',
     name: 'Fase do Egito',
     available: true,
-    tagline: 'Pirâmide com túneis secretos, esfinge, areia movediça e dardos. Cuidado com o aviso!',
+    tagline: 'Pirâmide com túneis secretos, areia movediça e dardos. Cuidado com o aviso!',
     cols: 17,
     rows: 13,
     maxPlayers: 4,
     mobileOk: false,
-    hazards: { quicksand: true, dartRow: 9, sphinx: true, pyramid: true },
+    hazards: { quicksand: true, dartRow: 9, pyramid: true },
     music: ['audio/egypt.ogg', 'audio/suez.ogg'],
   },
-  { id: 'train', name: 'Fase do Trenzinho', available: false, tagline: 'Trilhos, vagões e muita fumaça.', cols: 15, rows: 13, maxPlayers: 5, mobileOk: true, music: [] },
 ];
 
 export const DEFAULT_STAGE = 'classic';

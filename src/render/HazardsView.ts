@@ -103,6 +103,41 @@ export class HazardsView {
         g.lineBetween(x + 40, y + 27, x + 48, y + 46);
         g.lineBetween(x + 26, y + 44, x + 14, y + 54);
       }
+      if (level >= 3) {
+        // Quase quebrando: o gelo fica mais escuro e cheio de rachaduras.
+        g.fillStyle(0x6fb0d8, 0.4).fillRoundedRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4, 8);
+        g.lineBetween(x + 12, y + 14, x + 8, y + 4);
+        g.lineBetween(x + 52, y + 22, x + 58, y + 10);
+        g.lineBetween(x + 48, y + 46, x + 58, y + 56);
+        g.lineBetween(x + 14, y + 54, x + 6, y + 58);
+        g.lineBetween(x + 30, y + 30, x + 36, y + 12);
+      }
+    }
+  }
+
+  /** Bola de neve (rola) e pinguim (escorrega de barriga) que descem do iglu. */
+  private drawRollers(state: GameState, g: Phaser.GameObjects.Graphics): void {
+    for (const roller of state.hazards?.rollers ?? []) {
+      const x = roller.x * TILE_SIZE;
+      const y = roller.y * TILE_SIZE;
+      g.fillStyle(0x1b1f3b, 0.25).fillEllipse(x, y + 22, 44, 12); // sombra
+      if (roller.kind === 'snowball') {
+        const spin = roller.y * 5;
+        g.fillStyle(0xdff3ff, 1).fillCircle(x, y, 27);
+        g.fillStyle(0xffffff, 1).fillCircle(x - 7, y - 8, 14);
+        g.lineStyle(3, 0x8cc7e8, 1).strokeCircle(x, y, 27);
+        g.lineStyle(3, 0x8cc7e8, 0.9).lineBetween(x + Math.cos(spin) * 8, y + Math.sin(spin) * 8, x + Math.cos(spin) * 20, y + Math.sin(spin) * 20);
+        g.lineBetween(x + Math.cos(spin + 2.1) * 8, y + Math.sin(spin + 2.1) * 8, x + Math.cos(spin + 2.1) * 20, y + Math.sin(spin + 2.1) * 20);
+      } else {
+        // Pinguim de barriga para baixo, olhando para a frente (para baixo na tela).
+        g.fillStyle(0x1f2540, 1).fillEllipse(x, y, 40, 54);
+        g.fillStyle(0xf4f7ff, 1).fillEllipse(x, y + 4, 24, 40);
+        g.fillStyle(0x1f2540, 1).fillEllipse(x - 24, y - 2, 10, 30).fillEllipse(x + 24, y - 2, 10, 30); // nadadeiras abertas
+        g.fillStyle(0xff9f1a, 1).fillTriangle(x - 7, y + 22, x + 7, y + 22, x, y + 34); // bico
+        g.fillStyle(0xff9f1a, 1).fillEllipse(x - 10, y - 28, 14, 8).fillEllipse(x + 10, y - 28, 14, 8); // pés
+        g.fillStyle(0xffffff, 1).fillCircle(x - 6, y + 14, 3).fillCircle(x + 6, y + 14, 3);
+        g.fillStyle(0x1b1f3b, 1).fillCircle(x - 6, y + 14, 1.5).fillCircle(x + 6, y + 14, 1.5);
+      }
     }
   }
 
@@ -120,6 +155,7 @@ export class HazardsView {
     const trap = state.hazards?.dartTrap;
     const g = this.g;
     g.clear();
+    this.drawRollers(state, g);
     if (!trap) return;
     const y = (trap.row + 0.5) * TILE_SIZE;
     const width = state.arena.cols * TILE_SIZE;

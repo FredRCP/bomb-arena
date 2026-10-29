@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { ICE_CRACK_LEVELS } from '../../src/config/hazards';
 import { ELEPHANT_SPEED, POWER_CHARGE_TICKS } from '../../src/config/powers';
 import { stageById } from '../../src/config/stages';
-import { aiShouldUsePower, createGameState, drainEvents, getCell, givePower, powerFraction, powerReady, step, createAi, iglooCells, placeBomb, pyramidOrigin, pyramidTunnelCells, pyramidWallCells, sphinxCells } from '../../src/core';
+import { aiShouldUsePower, createGameState, drainEvents, getCell, givePower, powerFraction, powerReady, step, createAi, iglooCells, placeBomb, pyramidOrigin, pyramidTunnelCells, pyramidWallCells } from '../../src/core';
 import type { GameState } from '../../src/core';
 import { stateFromText } from '../helpers/stateFromText';
 
@@ -26,13 +26,26 @@ describe('Egito: pirâmide central, esfinge e borda', () => {
     expect([o.col - 1, o.col + 5].every((c) => c % 2 === 1)).toBe(true);
   });
 
-  it('esfinge na fileira de cima, no meio; ninguém nasce em parede', () => {
+  it('sem esfinge, e ninguém nasce em parede', () => {
     const state = make();
-    for (const c of sphinxCells(17, 13)) {
-      expect(c.row).toBe(1);
-      expect(getCell(state.arena, c.col, c.row)).toBe('wall');
-    }
+    expect(getCell(state.arena, 8, 1)).not.toBe('wall');
     for (const p of state.players) expect(getCell(state.arena, Math.floor(p.x), Math.floor(p.y))).toBe('empty');
+  });
+
+  it('o fogo entra no túnel da pirâmide', () => {
+    const state = make();
+    const t = pyramidTunnelCells(17, 13);
+    const o = pyramidOrigin(17, 13);
+    // bomba no portal de cima (fora do túnel), com alcance de sobra: as chamas descem pela coluna do túnel
+    const p = state.players[0]!;
+    p.bombRange = 5;
+    p.x = o.col + 2.5;
+    p.y = o.row - 0.5;
+    state.arena.cells[(o.row - 1) * 17 + o.col + 2] = 'empty';
+    placeBomb(state, p);
+    for (let i = 0; i < 300 && state.flames.length === 0; i++) step(state);
+    const burning = state.flames.map((f) => f.row * 17 + f.col);
+    expect(t.some((c) => burning.includes(c.row * 17 + c.col))).toBe(true);
   });
 
   it('ninguém coloca bomba dentro do túnel', () => {
@@ -58,21 +71,63 @@ describe('Egito: pirâmide central, esfinge e borda', () => {
 });
 
 describe('Gelo: iglu, faixas e IA', () => {
-  it('iglu 3 x 3 no centro e só 4 jogadores', () => {
+  it('dois iglus na lateral de cima, simétricos, com a porta (livre) para baixo', () => {
     const state = ice({ players: 2 });
-    expect(iglooCells(15, 13)).toHaveLength(9);
-    for (const c of iglooCells(15, 13)) expect(getCell(state.arena, c.col, c.row)).toBe('wall');
-    expect(stageById('ice').maxPlayers).toBe(4);
+    const cells = iglooCells(15, 13);
+    expect(cells.map((c) => c.col)).toEqual([4, 5, 9, 10]);
+    for (const c of cells) {
+      expect(c.row).toBe(1);
+      expect(getCell(state.arena, c.col, c.row)).toBe('wall');
+    }
+    expect(state.hazards!.doors!.map((d) => [d.col, d.row])).toEqual([[5, 2], [9, 2]]);
+    for (const d of state.hazards!.doors!) expect(getCell(state.arena, d.col, d.row)).toBe('empty');
   });
 
-  it('as faixas escorregadias são poucas (20 células), sem bloco e fora do gelo fino', () => {
+  it('só 2 faixas escorregadias de 4 células, sem bloco e fora do gelo fino', () => {
     const state = ice({ players: 2 });
     const strips = state.hazards!.slippery!;
-    expect(strips).toHaveLength(20);
+    expect(strips).toHaveLength(8);
     for (const i of strips) {
       expect(state.arena.cells[i]).toBe('empty');
       expect(state.hazards!.thinIce!.includes(i)).toBe(false);
     }
+  });
+
+  it('a cada 20 s sai uma bola de neve ou um pinguim de cada iglu (o segundo, 10 s depois); descem e param na parede', () => {
+    const state = ice({ players: 1 });
+    state.hazards!.thinIce = [];
+    state.arena.cells.fill('empty');
+    for (let c = 0; c < 15; c++) state.arena.cells[12 * 15 + c] = 'wall';
+    state.round.phase = 'playing';
+    state.players[0]!.x = 1.5;
+    state.players[0]!.y = 1.5;
+    const seen: Array<[number, string, number]> = [];
+    for (let i = 0; i < 41 * 60; i++) {
+      step(state);
+      for (const e of drainEvents(state)) if (e.type === 'rollerSpawned') seen.push([e.col, e.kind, Math.round(state.tick / 60)]);
+    }
+    // segundo iglu (coluna 9) em 10 s e 30 s; primeiro (coluna 5) em 20 s e 40 s; alternando bola de neve e pinguim
+    expect(seen).toEqual([[9, 'penguin', 10], [5, 'snowball', 20], [9, 'snowball', 30], [5, 'penguin', 40]]);
+    for (let i = 0; i < 4 * 60; i++) step(state);
+    expect(state.hazards!.rollers!.length).toBe(0); // já bateram na parede de baixo
+  });
+
+  it('quem está no caminho é empurrado (sem dano); sem espaço, o rolo para', () => {
+    const state = ice({ players: 1 });
+    state.hazards!.thinIce = [];
+    state.arena.cells.fill('empty');
+    for (let c = 0; c < 15; c++) state.arena.cells[10 * 15 + c] = 'wall';
+    state.round.phase = 'playing';
+    const p = state.players[0]!;
+    p.x = 7.5;
+    p.y = 4.5;
+    state.hazards!.rollers = [{ id: 1, kind: 'penguin', x: 7.5, y: 2.5 }];
+    state.hazards!.doors = [];
+    for (let i = 0; i < 200; i++) step(state);
+    expect(p.alive).toBe(true);
+    expect(p.y).toBeGreaterThan(8); // foi empurrado até a parede
+    expect(p.y).toBeLessThan(9.6);
+    expect(state.hazards!.rollers).toHaveLength(0);
   });
 
   it('fora das faixas o jogador para quando solta a tecla; na faixa, desliza até sair', () => {
@@ -141,7 +196,7 @@ describe('Gelo: piso escorregadio', () => {
 });
 
 describe('Gelo: gelo fino', () => {
-  it('racha a cada entrada e, na terceira passagem, vira buraco quando a célula fica livre', () => {
+  it('racha a cada entrada e, na quarta passagem, vira buraco quando a célula fica livre', () => {
     const state = ice({ players: 1 });
     const p = state.players[0]!;
     const index = state.hazards!.thinIce![0]!;
@@ -160,7 +215,7 @@ describe('Gelo: gelo fino', () => {
     }
     expect(getCell(state.arena, col, row)).toBe('hole');
     const events = drainEvents(state);
-    expect(events.filter((e) => e.type === 'iceCracked')).toHaveLength(3);
+    expect(events.filter((e) => e.type === 'iceCracked')).toHaveLength(ICE_CRACK_LEVELS);
     expect(events.some((e) => e.type === 'iceBroken')).toBe(true);
     // buraco é intransponível
     p.x = col - 0.5;
@@ -247,5 +302,91 @@ describe('superpoder (elefantinho da Ana)', () => {
     expect(aiShouldUsePower(state, p)).toBe(false);
     p.facing = 'left';
     expect(aiShouldUsePower(state, p)).toBe(false);
+  });
+});
+
+describe('Gelo: a neve faz os blocos crescerem de novo', () => {
+  it('a cada 8 s cresce um bloco numa casa que começou com bloco, hoje livre e longe de todos', () => {
+    const state = ice({ players: 1 });
+    state.hazards!.thinIce = [];
+    state.round.phase = 'playing';
+    state.hazards!.doors = [];
+    const spots = state.hazards!.blockSpots!;
+    expect(spots.length).toBeGreaterThan(20);
+    for (const i of spots) state.arena.cells[i] = 'empty'; // tudo quebrado
+    const p = state.players[0]!;
+    const before = state.arena.cells.filter((c) => c === 'block').length;
+    expect(before).toBe(0);
+    let grown = 0;
+    for (let i = 0; i < 8 * 60 * 3; i++) {
+      step(state);
+      for (const e of drainEvents(state)) if (e.type === 'blockGrown') grown += 1;
+    }
+    expect(grown).toBe(3);
+    expect(state.arena.cells.filter((c) => c === 'block').length).toBe(3);
+    for (const index of state.arena.cells.keys()) if (state.arena.cells[index] === 'block') {
+      expect(spots.includes(index)).toBe(true);
+      expect(Math.abs((index % 15) - Math.floor(p.x)) + Math.abs(Math.floor(index / 15) - Math.floor(p.y))).toBeGreaterThan(1);
+    }
+  });
+
+  it('não cresce bloco em cima de bomba, fogo ou item', () => {
+    const state = ice({ players: 1 });
+    state.hazards!.thinIce = [];
+    state.round.phase = 'playing';
+    state.hazards!.doors = [];
+    const spots = state.hazards!.blockSpots!;
+    for (const i of spots) state.arena.cells[i] = 'empty';
+    state.hazards!.blockSpots = [spots[0]!];
+    const index = spots[0]!;
+    const col = index % 15;
+    const row = Math.floor(index / 15);
+    state.items.push({ kind: 'bomb', col, row } as never);
+    state.hazards!.regrowTimer = 1;
+    step(state);
+    expect(state.arena.cells[index]).toBe('empty');
+  });
+});
+
+describe('superpoder do Lucas: avião', () => {
+  const field = (): GameState => {
+    const state = stateFromText(['###########', '#.........#', '#.........#', '#.........#', '#.........#', '#.........#', '###########'], [{ id: 1, col: 1, row: 3 }, { id: 2, col: 5, row: 5 }]);
+    state.round.phase = 'playing';
+    return state;
+  };
+
+  it('carregado, o avião cruza a arena na linha do jogador largando bombas, e some na outra borda', () => {
+    const state = field();
+    const p = state.players[0]!;
+    givePower(p, 'airplane');
+    p.power!.charge = POWER_CHARGE_TICKS;
+    p.facing = 'right';
+    expect(aiShouldUsePower(state, p)).toBe(true); // há inimigo a menos de 7 células
+    step(state, { 1: { move: null, power: true } });
+    expect(state.planes).toHaveLength(1);
+    let placed = 0;
+    let gone = false;
+    for (let i = 0; i < 400; i++) {
+      step(state);
+      for (const e of drainEvents(state)) {
+        if (e.type === 'bombPlaced') placed += 1;
+        if (e.type === 'planeGone') gone = true;
+      }
+    }
+    expect(placed).toBeGreaterThanOrEqual(4);
+    expect(gone).toBe(true);
+    expect(state.planes).toHaveLength(0);
+    for (const bomb of state.bombs) expect(Math.abs(bomb.row - 3)).toBeLessThanOrEqual(3);
+  });
+
+  it('as bombas do avião não ocupam o limite de bombas do dono', () => {
+    const state = field();
+    const p = state.players[0]!;
+    p.maxBombs = 1;
+    givePower(p, 'airplane');
+    p.power!.charge = POWER_CHARGE_TICKS;
+    step(state, { 1: { move: null, power: true } });
+    for (let i = 0; i < 100; i++) step(state);
+    expect(state.bombs.filter((b) => b.owner === 1).length).toBeGreaterThanOrEqual(2); // mais que o limite de 1
   });
 });

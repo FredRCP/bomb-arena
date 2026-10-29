@@ -30,6 +30,12 @@ export interface ThemeDef {
   pyramid?: boolean;
   /** Iglu central 3 x 3 (igloo.png)? */
   igloo?: boolean;
+  /** Neve caindo por toda a tela da fase? */
+  snow?: boolean;
+  /** Piso em uma imagem só do tamanho da arena (floor.jpg), em vez dos dois ladrilhos? */
+  floorFull?: boolean;
+  /** Colunas altas (column.png, o dobro da altura de um bloco) nos quatro cantos da arena? */
+  columns?: boolean;
   /** Esfinge do alto da arena (sphinx.png, 3 células de largura)? */
   sphinx?: boolean;
   /** Areia movediça em imagem (quicksand.png)? */
@@ -38,7 +44,7 @@ export interface ThemeDef {
 
 export const THEMES: Record<string, ThemeDef> = {
   classic: { id: 'classic', floors: false, wall: true, wallWidth: 62, blockVariants: 1, blockWidth: 62, rubble: false, background: false, chips: [0xd9822b, 0xa65a1c, 0x6e3a12] },
-  egypt: { id: 'egypt', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xf3d896, 0xe0b868, 0xb88f46], borderGlyphs: 22, pyramid: true, sphinx: true, quicksand: true },
+  egypt: { id: 'egypt', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xf3d896, 0xe0b868, 0xb88f46], borderGlyphs: 22, pyramid: true, floorFull: true, columns: true, quicksand: true },
   ice: { id: 'ice', floors: true, wall: true, wallWidth: 56, blockVariants: 3, blockWidth: 62, rubble: true, background: true, chips: [0xe3f6ff, 0xb9e3f7, 0x7fc4e8], igloo: true },
 };
 
@@ -66,6 +72,8 @@ export function preloadThemes(scene: Phaser.Scene): void {
     if (theme.pyramid) add('pyramid', 'pyramid.png');
     if (theme.igloo) add('igloo', 'igloo.png');
     if (theme.sphinx) add('sphinx', 'sphinx.png');
+    if (theme.floorFull) add('floorFull', 'floor.jpg');
+    if (theme.columns) add('column', 'column.png');
     if (theme.quicksand) add('quicksand', 'quicksand.png');
     if (theme.background) add('background', 'background.jpg');
   }

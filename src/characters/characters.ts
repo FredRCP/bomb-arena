@@ -27,7 +27,15 @@ export interface CharacterDef {
   power?: PowerKind;
 }
 
+/** Os personagens com arte própria (caricaturas) vêm primeiro: ficam na linha de cima da escolha. */
 export const CHARACTERS: readonly CharacterDef[] = [
+  { id: 'fred', name: 'Fred', color: 0xffa94d, hat: 'cap', custom: true, sprites: true },
+  { id: 'vanessa', name: 'Van', color: 0xf06595, hat: 'flower', custom: true, sprites: true, spriteScale: 1.12 },
+  { id: 'ana-julia', name: 'Ana', color: 0xffd43b, hat: 'bow', custom: true, sprites: true, spriteScale: 0.92, power: 'elephant' },
+  { id: 'lucas', name: 'Lucas', color: 0x74c0fc, hat: 'none', custom: true, sprites: true, spriteScale: 0.74, power: 'airplane' },
+  { id: 'filippe', name: 'Filippe', color: 0x38d9a9, hat: 'headband', custom: true, sprites: true, spriteScale: 0.92 },
+  { id: 'waleska', name: 'Wal', color: 0xe599f7, hat: 'crown', custom: true, sprites: true },
+  { id: 'glaucio', name: 'Glauceste', color: 0xadb5bd, hat: 'cap', custom: true, sprites: true },
   { id: 'pipoca', name: 'Pipoca', color: 0xff5c8a, hat: 'antenna', custom: false },
   { id: 'bolt', name: 'Bolt', color: 0x2dc7ff, hat: 'horns', custom: false },
   { id: 'musgo', name: 'Musgo', color: 0x7ed957, hat: 'leaf', custom: false },
@@ -35,13 +43,6 @@ export const CHARACTERS: readonly CharacterDef[] = [
   { id: 'fagulha', name: 'Fagulha', color: 0xff6b35, hat: 'star', custom: false },
   { id: 'nimbo', name: 'Nimbo', color: 0x5c7cfa, hat: 'ears', custom: false },
   { id: 'cacau', name: 'Cacau', color: 0xa9744f, hat: 'tuft', custom: false },
-  { id: 'fred', name: 'Fred', color: 0xffa94d, hat: 'cap', custom: true, sprites: true },
-  { id: 'vanessa', name: 'Van', color: 0xf06595, hat: 'flower', custom: true, sprites: true, spriteScale: 1.12 },
-  { id: 'ana-julia', name: 'Ana', color: 0xffd43b, hat: 'bow', custom: true, sprites: true, spriteScale: 0.92, power: 'elephant' },
-  { id: 'lucas', name: 'Lucas', color: 0x74c0fc, hat: 'none', custom: true, sprites: true, spriteScale: 0.85 },
-  { id: 'filippe', name: 'Filippe', color: 0x38d9a9, hat: 'headband', custom: true, sprites: true, spriteScale: 0.92 },
-  { id: 'waleska', name: 'Wal', color: 0xe599f7, hat: 'crown', custom: true, sprites: true },
-  { id: 'glaucio', name: 'Glauceste', color: 0xadb5bd, hat: 'cap', custom: true, sprites: true },
 ];
 
 export function characterById(id: string | undefined): CharacterDef {

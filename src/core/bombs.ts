@@ -71,6 +71,16 @@ export function placeBomb(state: GameState, player: PlayerState): boolean {
   return true;
 }
 
+/** Bomba que cai do ar (avião do Lucas): não conta no limite de bombas do dono. Devolve false se a célula não aceita bomba. */
+export function dropBomb(state: GameState, owner: PlayerState, col: number, row: number): boolean {
+  if (!isFreeForBomb(state, col, row)) return false;
+  if (state.flames.some((flame) => flame.col === col && flame.row === row)) return false;
+  const walkThrough = state.players.filter((other) => other.alive && bodyOverlapsCell(other.x, other.y, col, row)).map((other) => other.id);
+  state.bombs.push({ owner: owner.id, col, row, ticksLeft: BOMB_FUSE_TICKS, range: owner.bombRange, walkThrough, pierce: owner.piercing, remote: false });
+  state.events.push({ type: 'bombPlaced', col, row, owner: owner.id });
+  return true;
+}
+
 /** Tira da lista `walkThrough` quem já saiu de cima da bomba (a partir daí a bomba o bloqueia). */
 export function releaseBombs(state: GameState): void {
   for (const bomb of state.bombs) {
