@@ -156,6 +156,10 @@ describe('classificação e relógio', () => {
     expect(rankingLines(ranked, solo)).toEqual(['1º CPU 1  ·  800 pts  ·  3 elim.', '2º Você  ·  300 pts  ·  0 elim.']);
   });
 
+  it('formatClock: sem limite de tempo mostra o infinito', () => {
+    expect(formatClock(Number.POSITIVE_INFINITY)).toBe('∞');
+  });
+
   it('formatClock: minutos e segundos, arredondando para cima', () => {
     expect(formatClock(10800)).toBe('3:00');
     expect(formatClock(10799)).toBe('3:00');

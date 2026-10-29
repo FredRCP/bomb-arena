@@ -20,7 +20,13 @@ const TOP = 190;
 const PLAYERS = [
   { label: 'Jogador 1', color: 0xff5c8a, hex: '#ff5c8a', left: ['A'], right: ['D'], up: ['W'], down: ['S'], confirm: ['SPACE'], cancel: ['ESC'] },
   { label: 'Jogador 2', color: 0x2dc7ff, hex: '#2dc7ff', left: ['LEFT', 'NUMPAD_FOUR'], right: ['RIGHT', 'NUMPAD_SIX'], up: ['UP', 'NUMPAD_EIGHT'], down: ['DOWN', 'NUMPAD_TWO'], confirm: ['ENTER'], cancel: ['BACKSPACE'] },
+  { label: 'Jogador 3', color: 0x7ed957, hex: '#7ed957', left: [], right: [], up: [], down: [], confirm: [], cancel: [] },
+  { label: 'Jogador 4', color: 0xb388ff, hex: '#b388ff', left: [], right: [], up: [], down: [], confirm: [], cancel: [] },
+  { label: 'Jogador 5', color: 0xffd43b, hex: '#ffd43b', left: [], right: [], up: [], down: [], confirm: [], cancel: [] },
 ] as const;
+
+/** Jogadores de 3 em diante usam só o controle de videogame. */
+const KEYBOARD_PLAYERS = 2;
 
 /**
  * Escolha de personagem: cada pessoa move o cursor e confirma. Os inimigos do computador recebem
@@ -63,7 +69,7 @@ export class SelectScene extends Phaser.Scene {
     });
 
     this.add
-      .text(SCREEN_WIDTH / 2, SCREEN_HEIGHT - 60, this.humans === 1 ? 'Setas ou W A S D mover     Espaço ou Enter confirmar     Esc voltar' : 'Jogador 1: W A S D + Espaço     Jogador 2: setas ou 2 4 8 6 + Enter     Esc/Backspace ou B: desfazer ou voltar', { fontFamily: FONT, fontSize: '24px', color: '#ffffff' })
+      .text(SCREEN_WIDTH / 2, SCREEN_HEIGHT - 60, this.humans === 1 ? 'Setas ou W A S D mover     Espaço ou Enter confirmar     Esc voltar' : this.humans === 2 ? 'Jogador 1: W A S D + Espaço     Jogador 2: setas ou 2 4 8 6 + Enter     Esc/Backspace ou B: desfazer ou voltar' : 'Jogadores 1 e 2: teclado ou controles 1 e 2     Jogadores 3 em diante: controle de mesmo número     A confirma, B volta', { fontFamily: FONT, fontSize: '24px', color: '#ffffff' })
       .setOrigin(0.5);
 
     this.bindKeys();
@@ -85,7 +91,7 @@ export class SelectScene extends Phaser.Scene {
     const bind = (names: readonly string[], action: () => void): void => {
       for (const name of names) keyboard.addKey(name).on('down', action);
     };
-    for (let who = 0; who < this.humans; who++) {
+    for (let who = 0; who < Math.min(this.humans, KEYBOARD_PLAYERS); who++) {
       const keys = PLAYERS[who]!;
       // Sozinho, o jogador 1 também aceita as setas e o Enter (como no menu).
       const solo = this.humans === 1;
@@ -153,11 +159,12 @@ export class SelectScene extends Phaser.Scene {
     this.picker.cursor.forEach((index, who) => {
       const { x, y } = this.cardCenter(index);
       const keys = PLAYERS[who]!;
-      const offset = who === 0 ? -6 : 6;
+      const offset = [-8, 8, -8, 8, 0][who] ?? 0;
+      const offsetY = [-8, -8, 8, 8, 0][who] ?? 0;
       const done = this.picker.confirmed[who]!;
-      const frame = this.add.rectangle(x + offset, y + offset, CARD_W + 8, CARD_H + 8).setStrokeStyle(done ? 8 : 5, keys.color).setDepth(5);
+      const frame = this.add.rectangle(x + offset, y + offsetY, CARD_W + 8, CARD_H + 8).setStrokeStyle(done ? 8 : 5, keys.color).setDepth(5);
       const tag = this.add
-        .text(x + offset, y - CARD_H / 2 + 6, done ? `${keys.label} ✔` : keys.label, { fontFamily: FONT, fontSize: '20px', fontStyle: 'bold', color: '#0b0c1a', backgroundColor: keys.hex, padding: { x: 8, y: 2 } })
+        .text(x + offset * 5, y - CARD_H / 2 + 6 + Math.floor(who / 2) * 26, done ? `${keys.label} ✔` : keys.label, { fontFamily: FONT, fontSize: '20px', fontStyle: 'bold', color: '#0b0c1a', backgroundColor: keys.hex, padding: { x: 8, y: 2 } })
         .setOrigin(0.5, 0)
         .setDepth(6);
       this.overlay.push(frame, tag);

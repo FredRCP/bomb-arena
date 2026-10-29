@@ -5,7 +5,7 @@ import type { CharacterChoices } from '../characters/characters';
 import { drawItemPlate } from './ArenaRenderer';
 import { hasItemIcon, itemTexture } from './ItemSprites';
 import { addCharacter, setFace } from './CharacterView';
-import { ARENA_WIDTH, SIDE_WIDTH, SCREEN_WIDTH, TOP_HEIGHT } from './layout';
+import { SCREEN_WIDTH, TOP_HEIGHT, arenaWidthFor, sideWidthFor } from './layout';
 import { formatClock, isTeamGame, playerLabel } from './outcomeText';
 
 const FONT = 'system-ui, "Segoe UI", Roboto, sans-serif';
@@ -70,7 +70,8 @@ export function createHud(scene: Phaser.Scene, state: GameState, choices: Charac
   const characterOf = (player: PlayerState) => characterById(choices[player.id]);
   const hasAlly = (player: PlayerState): boolean => players.some((other) => other.id !== player.id && other.team === player.team);
   const accentOf = (player: PlayerState): number => (teamGame && hasAlly(player) ? TEAM_COLORS[player.team] ?? characterOf(player).color : characterOf(player).color);
-  const left = -SIDE_WIDTH;
+  const side = sideWidthFor(state.arena.cols);
+  const left = -side;
   const barY = -TOP_HEIGHT;
 
   // Fundo da barra (o fundo colorido da tela é desenhado pela cena)
@@ -81,7 +82,7 @@ export function createHud(scene: Phaser.Scene, state: GameState, choices: Charac
   back.fillRect(left, -4, SCREEN_WIDTH, 4);
 
   // ---- Relógio e, embaixo dele, o aviso da morte súbita
-  const clockCenter = ARENA_WIDTH / 2;
+  const clockCenter = arenaWidthFor(state.arena.cols) / 2;
   const clockY = barY + TOP_HEIGHT / 2 - 2;
   drawClockIcon(back, clockCenter - 62, clockY);
   const clock = scene.add.text(clockCenter + 14, clockY, '', style(44, '#ffffff', 5)).setOrigin(0.5).setDepth(5);
@@ -108,7 +109,7 @@ export function createHud(scene: Phaser.Scene, state: GameState, choices: Charac
 
   // Teclas gerais, no canto esquerdo da tela (o fundo colorido, ao lado da arena)
   scene.add
-    .text(left + 24, 24, 'Esc  pausa\nR  reinicia a rodada\nQ  menu\nM  som', { ...style(20, '#ffffff', 4), lineSpacing: 6 })
+    .text(left + 24, 24, 'Esc  pausa\nR  reinicia a rodada\nQ  menu\nM  som', { ...style(side >= 256 ? 20 : 15, '#ffffff', 4), lineSpacing: 6 })
     .setOrigin(0, 0)
     .setDepth(5)
     .setAlpha(0.85);

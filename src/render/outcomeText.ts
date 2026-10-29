@@ -121,6 +121,7 @@ export function rankingLines(ranked: readonly RankedPlayer[], players: Roster): 
 
 /** Tempo restante no formato do relógio ("3:00"). Arredonda para cima: com 0,3 s sobrando ainda mostra 0:01. */
 export function formatClock(ticksLeft: number): string {
+  if (!Number.isFinite(ticksLeft)) return '∞'; // rodada sem limite de tempo
   const seconds = Math.ceil(Math.max(0, ticksLeft) / TICKS_PER_SECOND);
   return `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
 }

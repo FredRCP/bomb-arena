@@ -58,7 +58,8 @@ export class KeyboardInput {
       for (const id of playerIds) {
         const input: PlayerInput = { stack: new DirectionStack(), bombPressed: false, specialPressed: false, padBomb: false, padSpecial: false, padMove: null, touchMove: null };
         this.players.set(id, input);
-        const controls = PLAYER_CONTROLS[id];
+        const controls = id <= 2 ? PLAYER_CONTROLS[id as 1 | 2] : undefined; // 3 a 5: só controle de videogame
+        if (!controls) continue;
 
         for (const direction of DIRECTIONS) {
           for (const name of controls[direction]) {

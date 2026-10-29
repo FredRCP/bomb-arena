@@ -1,5 +1,7 @@
 import Phaser from 'phaser';
-import { music } from '../audio/music';
+import { SUDDEN_DEATH_MUSIC, music, pickTrack } from '../audio/music';
+import { stageById, themeIdOf } from '../config/stages';
+import { loadSettings } from '../menu/settingsStorage';
 import { sfx } from '../audio/sfx';
 import { AI_SETTINGS } from '../config/ai';
 import { COUNTDOWN_SECONDS } from '../config/round';
@@ -36,7 +38,8 @@ import { FlameSprites } from '../render/FlameSprites';
 import { ItemSprites, hasItemIcon } from '../render/ItemSprites';
 import { FLAME_TICKS } from '../config/bombs';
 import { createHud } from '../render/Hud';
-import { SCREEN_HEIGHT, SCREEN_WIDTH, SIDE_WIDTH, TOP_HEIGHT, placeArena } from '../render/layout';
+import { SCREEN_HEIGHT, SCREEN_WIDTH, TOP_HEIGHT, placeArena, sideWidthFor } from '../render/layout';
+import { HazardsView } from '../render/HazardsView';
 import { addMenuBackground } from '../render/menuBackground';
 import { has, themeById, themeKey } from '../render/theme';
 import type { Hud } from '../render/Hud';
@@ -46,6 +49,10 @@ import { addToRanking, rankingPosition } from '../menu/ranking';
 import { loadRanking, saveRanking } from '../menu/rankingStorage';
 import type { RankedPlayer } from '../core';
 
+
+/** Volume da música durante a contagem regressiva (1 = normal). */
+const COUNTDOWN_MUSIC_DUCK = 0.3;
+
 /** Tudo que atravessa o reinício da cena: a configuração da partida e o placar. A rodada em si é descartada. */
 export interface GameSession {
   config: GameConfig;
@@ -54,6 +61,8 @@ export interface GameSession {
   scores?: Scoreboard;
   /** Personagem de cada jogador (id do jogador -> id do personagem). Ausente: escolha padrão. */
   characters?: CharacterChoices;
+  /** Música sorteada para esta partida (vale para todas as rodadas dela). Ausente: sorteia ao começar. */
+  track?: string;
 }
 
 /** Quanto a semente avança quando começa uma partida nova (para a revanche não repetir as mesmas arenas). */
@@ -75,6 +84,9 @@ export class GameScene extends Phaser.Scene {
   private flameSprites!: FlameSprites;
   private itemSprites!: ItemSprites;
   private closedView!: ClosedView;
+  private hazardsView!: HazardsView;
+  /** A música da morte súbita já começou nesta rodada? */
+  private suddenMusic = false;
   private hud!: Hud;
   private readonly playerViews = new Map<PlayerId, Phaser.GameObjects.Container>();
   /** Jogadores controlados por pessoas (para os textos de resultado e para ligar as teclas certas). */
@@ -107,6 +119,7 @@ export class GameScene extends Phaser.Scene {
       config: data?.config ?? parseGameConfig(window.location.search),
       match: data?.match ?? createMatch(data?.config?.wins ?? parseGameConfig(window.location.search).wins),
       ...(data?.characters && { characters: data.characters }),
+      ...(data?.track && { track: data.track }),
       ...(data?.scores && { scores: data.scores }),
     };
   }
@@ -123,7 +136,11 @@ export class GameScene extends Phaser.Scene {
     console.info(`[Bomb Arena] semente da arena: ${seed} (rodada ${match.round})`);
 
     // O core decide o que existe; a cena só pede o estado e manda desenhar.
-    this.gameState = createGameState({ seed, players: config.players, enemies: config.enemies, items: config.items, sideline: config.sideline ?? true, teams: config.teams, ...(config.teamAssignment && { teamAssignment: config.teamAssignment }), enemySpeedScale: AI_SETTINGS[config.difficulty].speedScale, ...(config.time !== undefined && { roundTicks: config.time * TICKS_PER_SECOND }) });
+    const stage = stageById(config.stage ?? 'classic');
+    // A fase manda no tamanho da arena e no máximo de jogadores (endereços como ?stage=egypt&players=5 também respeitam).
+    const players = Math.min(config.players, stage.maxPlayers) as typeof config.players;
+    const enemies = Math.min(config.enemies, stage.maxPlayers - players) as typeof config.enemies;
+    this.gameState = createGameState({ seed, cols: stage.cols, rows: stage.rows, ...(stage.hazards && { hazards: stage.hazards }), players, enemies, items: config.items, sideline: config.sideline ?? true, teams: config.teams, ...(config.teamAssignment && { teamAssignment: config.teamAssignment }), enemySpeedScale: AI_SETTINGS[config.difficulty].speedScale, ...(config.time !== undefined && { roundTicks: config.time === 0 ? Number.POSITIVE_INFINITY : config.time * TICKS_PER_SECOND }) });
     this.characters = this.session.characters ?? defaultChoices(this.gameState.players.length);
     // O computador aparece com o nome do personagem que está jogando (e não "CPU 1", "CPU 2"...).
     const cpuNames: Record<number, string> = {};
@@ -146,8 +163,8 @@ export class GameScene extends Phaser.Scene {
       if (config.range !== undefined) player.bombRange = config.range;
     }
 
-    placeArena(this);
-    const theme = themeById(config.stage);
+    placeArena(this, stage.cols);
+    const theme = themeById(themeIdOf(stage));
     if (theme.background && has(this, theme, 'background')) {
       // Fundo da fase: uma imagem do tamanho da tela (a câmera desliza, por isso começa no canto da tela, e não em 0,0).
       this.add.image(this.cameras.main.scrollX, this.cameras.main.scrollY, themeKey(theme, 'background')).setOrigin(0, 0).setDisplaySize(SCREEN_WIDTH, SCREEN_HEIGHT).setDepth(-100);
@@ -163,7 +180,7 @@ export class GameScene extends Phaser.Scene {
     this.pauseObjects = [];
     this.playerViews.clear();
 
-    drawArena(this, this.gameState.arena, theme.id);
+    drawArena(this, this.gameState.arena, theme.id, this.gameState.hazards);
     this.blocksView = createBlocksView(this, this.gameState.arena, theme.id);
     this.itemsView = createItemsView(this);
     this.effectsView = createEffectsView(this);
@@ -171,6 +188,8 @@ export class GameScene extends Phaser.Scene {
     this.flameSprites = new FlameSprites(this);
     this.itemSprites = new ItemSprites(this);
     this.closedView = createClosedView(this, theme.id);
+    this.hazardsView = new HazardsView(this, this.gameState);
+    this.suddenMusic = false;
     for (const player of this.gameState.players) {
       this.playerViews.set(player.id, createPlayerView(this, player, characterById(this.characters[player.id])));
     }
@@ -178,14 +197,17 @@ export class GameScene extends Phaser.Scene {
 
     this.debugText = null;
     if (new URLSearchParams(window.location.search).get('debug') === '1') {
-      this.debugText = this.add.text(-SIDE_WIDTH + 12, -TOP_HEIGHT + 4, '', { fontFamily: 'monospace', fontSize: '16px', color: '#ffe66d' }).setDepth(50);
+      this.debugText = this.add.text(-sideWidthFor(stage.cols) + 12, -TOP_HEIGHT + 4, '', { fontFamily: 'monospace', fontSize: '16px', color: '#ffe66d' }).setDepth(50);
       this.debugMs = 0;
       this.debugTicks = 0;
     }
 
     this.keyboardInput = new KeyboardInput(this, this.humans as HumanId[]);
     this.touchControls = this.humans.includes(1) && wantsTouchControls() ? new TouchControls(this, this.keyboardInput) : null;
-    music.play(theme.id);
+    music.setLevel(loadSettings().music);
+    music.setDuck(this.countdownTicks > 0 ? COUNTDOWN_MUSIC_DUCK : 1); // música baixinha durante a contagem
+    this.session.track ??= pickTrack(stage.id);
+    music.play(this.session.track);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.keyboardInput.destroy();
       music.release();
@@ -290,6 +312,7 @@ export class GameScene extends Phaser.Scene {
     const label = this.countdownTicks > 0 ? String(Math.ceil(this.countdownTicks / TICKS_PER_SECOND)) : 'VAI!';
     if (label === this.lastCountdownShown) return;
     this.lastCountdownShown = label;
+    if (this.countdownTicks === 0) music.fadeDuckTo(1, 1200); // "VAI!": a música sobe ao volume normal
     sfx.play(this.countdownTicks > 0 ? 'tick' : 'place');
     const x = (this.gameState.arena.cols * TILE_SIZE) / 2;
     const y = (this.gameState.arena.rows * TILE_SIZE) / 2;
@@ -314,12 +337,12 @@ export class GameScene extends Phaser.Scene {
   private restart(roundOver: boolean): void {
     const { config, match } = this.session;
     if (!roundOver) {
-      this.scene.restart({ config, match, characters: this.characters, scores: this.session.scores });
+      this.scene.restart({ config, match, characters: this.characters, scores: this.session.scores, ...(this.session.track && { track: this.session.track }) });
     } else if (match.finished) {
       this.scene.restart({ config: { ...config, seed: config.seed + SEED_STEP_PER_MATCH }, match: createMatch(config.wins), characters: this.characters });
     } else {
       nextRound(match);
-      this.scene.restart({ config, match, characters: this.characters, scores: this.session.scores });
+      this.scene.restart({ config, match, characters: this.characters, scores: this.session.scores, ...(this.session.track && { track: this.session.track }) });
     }
   }
 
@@ -352,6 +375,8 @@ export class GameScene extends Phaser.Scene {
         drawClosedWall(this.closedView, event.col, event.row);
         heard.add('tick');
       }
+      if (event.type === 'dartWarn') heard.add('tick');
+      if (event.type === 'dartFired') heard.add('place');
       if (event.type === 'bombPlaced' || event.type === 'bombKicked' || event.type === 'bombThrown') heard.add('place');
       if (event.type === 'bombPlaced') triggerBombPose(this.playerViews.get(event.owner), this.gameState.tick);
       if (event.type === 'bombExploded') heard.add('explode');
@@ -412,6 +437,12 @@ export class GameScene extends Phaser.Scene {
 
   /** Copia o estado do core (jogadores, itens, bombas, chamas, placar) para os desenhos. */
   private syncViews(): void {
+    // Acabou o tempo: começa a música da morte súbita (a mesma em todas as fases).
+    if (this.gameState.round.suddenDeath && !this.suddenMusic && this.gameState.round.phase === 'playing') {
+      this.suddenMusic = true;
+      music.play(SUDDEN_DEATH_MUSIC);
+    }
+    this.hazardsView.update(this.gameState);
     drawItems(this.itemsView, this.gameState, (kind) => hasItemIcon(this, kind));
     this.itemSprites.update(this.gameState);
     const spriteFlames = this.flameSprites.ready;

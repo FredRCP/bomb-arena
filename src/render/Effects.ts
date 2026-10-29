@@ -48,7 +48,7 @@ export class Effects {
         const p = state.players.find((q) => q.id === (event.type === 'itemPicked' ? event.playerId : event.playerId));
         if (p) this.sparkle(p.x * TILE_SIZE, p.y * TILE_SIZE - 20, event.type === 'itemPicked' ? 0xffe66d : 0x7ed957);
       }
-      if (event.type === 'vestBroken' || event.type === 'playerHit') {
+      if (event.type === 'vestBroken' || event.type === 'playerHit' || event.type === 'thrownHit') {
         const p = state.players.find((q) => q.id === event.playerId);
         if (p) this.stars(p.x * TILE_SIZE, p.y * TILE_SIZE - 30);
       }

@@ -40,8 +40,8 @@ export function recordEvents(board: Scoreboard, events: readonly GameEvent[], pl
     if (event.type !== 'playerHit') continue;
     lineOf(board, event.playerId).deaths += 1;
     if (event.killers.length === 0) {
-      // Eliminou-se com a própria bomba (perde pontos); esmagado pela morte súbita só conta a morte.
-      if (!event.crushed) lineOf(board, event.playerId).points += POINTS_SUICIDE;
+      // Eliminou-se com a própria bomba (perde pontos); esmagado pela morte súbita ou atingido por dardo só conta a morte.
+      if (!event.crushed && !event.dart) lineOf(board, event.playerId).points += POINTS_SUICIDE;
       continue;
     }
     for (const killer of event.killers) {

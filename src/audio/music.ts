@@ -1,22 +1,27 @@
 // Música de fundo das partidas. Fora do core: é só apresentação.
 // Usa um elemento de áudio comum (toca em loop, carrega aos poucos e não pesa na abertura do jogo).
+import { SUDDEN_DEATH_MUSIC } from '../config/stages';
+import { pickTrack } from './musicPick';
 import { sfx } from './sfx';
 
-/** Arquivo de música de cada arena (relativo a public/). Arena sem entrada fica sem música. */
-export const STAGE_MUSIC: Record<string, string> = { classic: 'audio/classic.ogg' };
+export { SUDDEN_DEATH_MUSIC, pickTrack };
 
 /** A música fica bem abaixo dos efeitos para não cobrir os estrondos. */
-const MUSIC_GAIN = 0.45;
+const MUSIC_GAIN = 0.8;
 
 class Music {
   private element: HTMLAudioElement | null = null;
   private current: string | null = null;
   private stopTimer: number | undefined;
+  /** Volume da música pelo nível do menu (0 a 10), com a mesma curva dos sons. */
+  private level = 0.6;
+  /** Abafa a música (1 = normal): usado na contagem regressiva do início da rodada. */
+  private duck = 1;
+  private fadeTimer: number | undefined;
 
-  /** Toca a música da arena (ou nada, se não houver). Chamar de novo com a mesma faixa não reinicia. */
-  play(stage: string): void {
+  /** Toca a faixa (ou nada, se não houver). Chamar de novo com a mesma faixa não reinicia. */
+  play(file: string | undefined): void {
     window.clearTimeout(this.stopTimer);
-    const file = STAGE_MUSIC[stage];
     if (!file) {
       this.stopNow();
       return;
@@ -41,11 +46,39 @@ class Music {
     this.stopTimer = window.setTimeout(() => this.stopNow(), 400);
   }
 
+  /** Nível do menu: 0 (mudo) a 10. */
+  setLevel(level: number): void {
+    const clamped = Math.min(10, Math.max(0, level));
+    this.level = (clamped / 10) ** 2;
+    this.sync();
+  }
+
+  /** Abafa na hora (fator de 0 a 1). */
+  setDuck(factor: number): void {
+    window.clearInterval(this.fadeTimer);
+    this.duck = factor;
+    this.sync();
+  }
+
+  /** Volta ao volume normal aos poucos (em `ms` milissegundos). */
+  fadeDuckTo(target: number, ms: number): void {
+    window.clearInterval(this.fadeTimer);
+    const steps = 20;
+    const from = this.duck;
+    let n = 0;
+    this.fadeTimer = window.setInterval(() => {
+      n += 1;
+      this.duck = from + ((target - from) * n) / steps;
+      this.sync();
+      if (n >= steps) window.clearInterval(this.fadeTimer);
+    }, ms / steps);
+  }
+
   /** Acompanha o volume do menu e o mudo (tecla M). */
   sync(): void {
     const el = this.element;
     if (!el) return;
-    el.volume = Math.min(1, sfx.volumeNow * MUSIC_GAIN);
+    el.volume = Math.min(1, this.level * this.duck * MUSIC_GAIN);
     if (sfx.muted) el.pause();
     else if (el.paused) void el.play().catch(() => undefined);
   }

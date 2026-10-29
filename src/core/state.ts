@@ -2,6 +2,8 @@ import { DEFAULT_BOMB_RANGE, DEFAULT_MAX_BOMBS } from '../config/bombs';
 import { ARENA_SYMMETRIC, DEFAULT_SEED } from '../config/arena';
 import { centerSpawn, createArena, spawnCells } from './arena';
 import type { ArenaOptions } from './arena';
+import { createHazards } from './hazards';
+import type { HazardOptions } from './hazards';
 import { generateHiddenItems } from './items';
 import { createRound } from './round';
 import type { Cell, GameEvent, GameState, PlayerId, PlayerState } from './types';
@@ -54,7 +56,8 @@ export function createPlayer(id: PlayerId, cell: Cell, team: number = id, cpu = 
 
 export interface GameOptions extends ArenaOptions {
   /** Quantos jogadores nascem: 1 (canto superior esquerdo) ou 2 (o segundo, no canto oposto). Padrão: 1. */
-  players?: 1 | 2;
+  /** Pessoas na partida, de 1 a 5 (as de 3 em diante jogam com controle de videogame). */
+  players?: 1 | 2 | 3 | 4 | 5;
   /** Inimigos do computador (0 a 3). Nascem nos cantos que sobram (o time deles vem de `teams`). Padrão: 0. */
   enemies?: 0 | 1 | 2 | 3 | 4;
   /** Esconder itens em parte dos blocos (padrão: sim). Desligar deixa a partida igual à das Etapas 1–6. */
@@ -73,6 +76,8 @@ export interface GameOptions extends ArenaOptions {
    * próprio (veja `SOLO_TEAM_BASE`).
    */
   teamAssignment?: readonly number[];
+  /** Perigos do terreno da arena (areia movediça, dardos, esfinge). Padrão: nenhum. */
+  hazards?: HazardOptions;
 }
 
 /** Quem joga sem time recebe o time SOLO_TEAM_BASE + id (nunca colide com os times 1 e 2). */
@@ -86,10 +91,11 @@ export const MAX_PLAYERS = 5;
 
 /** Cria o estado inicial da partida: arena, jogadores (humanos e inimigos) vivos nos cantos e tudo o mais zerado. */
 export function createGameState(options: GameOptions = {}): GameState {
-  const humans = options.players === 2 ? 2 : 1;
+  const humans = Math.min(MAX_PLAYERS, Math.max(1, options.players ?? 1));
   const enemies = Math.min(options.enemies ?? 0, MAX_PLAYERS - humans);
   // Com 5 jogadores, o quinto nasce no centro da arena (que então ganha uma zona livre).
   const arena = createArena({ ...options, centerSpawn: humans + enemies >= MAX_PLAYERS });
+  const hazards = createHazards(arena, options.hazards, options.seed ?? DEFAULT_SEED);
   const spawns = [...spawnCells(arena.cols, arena.rows), centerSpawn(arena.cols, arena.rows)];
   const total = humans + enemies;
   const teams = options.teamAssignment?.length === total ? [...options.teamAssignment] : assignTeams(options.teams ?? 'free', humans, total);
@@ -108,6 +114,7 @@ export function createGameState(options: GameOptions = {}): GameState {
     bombs: [],
     flames: [],
     items: [],
+    ...(hazards && { hazards }),
     hiddenItems:
       options.items === false
         ? []

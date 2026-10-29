@@ -20,10 +20,19 @@ export interface ThemeDef {
   background: boolean;
   /** Cores dos estilhaços quando um bloco quebra. */
   chips: readonly number[];
+  /** Pilares do meio da arena em imagem própria (pillar.png), diferente da parede da borda? */
+  pillar?: boolean;
+  /** Largura com que o pilar é desenhado. */
+  pillarWidth?: number;
+  /** Esfinge do centro (sphinx.png, 3 células de largura)? */
+  sphinx?: boolean;
+  /** Areia movediça em imagem (quicksand.png)? */
+  quicksand?: boolean;
 }
 
 export const THEMES: Record<string, ThemeDef> = {
   classic: { id: 'classic', floors: false, wall: true, wallWidth: 62, blockVariants: 1, blockWidth: 62, rubble: false, background: false, chips: [0xd9822b, 0xa65a1c, 0x6e3a12] },
+  egypt: { id: 'egypt', floors: true, wall: true, wallWidth: 62, blockVariants: 22, blockWidth: 62, rubble: false, background: true, chips: [0xe6c98a, 0xc9a45c, 0x9a7a3c], pillar: true, pillarWidth: 66, sphinx: true, quicksand: true },
   ice: { id: 'ice', floors: true, wall: true, wallWidth: 56, blockVariants: 3, blockWidth: 62, rubble: true, background: true, chips: [0xe3f6ff, 0xb9e3f7, 0x7fc4e8] },
 };
 
@@ -46,6 +55,9 @@ export function preloadThemes(scene: Phaser.Scene): void {
     if (theme.wall) add('wall', 'wall.png');
     for (let i = 1; i <= theme.blockVariants; i++) add(`block${i}`, `block${i}.png`);
     if (theme.rubble) add('rubble', 'rubble.png');
+    if (theme.pillar) add('pillar', 'pillar.png');
+    if (theme.sphinx) add('sphinx', 'sphinx.png');
+    if (theme.quicksand) add('quicksand', 'quicksand.png');
     if (theme.background) add('background', 'background.jpg');
   }
 }

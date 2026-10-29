@@ -11,7 +11,8 @@ export const DEFAULT_TEAMS: TeamMode = 'free';
 // Sem Phaser: recebe o texto do endereço como parâmetro, então é testável.
 
 export interface GameConfig {
-  players: 1 | 2;
+  /** Pessoas na partida (1 a 5; de 3 em diante com controles de videogame). */
+  players: 1 | 2 | 3 | 4 | 5;
   /** Inimigos do computador. Em partida de 2 pessoas o padrão é 0. Pessoas + inimigos: no máximo 5. */
   enemies: 0 | 1 | 2 | 3 | 4;
   difficulty: AiDifficulty;
@@ -26,7 +27,7 @@ export interface GameConfig {
   /** Ajudas de teste: sobrescrevem bombas/alcance de todos os jogadores (?bombs=3&range=4). */
   bombs?: number;
   range?: number;
-  /** Duração da rodada em segundos (?time=10, para testar a morte súbita). Ausente: 3 minutos. */
+  /** Duração da rodada em segundos (?time=10, para testar a morte súbita; 0 = sem limite). Ausente: 3 minutos. */
   time?: number;
   /** Rodadas que um time precisa vencer para ganhar a partida (1 = partida única). Ausente: 2. */
   wins?: number;
@@ -60,7 +61,7 @@ function readInt(query: URLSearchParams, name: string, min: number, max: number)
 /** Lê a configuração do endereço (ex.: "?players=1&enemies=2&ai=hard"). Valor ausente ou inválido usa o padrão. */
 export function parseGameConfig(search: string): GameConfig {
   const query = new URLSearchParams(search);
-  const players = readInt(query, 'players', 1, 2) === 1 ? 1 : 2;
+  const players = (readInt(query, 'players', 1, 5) ?? 2) as GameConfig['players'];
   const enemies = Math.min(readInt(query, 'enemies', 0, 4) ?? (players === 1 ? 1 : 0), 5 - players) as 0 | 1 | 2 | 3 | 4;
   const aiRaw = query.get('ai');
   const difficulty = (Object.keys(AI_SETTINGS) as AiDifficulty[]).find((name) => name === aiRaw) ?? DEFAULT_AI_DIFFICULTY;
@@ -76,7 +77,7 @@ export function parseGameConfig(search: string): GameConfig {
   const range = readInt(query, 'range', 1, 12);
   if (bombs !== undefined) config.bombs = bombs;
   if (range !== undefined) config.range = range;
-  const time = readInt(query, 'time', 1, 600);
+  const time = readInt(query, 'time', 0, 600);
   if (time !== undefined) config.time = time;
   const wins = readInt(query, 'wins', 1, 3);
   if (wins !== undefined) config.wins = wins;

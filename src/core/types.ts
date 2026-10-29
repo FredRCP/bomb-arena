@@ -140,7 +140,7 @@ export type GameEvent =
   | { type: 'bombExploded'; col: number; row: number; owner: PlayerId }
   | { type: 'blockDestroyed'; col: number; row: number }
   /** `killers` = donos das bombas que o eliminaram (sem ele mesmo); vazio = ele mesmo; `crushed` = esmagado pela morte súbita. */
-  | { type: 'playerHit'; playerId: PlayerId; killers: PlayerId[]; crushed?: boolean }
+  | { type: 'playerHit'; playerId: PlayerId; killers: PlayerId[]; crushed?: boolean; dart?: boolean }
   /** O colete aguentou uma explosão e se desfez (o jogador segue vivo). */
   | { type: 'vestBroken'; playerId: PlayerId }
   /** Um jogador eliminado voltou à arena (porque uma bomba dele eliminou alguém). */
@@ -154,6 +154,9 @@ export type GameEvent =
   | { type: 'bombThrown'; fromCol: number; fromRow: number; col: number; row: number }
   /** Uma bomba arremessada caiu em cima de um jogador; `lost` é o item que ele perdeu (null = não tinha nenhum). */
   | { type: 'thrownHit'; playerId: PlayerId; lost: ItemKind | null }
+  /** Armadilha de dardos: aviso (a fileira vai ser varrida em instantes) e disparo. `dir` = 1 (da esquerda para a direita) ou -1. */
+  | { type: 'dartWarn'; row: number; dir: 1 | -1 }
+  | { type: 'dartFired'; row: number; dir: 1 | -1 }
   /** Morte súbita: a célula virou parede. */
   | { type: 'cellClosed'; col: number; row: number }
   | { type: 'roundEnded'; outcome: RoundOutcome };
@@ -186,6 +189,25 @@ export interface RoundState {
   nextCloseIn: number;
 }
 
+/**
+ * Armadilha de dardos de uma fileira: parada (idle) até o aviso (warn), depois os dardos varrem a fileira (fly).
+ * `timer` = passos até a próxima fase; `x` = posição do dardo em células (só em fly); `dir` alterna a cada disparo.
+ */
+export interface DartTrap {
+  row: number;
+  phase: 'idle' | 'warn' | 'fly';
+  timer: number;
+  dir: 1 | -1;
+  x: number;
+}
+
+/** Perigos do terreno de algumas arenas (veja hazards.ts). */
+export interface HazardsState {
+  /** Células de areia movediça (índices de `arena.cells`): quem pisa anda bem mais devagar. */
+  quicksand: number[];
+  dartTrap: DartTrap | null;
+}
+
 /** Fonte única de verdade da partida. A renderização apenas lê este estado. */
 export interface GameState {
   arena: Arena;
@@ -199,6 +221,8 @@ export interface GameState {
   /** Eventos acumulados desde a última leitura; use `drainEvents` para pegá-los e esvaziar a lista. */
   events: GameEvent[];
   round: RoundState;
+  /** Perigos do terreno (areia movediça, dardos). Ausente = arena sem perigos. */
+  hazards?: HazardsState;
   /** Quem é eliminado pode jogar das laterais e tentar voltar (veja sideline.ts)? Ausente = sim. */
   sidelineEnabled?: boolean;
   /** Quantos passos de simulação já aconteceram. Será a base dos temporizadores (bombas, chamas). */

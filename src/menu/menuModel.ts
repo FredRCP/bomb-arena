@@ -2,6 +2,7 @@ import { AI_SETTINGS, DEFAULT_AI_DIFFICULTY } from '../config/ai';
 import type { AiDifficulty } from '../config/ai';
 import { DEFAULT_SEED } from '../config/arena';
 import { DEFAULT_STAGE, STAGES, stageById } from '../config/stages';
+import type { StageDef } from '../config/stages';
 import { DEFAULT_TEAMS } from './gameConfig';
 import type { GameConfig } from './gameConfig';
 import { needsTeamsScreen } from './teamsModel';
@@ -11,9 +12,11 @@ import { needsTeamsScreen } from './teamsModel';
 
 export const MAX_VOLUME = 10;
 export const DEFAULT_VOLUME = 7;
+export const DEFAULT_MUSIC = 6;
 
 export interface MenuSettings {
-  players: 1 | 2;
+  /** Pessoas: 1 (sozinho), 2 (mesmo teclado) ou 3 a 5 (com controles de videogame). */
+  players: 1 | 2 | 3 | 4 | 5;
   /** Inimigos do computador. Com 1 pessoa: 1 a 4; com 2 pessoas: 0 a 3 (no máximo 5 jogadores no total). */
   enemies: 0 | 1 | 2 | 3 | 4;
   difficulty: AiDifficulty;
@@ -25,11 +28,13 @@ export interface MenuSettings {
   sideline: boolean;
   /** Fase escolhida (id de config/stages.ts). */
   stage: string;
-  /** Volume dos sons, de 0 (mudo) a MAX_VOLUME. */
+  /** Volume dos sons (efeitos), de 0 (mudo) a MAX_VOLUME. */
   volume: number;
+  /** Volume da música, de 0 (mudo) a MAX_VOLUME. */
+  music: number;
 }
 
-export type MenuRow = 'players' | 'enemies' | 'difficulty' | 'wins' | 'time' | 'sideline' | 'stage' | 'volume' | 'next';
+export type MenuRow = 'players' | 'enemies' | 'difficulty' | 'wins' | 'time' | 'sideline' | 'stage' | 'volume' | 'music' | 'controls' | 'next';
 
 /**
  * As telas de configuração, na ordem em que aparecem depois de "Jogar" (a escolha de personagem fica entre
@@ -42,8 +47,8 @@ export const NEXT_LABELS: Record<MenuScreen, string> = { participants: 'CONTINUA
 
 export const SCREEN_TITLES: Record<MenuScreen, string> = { participants: 'QUEM VAI JOGAR', rules: 'REGRAS DA PARTIDA', stage: 'ESCOLHA A FASE', options: 'OPÇÕES' };
 
-/** Durações de rodada que o menu oferece, em segundos. */
-export const ROUND_TIME_OPTIONS = [60, 90, 120, 180, 240, 300] as const;
+/** Durações de rodada que o menu oferece, em segundos. 0 = sem limite de tempo. */
+export const ROUND_TIME_OPTIONS = [60, 90, 120, 180, 240, 300, 0] as const;
 export const WINS_OPTIONS = [1, 2, 3] as const;
 
 export interface MenuState {
@@ -51,6 +56,8 @@ export interface MenuState {
   settings: MenuSettings;
   /** Posição na lista de linhas visíveis. */
   selected: number;
+  /** Quantas pessoas cabem agora: 2, ou o número de controles conectados (até 5). A cena atualiza. */
+  maxHumans: number;
 }
 
 export const DEFAULT_SETTINGS: MenuSettings = {
@@ -62,13 +69,14 @@ export const DEFAULT_SETTINGS: MenuSettings = {
   sideline: true,
   stage: DEFAULT_STAGE,
   volume: DEFAULT_VOLUME,
+  music: DEFAULT_MUSIC,
 };
 
 const DIFFICULTIES = Object.keys(AI_SETTINGS) as AiDifficulty[];
 
 /** Começa no botão que fecha a tela (Enter já avança com as escolhas guardadas). */
 export function createMenu(settings: MenuSettings = DEFAULT_SETTINGS, screen: MenuScreen = 'participants'): MenuState {
-  return { screen, settings: { ...settings }, selected: visibleRows(settings, screen).length - 1 };
+  return { screen, settings: { ...settings }, selected: visibleRows(settings, screen).length - 1, maxHumans: 2 };
 }
 
 /** Quantos passos tem o "Jogar": a tela de times só entra com 3 ou mais jogadores. */
@@ -88,11 +96,11 @@ export function stepNumber(screen: MenuScreen, settings: MenuSettings): number |
 export const MAX_TOTAL_PLAYERS = 5;
 
 /** Quantos inimigos o modo permite: com 1 pessoa, de 1 a 4; com 2 pessoas, de 0 a 3. */
-export function enemyRange(players: 1 | 2): { min: number; max: number } {
+export function enemyRange(players: number): { min: number; max: number } {
   return { min: players === 1 ? 1 : 0, max: MAX_TOTAL_PLAYERS - players };
 }
 
-function clampEnemies(players: 1 | 2, enemies: number): MenuSettings['enemies'] {
+function clampEnemies(players: number, enemies: number): MenuSettings['enemies'] {
   const { min, max } = enemyRange(players);
   return Math.min(max, Math.max(min, enemies)) as MenuSettings['enemies'];
 }
@@ -106,7 +114,7 @@ export function visibleRows(settings: MenuSettings, screen: MenuScreen = 'partic
   }
   if (screen === 'rules') return ['wins', 'time', 'sideline', 'next'];
   if (screen === 'stage') return ['stage', 'next'];
-  return ['volume', 'next'];
+  return ['volume', 'music', 'controls', 'next'];
 }
 
 export function selectedRow(menu: MenuState): MenuRow {
@@ -133,7 +141,8 @@ export function changeValue(menu: MenuState, delta: -1 | 1): boolean {
   const row = selectedRow(menu);
   const s = menu.settings;
   if (row === 'players') {
-    s.players = s.players === 1 ? 2 : 1;
+    const values = Array.from({ length: Math.max(2, menu.maxHumans) }, (_, i) => i + 1);
+    s.players = cycle(values, Math.min(s.players, values.length), delta) as MenuSettings['players'];
     s.enemies = clampEnemies(s.players, s.enemies); // ao trocar o modo, ajusta os inimigos à faixa permitida
   } else if (row === 'enemies') {
     const { min, max } = enemyRange(s.players);
@@ -154,6 +163,10 @@ export function changeValue(menu: MenuState, delta: -1 | 1): boolean {
     const next = Math.min(MAX_VOLUME, Math.max(0, s.volume + delta));
     if (next === s.volume) return false;
     s.volume = next;
+  } else if (row === 'music') {
+    const next = Math.min(MAX_VOLUME, Math.max(0, s.music + delta));
+    if (next === s.music) return false;
+    s.music = next;
   } else {
     return false;
   }
@@ -179,11 +192,16 @@ export const DIFFICULTY_TAGLINES: Record<AiDifficulty, string> = {
   ultra: 'Boa sorte. Você vai precisar.',
 };
 
+/** Tempo de rodada em texto: "3:00", ou "sem limite" (0). */
+function clockText(seconds: number): string {
+  return seconds === 0 ? 'sem limite' : `${Math.floor(seconds / 60)}:${String(seconds % 60).padStart(2, '0')}`;
+}
+
 /** Rótulo e valor mostrados em cada linha (textos em português). */
 export function describeRow(settings: MenuSettings, row: MenuRow): { label: string; value: string } {
   switch (row) {
     case 'players':
-      return { label: 'Jogadores', value: settings.players === 1 ? '1 jogador' : '2 jogadores (mesmo teclado)' };
+      return { label: 'Jogadores', value: settings.players === 1 ? '1 jogador' : settings.players === 2 ? '2 jogadores (mesmo teclado)' : `${settings.players} jogadores (com controles)` };
     case 'enemies':
       return { label: 'Jogadores do computador', value: String(settings.enemies) };
     case 'difficulty':
@@ -191,11 +209,15 @@ export function describeRow(settings: MenuSettings, row: MenuRow): { label: stri
     case 'wins':
       return { label: 'Partida', value: settings.wins === 1 ? 'Partida única' : `Melhor de ${settings.wins}` };
     case 'time':
-      return { label: 'Tempo da rodada', value: `${Math.floor(settings.time / 60)}:${String(settings.time % 60).padStart(2, '0')}` };
+      return { label: 'Tempo da rodada', value: clockText(settings.time) };
     case 'sideline':
       return { label: 'Repescagem', value: settings.sideline ? 'Ligada' : 'Desligada' };
     case 'volume':
-      return { label: 'Volume', value: settings.volume === 0 ? 'mudo' : `${settings.volume * 10}%` };
+      return { label: 'Volume dos sons', value: settings.volume === 0 ? 'mudo' : `${settings.volume * 10}%` };
+    case 'music':
+      return { label: 'Volume da música', value: settings.music === 0 ? 'mudo' : `${settings.music * 10}%` };
+    case 'controls':
+      return { label: 'Controles', value: 'ver os comandos  ▶' };
     case 'stage': {
       const stage = stageById(settings.stage);
       return { label: 'Fase', value: stage.available ? stage.name : `${stage.name} (em breve)` };
@@ -221,18 +243,29 @@ export function toGameConfig(settings: MenuSettings, seed: number = DEFAULT_SEED
   };
 }
 
-/** A fase escolhida já pode ser jogada? (As "em breve" não deixam começar.) */
-export function canStart(settings: MenuSettings): boolean {
-  return stageById(settings.stage).available;
+/**
+ * Por que a fase NÃO pode ser jogada agora (texto para mostrar), ou null se pode:
+ * ainda não existe ("em breve"), não cabe tanta gente, ou é grande demais para a tela de toque.
+ */
+export function stageIssue(stage: StageDef, total: number, touch: boolean): string | null {
+  if (!stage.available) return 'Em breve!';
+  if (touch && !stage.mobileOk) return 'Esta arena é grande demais para celular.';
+  if (total > stage.maxPlayers) return `Esta fase comporta até ${stage.maxPlayers} jogadores (a partida tem ${total}).`;
+  return null;
+}
+
+/** A fase escolhida pode ser jogada? `total` = jogadores da partida (pessoas + computador); `touch` = tela de toque. */
+export function canStart(settings: MenuSettings, touch = false, total: number = settings.players + settings.enemies): boolean {
+  return stageIssue(stageById(settings.stage), total, touch) === null;
 }
 
 /** Resumo da partida, uma linha por assunto (mostrado na tela da fase, antes de jogar). */
 export function summaryLines(settings: MenuSettings): string[] {
   const enemies = clampEnemies(settings.players, settings.enemies);
-  const people = settings.players === 1 ? '1 pessoa' : '2 pessoas';
+  const people = settings.players === 1 ? '1 pessoa' : `${settings.players} pessoas`;
   const lines = [enemies > 0 ? `${people} + ${enemies} do computador (${DIFFICULTY_LABELS[settings.difficulty]})` : people];
-  const minutes = `${Math.floor(settings.time / 60)}:${String(settings.time % 60).padStart(2, '0')}`;
-  lines.push(`${settings.wins === 1 ? 'Partida única' : `Melhor de ${settings.wins}`} · rodadas de ${minutes} · repescagem ${settings.sideline ? 'ligada' : 'desligada'}`);
+  const minutes = clockText(settings.time);
+  lines.push(`${settings.wins === 1 ? 'Partida única' : `Melhor de ${settings.wins}`} · rodadas ${settings.time === 0 ? 'sem limite de tempo' : `de ${minutes}`} · repescagem ${settings.sideline ? 'ligada' : 'desligada'}`);
   return lines;
 }
 
@@ -251,7 +284,7 @@ export function parseSettings(raw: string | null): MenuSettings {
   }
   if (typeof data !== 'object' || data === null) return result;
   const record = data as Record<string, unknown>;
-  if (record.players === 1 || record.players === 2) result.players = record.players;
+  if (typeof record.players === 'number' && Number.isInteger(record.players) && record.players >= 1 && record.players <= 5) result.players = record.players as MenuSettings['players'];
   if (typeof record.enemies === 'number' && Number.isInteger(record.enemies) && record.enemies >= 0 && record.enemies <= 4) {
     result.enemies = record.enemies as MenuSettings['enemies'];
   }
@@ -264,6 +297,9 @@ export function parseSettings(raw: string | null): MenuSettings {
   if (typeof record.sideline === 'boolean') result.sideline = record.sideline;
   if (typeof record.volume === 'number' && Number.isInteger(record.volume) && record.volume >= 0 && record.volume <= MAX_VOLUME) {
     result.volume = record.volume;
+  }
+  if (typeof record.music === 'number' && Number.isInteger(record.music) && record.music >= 0 && record.music <= MAX_VOLUME) {
+    result.music = record.music;
   }
   result.enemies = clampEnemies(result.players, result.enemies);
   return result;

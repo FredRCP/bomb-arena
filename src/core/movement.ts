@@ -151,10 +151,11 @@ export function movePlayer(
   direction: Direction,
   blocked?: ReadonlySet<number>,
   soft: readonly SoftCell[] = [],
+  speedFactor = 1,
 ): void {
   const { dx, dy } = VECTORS[direction];
 
-  const stepDistance = stepDistanceOf(player);
+  const stepDistance = stepDistanceOf(player) * speedFactor;
   const ghost = player.ghostTicks > 0;
   const nextX = player.x + dx * stepDistance;
   const nextY = player.y + dy * stepDistance;

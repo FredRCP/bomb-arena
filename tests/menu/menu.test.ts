@@ -11,12 +11,14 @@ import {
   moveSelection,
   parseSettings,
   selectedRow,
+  stageIssue,
   stepNumber,
   summaryLines,
   toGameConfig,
   totalSteps,
   visibleRows,
 } from '../../src/menu/menuModel';
+import { stageById } from '../../src/config/stages';
 import { hasGameParams, parseGameConfig } from '../../src/menu/gameConfig';
 import { loadSettings, saveSettings } from '../../src/menu/settingsStorage';
 import type { StorageLike } from '../../src/menu/settingsStorage';
@@ -24,7 +26,7 @@ import type { StorageLike } from '../../src/menu/settingsStorage';
 /** Leva a seleção até a linha pedida (dando a volta pelo menu). */
 function goTo(menu: ReturnType<typeof createMenu>, row: string): void {
   // Cada linha mora numa tela; vai para a certa antes de procurar a linha.
-  const screens: Record<string, 'rules' | 'stage' | 'options'> = { wins: 'rules', time: 'rules', sideline: 'rules', stage: 'stage', volume: 'options' };
+  const screens: Record<string, 'rules' | 'stage' | 'options'> = { wins: 'rules', time: 'rules', sideline: 'rules', stage: 'stage', volume: 'options', music: 'options' };
   if (screens[row]) menu.screen = screens[row]!;
   menu.selected = 0;
   for (let i = 0; i < 12 && selectedRow(menu) !== row; i++) moveSelection(menu, 1);
@@ -39,7 +41,7 @@ describe('menu: linhas e seleção', () => {
     expect(visibleRows({ ...base, players: 2, enemies: 2 }, 'participants')).toEqual(['players', 'enemies', 'difficulty', 'next']);
     expect(visibleRows(base, 'rules')).toEqual(['wins', 'time', 'sideline', 'next']);
     expect(visibleRows(base, 'stage')).toEqual(['stage', 'next']);
-    expect(visibleRows(base, 'options')).toEqual(['volume', 'next']);
+    expect(visibleRows(base, 'options')).toEqual(['volume', 'music', 'controls', 'next']);
   });
 
   it('faixa de inimigos: 1 pessoa 1 a 4; 2 pessoas 0 a 3 (máximo 5 no total)', () => {
@@ -134,20 +136,31 @@ describe('menu: partida, tempo e laterais', () => {
     expect(menu.settings.wins).toBe(3);
   });
 
-  it('tempo da rodada percorre 1:00, 1:30, 2:00, 3:00, 4:00, 5:00', () => {
+  it('tempo da rodada percorre 1:00, 1:30, 2:00, 3:00, 4:00, 5:00 e sem limite', () => {
     const menu = createMenu();
     goTo(menu, 'time');
     expect(describeRow(menu.settings, 'time').value).toBe('3:00');
     changeValue(menu, 1);
     expect(menu.settings.time).toBe(240);
     changeValue(menu, 1);
+    expect(menu.settings.time).toBe(300);
+    changeValue(menu, 1);
+    expect(menu.settings.time).toBe(0);
+    expect(describeRow(menu.settings, 'time').value).toBe('sem limite');
     changeValue(menu, 1);
     expect(describeRow(menu.settings, 'time').value).toBe('1:00');
     changeValue(menu, -1);
-    expect(menu.settings.time).toBe(300);
+    expect(menu.settings.time).toBe(0);
     goTo(menu, 'time');
     for (let i = 0; i < 4; i++) changeValue(menu, -1);
-    expect(describeRow(menu.settings, 'time').value).toBe('1:30');
+    expect(describeRow(menu.settings, 'time').value).toBe('2:00');
+  });
+
+  it('sem limite de tempo vale também no resumo e na configuração da partida', () => {
+    expect(toGameConfig({ ...DEFAULT_SETTINGS, time: 0 })).toMatchObject({ time: 0 });
+    expect(summaryLines({ ...DEFAULT_SETTINGS, time: 0 })[1]).toContain('sem limite de tempo');
+    expect(parseSettings(JSON.stringify({ time: 0 }))).toEqual({ ...DEFAULT_SETTINGS, time: 0 });
+    expect(parseGameConfig('?time=0')).toMatchObject({ time: 0 });
   });
 
   it('repescagem liga e desliga com esquerda/direita', () => {
@@ -234,7 +247,7 @@ describe('endereço (?players=1&...)', () => {
 
   it('valores inválidos ou fora da faixa viram o padrão ou são limitados', () => {
     expect(parseGameConfig('?players=7&enemies=99&ai=banana&bombs=0&range=500')).toMatchObject({
-      players: 2, enemies: 3, difficulty: 'normal', bombs: 1, range: 12,
+      players: 5, enemies: 0, difficulty: 'normal', bombs: 1, range: 12,
     });
     expect(parseGameConfig('?players=abc&seed=xyz')).toMatchObject({ players: 2, seed: 1 });
   });
@@ -248,7 +261,7 @@ describe('configurações guardadas', () => {
 
   it('guardar e ler devolve as mesmas escolhas', () => {
     const storage = fakeStorage();
-    const settings = { players: 2 as const, enemies: 3 as const, difficulty: 'hard' as const, wins: 3 as const, time: 120, sideline: false, stage: 'classic', volume: 4 };
+    const settings = { players: 2 as const, enemies: 3 as const, difficulty: 'hard' as const, wins: 3 as const, time: 120, sideline: false, stage: 'classic', volume: 4, music: 2 };
     saveSettings(settings, storage);
     expect(loadSettings(storage)).toEqual(settings);
   });
@@ -258,7 +271,7 @@ describe('configurações guardadas', () => {
     expect(parseSettings('{não é json')).toEqual(DEFAULT_SETTINGS);
     expect(parseSettings('123')).toEqual(DEFAULT_SETTINGS);
     expect(parseSettings('null')).toEqual(DEFAULT_SETTINGS);
-    expect(parseSettings(JSON.stringify({ players: 5, enemies: '2', difficulty: 'insano', volume: 99 }))).toEqual(DEFAULT_SETTINGS);
+    expect(parseSettings(JSON.stringify({ players: 9, enemies: '2', difficulty: 'insano', volume: 99 }))).toEqual(DEFAULT_SETTINGS);
     expect(parseSettings(JSON.stringify({ players: 2, volume: 3 }))).toEqual({ ...DEFAULT_SETTINGS, players: 2, volume: 3 });
     expect(parseSettings(JSON.stringify({ volume: 2.5 }))).toEqual(DEFAULT_SETTINGS);
   });
@@ -309,22 +322,25 @@ describe('menu: níveis', () => {
 });
 
 describe('menu: fase e resumo', () => {
-  it('a fase percorre a lista; clássica e gelo podem ser jogadas (as outras mostram "em breve")', () => {
+  it('a fase percorre a lista; só o trenzinho ainda mostra "em breve"', () => {
     const menu = createMenu(DEFAULT_SETTINGS, 'stage');
     goTo(menu, 'stage');
-    expect(describeRow(menu.settings, 'stage').value).toBe('Arena Clássica');
-    expect(canStart(menu.settings)).toBe(true);
-    changeValue(menu, 1);
-    expect(describeRow(menu.settings, 'stage').value).toBe('Fase do Gelo');
-    expect(canStart(menu.settings)).toBe(true);
-    changeValue(menu, 1);
-    expect(describeRow(menu.settings, 'stage').value).toBe('Fase do Egito (em breve)');
-    expect(canStart(menu.settings)).toBe(false);
-    changeValue(menu, -1);
-    changeValue(menu, -1);
-    expect(menu.settings.stage).toBe('classic');
-    for (let i = 0; i < 4; i++) changeValue(menu, 1);
-    expect(menu.settings.stage).toBe('classic'); // deu a volta nas 4 fases
+    const expected: Array<[string, boolean]> = [['Arena Clássica', true], ['Arena Clássica Grande', true], ['Fase do Gelo', true], ['Fase do Egito', true], ['Fase do Trenzinho (em breve)', false]];
+    for (const [name, playable] of expected) {
+      expect(describeRow(menu.settings, 'stage').value).toBe(name);
+      expect(canStart(menu.settings)).toBe(playable);
+      changeValue(menu, 1);
+    }
+    expect(menu.settings.stage).toBe('classic'); // deu a volta nas 5 fases
+  });
+
+  it('stageIssue: celular não joga arena grande; fase pequena demais não comporta todos', () => {
+    const big = stageById('egypt');
+    expect(stageIssue(big, 2, false)).toBeNull();
+    expect(stageIssue(big, 2, true)).toMatch(/grande demais para celular/);
+    expect(stageIssue(big, 5, false)).toMatch(/até 4 jogadores/);
+    expect(stageIssue(stageById('classic'), 5, true)).toBeNull();
+    expect(stageIssue(stageById('train'), 2, false)).toBe('Em breve!');
   });
 
   it('a fase vai na configuração da partida e é guardada; fase desconhecida volta à clássica', () => {
@@ -343,5 +359,44 @@ describe('menu: fase e resumo', () => {
       'Partida única · rodadas de 1:30 · repescagem desligada',
     ]);
     expect(summaryLines({ ...DEFAULT_SETTINGS, players: 2, enemies: 0 })[0]).toBe('2 pessoas');
+  });
+});
+
+describe('volume da música', () => {
+  it('é uma linha própria das opções, de 0 (mudo) a 10, guardada junto com as outras escolhas', () => {
+    const menu = createMenu(DEFAULT_SETTINGS, 'options');
+    menu.selected = 1;
+    expect(selectedRow(menu)).toBe('music');
+    expect(describeRow(menu.settings, 'music').label).toBe('Volume da música');
+    for (let i = 0; i < 20; i++) changeValue(menu, 1);
+    expect(menu.settings.music).toBe(10);
+    expect(changeValue(menu, 1)).toBe(false);
+    for (let i = 0; i < 20; i++) changeValue(menu, -1);
+    expect(describeRow(menu.settings, 'music').value).toBe('mudo');
+    expect(parseSettings(JSON.stringify({ music: 3 }))).toEqual({ ...DEFAULT_SETTINGS, music: 3 });
+    expect(parseSettings(JSON.stringify({ music: 99 }))).toEqual(DEFAULT_SETTINGS);
+  });
+});
+
+describe('mais pessoas com controles de videogame', () => {
+  it('sem controles sobrando a lista de jogadores só tem 1 e 2; com 4 controles vai até 4', () => {
+    const menu = createMenu();
+    goTo(menu, 'players');
+    changeValue(menu, 1);
+    expect(menu.settings.players).toBe(2);
+    changeValue(menu, 1);
+    expect(menu.settings.players).toBe(1);
+    menu.maxHumans = 4;
+    changeValue(menu, -1);
+    expect(menu.settings.players).toBe(4);
+    expect(describeRow(menu.settings, 'players').value).toBe('4 jogadores (com controles)');
+    // As vagas dos inimigos respeitam o total de 5.
+    expect(enemyRange(4)).toEqual({ min: 0, max: 1 });
+  });
+
+  it('a configuração aceita 3 a 5 pessoas', () => {
+    expect(parseGameConfig('?players=4&enemies=3')).toMatchObject({ players: 4, enemies: 1 });
+    expect(parseSettings(JSON.stringify({ players: 3 }))).toEqual({ ...DEFAULT_SETTINGS, players: 3, enemies: 1 });
+    expect(summaryLines({ ...DEFAULT_SETTINGS, players: 3, enemies: 0 })[0]).toBe('3 pessoas');
   });
 });

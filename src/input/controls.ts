@@ -15,15 +15,18 @@ export interface PlayerControls {
   special: string[];
 }
 
-/** Só os jogadores 1 e 2 são pessoas; de 3 a 5 só existem como inimigos controlados pelo computador. */
-export type HumanId = 1 | 2;
+/** Pessoas: 1 e 2 jogam no teclado (ou com controle); de 3 a 5 só com controle de videogame (o controle N comanda o jogador N). */
+export type HumanId = 1 | 2 | 3 | 4 | 5;
+
+/** Jogadores que têm teclas no teclado. */
+export type KeyboardPlayerId = 1 | 2;
 
 /**
  * Jogador 1: A S D W, Espaço (bomba), E (especial).
  * Jogador 2: 2 4 8 6 (do teclado numérico; os mesmos números da fileira de cima também funcionam), Enter (bomba),
  * 9 (especial). As setas também movem o jogador 2, para quem joga sem teclado numérico.
  */
-export const PLAYER_CONTROLS: Record<HumanId, PlayerControls> = {
+export const PLAYER_CONTROLS: Record<KeyboardPlayerId, PlayerControls> = {
   1: { up: ['W'], down: ['S'], left: ['A'], right: ['D'], bomb: ['SPACE'], special: ['E'] },
   2: {
     up: ['NUMPAD_EIGHT', 'EIGHT', 'UP'],

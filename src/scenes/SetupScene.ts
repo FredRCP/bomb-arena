@@ -1,11 +1,13 @@
 import Phaser from 'phaser';
+import { music } from '../audio/music';
 import { sfx } from '../audio/sfx';
 import { ARENA_COLS, ARENA_ROWS } from '../config/arena';
 import { STAGES, stageById } from '../config/stages';
+import { wantsTouchControls } from '../input/touchUi';
 import { createMatch } from '../core';
 import { PadNav } from '../input/padNav';
-import { DIFFICULTY_TAGLINES, NEXT_LABELS, SCREEN_TITLES, canStart, changeValue, createMenu, describeRow, moveSelection, selectedRow, stepNumber, toGameConfig, totalSteps, visibleRows } from '../menu/menuModel';
-import type { MenuScreen, MenuState } from '../menu/menuModel';
+import { DIFFICULTY_TAGLINES, NEXT_LABELS, SCREEN_TITLES, canStart, changeValue, stageIssue, createMenu, describeRow, moveSelection, selectedRow, stepNumber, toGameConfig, totalSteps, visibleRows } from '../menu/menuModel';
+import type { MenuScreen, MenuSettings, MenuState } from '../menu/menuModel';
 import { needsTeamsScreen } from '../menu/teamsModel';
 import { loadSettings, saveSettings } from '../menu/settingsStorage';
 import { TILE_SIZE } from '../render/ArenaRenderer';
@@ -36,6 +38,8 @@ export class SetupScene extends Phaser.Scene {
   private texts: Phaser.GameObjects.GameObject[] = [];
   private arrow!: Phaser.GameObjects.Text;
   private padNav!: PadNav;
+  /** Tela de toque (celular/tablet)? As arenas grandes ficam desligadas nela. */
+  private touch = false;
 
   constructor() {
     super({ key: 'Setup' });
@@ -44,6 +48,13 @@ export class SetupScene extends Phaser.Scene {
   init(data: SetupData): void {
     this.menu = createMenu(loadSettings(), data?.screen ?? 'participants');
     this.session = data?.session;
+    this.touch = wantsTouchControls();
+  }
+
+  /** Jogadores da partida (pessoas + computador): a sessão já montada, ou, sem ela, o que está no menu. */
+  private totalPlayers(): number {
+    const config = this.session?.config;
+    return config ? config.players + config.enemies : this.menu.settings.players + this.menu.settings.enemies;
   }
 
   /** Imagens de prévia das fases (public/stages/<id>.jpg). Fase sem imagem aparece como cartão "?". */
@@ -56,6 +67,7 @@ export class SetupScene extends Phaser.Scene {
   create(): void {
     placeArena(this);
     sfx.setLevel(this.menu.settings.volume);
+    music.setLevel(this.menu.settings.music);
     this.texts = [];
     addMenuBackground(this);
     if (this.menu.screen === 'stage') addPanel(this, WIDTH / 2, 470, WIDTH - 120, 560);
@@ -95,8 +107,26 @@ export class SetupScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => keyboard.removeAllKeys(true));
   }
 
+  /** Quantos controles de videogame estão conectados agora. */
+  private connectedPads(): number {
+    const plugin = this.input.gamepad;
+    return plugin ? plugin.gamepads.filter((pad) => pad && pad.connected).length : 0;
+  }
+
   update(time: number): void {
     if (!this.padNav) return;
+    if (this.menu.screen === 'participants') {
+      // Com 3 ou mais controles conectados, a lista de jogadores passa a oferecer mais pessoas.
+      const max = Math.min(5, Math.max(2, this.connectedPads()));
+      if (max !== this.menu.maxHumans) {
+        this.menu.maxHumans = max;
+        if (this.menu.settings.players > max) {
+          this.menu.settings.players = max as MenuSettings['players'];
+          saveSettings(this.menu.settings);
+        }
+        this.render();
+      }
+    }
     for (const { action } of this.padNav.poll(time)) {
       if (action === 'up') this.navigate(-1);
       else if (action === 'down') this.navigate(1);
@@ -118,6 +148,7 @@ export class SetupScene extends Phaser.Scene {
     if (this.menu.screen === 'stage') this.menu.selected = 0; // setas sempre giram o carrossel (a linha 0 é a fase)
     if (!changeValue(this.menu, delta)) return;
     sfx.setLevel(this.menu.settings.volume);
+    music.setLevel(this.menu.settings.music);
     sfx.play('tick');
     saveSettings(this.menu.settings);
     this.render();
@@ -127,8 +158,13 @@ export class SetupScene extends Phaser.Scene {
   private confirm(): void {
     const { screen, settings } = this.menu;
     saveSettings(settings);
-    if (screen === 'stage' && !canStart(settings)) {
+    if (screen === 'stage' && !canStart(settings, this.touch, this.totalPlayers())) {
       sfx.play('hit');
+      return;
+    }
+    if (screen === 'options' && selectedRow(this.menu) === 'controls') {
+      sfx.play('confirm');
+      this.scene.start('Controls');
       return;
     }
     sfx.play('confirm');
@@ -164,6 +200,14 @@ export class SetupScene extends Phaser.Scene {
     const prev = STAGES[(at - 1 + STAGES.length) % STAGES.length]!;
     const next = STAGES[(at + 1) % STAGES.length]!;
     const cardY = 362;
+    const total = this.totalPlayers();
+    /** Rótulo da faixa em cima do cartão de uma fase que não pode ser jogada agora (ou null). */
+    const cardIssue = (def: (typeof STAGES)[number]): string | null => {
+      if (!def.available) return 'EM BREVE';
+      if (this.touch && !def.mobileOk) return 'GRANDE DEMAIS\nPARA CELULAR';
+      if (total > def.maxPlayers) return `ATÉ ${def.maxPlayers}\nJOGADORES`;
+      return null;
+    };
 
     const card = (def: (typeof STAGES)[number], x: number, height: number, alpha: number, onTap: () => void): void => {
       const key = `stage-${def.id}`;
@@ -173,7 +217,7 @@ export class SetupScene extends Phaser.Scene {
         const image = this.add.image(x, cardY, key).setAlpha(alpha);
         image.setScale(height / image.height);
         width = image.displayWidth;
-        if (!def.available) image.setTint(0x666b88);
+        if (cardIssue(def)) image.setTint(0x666b88);
         image.setInteractive({ useHandCursor: true }).on('pointerdown', onTap);
         this.texts.push(image);
       } else {
@@ -187,9 +231,10 @@ export class SetupScene extends Phaser.Scene {
       frame.lineStyle(height > 250 ? 6 : 3, height > 250 ? 0xffe66d : 0xffffff, height > 250 ? 1 : 0.35);
       frame.strokeRoundedRect(x - width / 2, cardY - height / 2, width, height, 10);
       this.texts.push(frame);
-      if (!def.available) {
+      const issue = cardIssue(def);
+      if (issue) {
         const badge = this.add
-          .text(x, cardY, 'EM BREVE', { fontFamily: FONT, fontSize: height > 250 ? '48px' : '22px', fontStyle: 'bold', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 7 })
+          .text(x, cardY, issue, { fontFamily: FONT, fontSize: height > 250 ? '40px' : '18px', fontStyle: 'bold', align: 'center', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 7 })
           .setOrigin(0.5)
           .setAngle(-12);
         this.texts.push(badge);
@@ -213,14 +258,19 @@ export class SetupScene extends Phaser.Scene {
       void def;
     });
 
+    const issueText = stageIssue(stage, total, this.touch);
     this.texts.push(
-      this.add.text(WIDTH / 2, 572, stage.name, { fontFamily: FONT, fontSize: '42px', fontStyle: 'bold', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 6 }).setOrigin(0.5),
-      this.add.text(WIDTH / 2, 616, stage.available ? stage.tagline : `${stage.tagline} (em breve)`, { fontFamily: FONT, fontSize: '23px', color: '#e3e7ff' }).setOrigin(0.5),
+      this.add.text(WIDTH / 2, 562, stage.name, { fontFamily: FONT, fontSize: '42px', fontStyle: 'bold', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 6 }).setOrigin(0.5),
+      this.add.text(WIDTH / 2, 604, stage.available ? stage.tagline : `${stage.tagline} (em breve)`, { fontFamily: FONT, fontSize: '23px', color: '#e3e7ff' }).setOrigin(0.5),
+      this.add.text(WIDTH / 2, 636, `Arena ${stage.cols} x ${stage.rows}  ·  até ${stage.maxPlayers} jogadores${stage.hazards ? '  ·  com perigos no terreno' : ''}`, { fontFamily: FONT, fontSize: '21px', color: '#ffe66d' }).setOrigin(0.5),
     );
-    const blocked = !stage.available;
+    if (issueText && stage.available) {
+      this.texts.push(this.add.text(WIDTH / 2, 666, issueText, { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold', color: '#ff8fa3', stroke: '#1b1f3b', strokeThickness: 4 }).setOrigin(0.5));
+    }
+    const blocked = issueText !== null;
     this.texts.push(
       this.add
-        .text(WIDTH / 2, 686, NEXT_LABELS.stage, { fontFamily: FONT, fontSize: '50px', fontStyle: 'bold', color: blocked ? '#6c7293' : '#ffe66d', stroke: '#1b1f3b', strokeThickness: 6 })
+        .text(WIDTH / 2, 712, NEXT_LABELS.stage, { fontFamily: FONT, fontSize: '50px', fontStyle: 'bold', color: blocked ? '#6c7293' : '#ffe66d', stroke: '#1b1f3b', strokeThickness: 6 })
         .setOrigin(0.5)
         .setInteractive({ useHandCursor: true })
         .on('pointerdown', () => this.confirm()),
@@ -240,7 +290,7 @@ export class SetupScene extends Phaser.Scene {
       const y = ROW_TOP + index * ROW_STEP;
       const selected = row === current;
       if (row === 'next') {
-        const blocked = this.menu.screen === 'stage' && !canStart(this.menu.settings);
+        const blocked = this.menu.screen === 'stage' && !canStart(this.menu.settings, this.touch, this.totalPlayers());
         const label = NEXT_LABELS[this.menu.screen];
         const color = blocked ? '#6c7293' : selected ? '#ffe66d' : '#c9a93a';
         this.texts.push(this.add.text(WIDTH / 2, y + 24, label, { fontFamily: FONT, fontSize: '50px', fontStyle: 'bold', color, stroke: '#1b1f3b', strokeThickness: 6 }).setOrigin(0.5));
@@ -256,6 +306,10 @@ export class SetupScene extends Phaser.Scene {
       );
       if (selected) this.arrow.setPosition(110, y);
     });
+
+    if (this.menu.screen === 'participants' && this.menu.maxHumans < 3) {
+      this.texts.push(this.add.text(WIDTH / 2, HEIGHT - 100, 'Dica: conecte 3 ou mais controles de videogame para jogar com mais gente.', { fontFamily: FONT, fontSize: '22px', color: '#c9d1ff', stroke: '#1b1f3b', strokeThickness: 3 }).setOrigin(0.5));
+    }
 
     // Na tela de participantes, uma frase de humor sobre o nível escolhido.
     if (this.menu.screen === 'participants' && rows.includes('difficulty')) {

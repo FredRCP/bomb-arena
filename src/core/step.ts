@@ -1,5 +1,6 @@
 import { advanceSlidingBombs, blockedCellsFor, placeBomb, releaseBombs, tryKick, useSpecial, walkThroughCellsFor } from './bombs';
 import { advanceExplosions, applyFlameDamage } from './explosions';
+import { speedFactorAt, updateHazards } from './hazards';
 import { collectItems } from './items';
 import { collidesAt, movePlayer } from './movement';
 import { updateRound } from './round';
@@ -41,7 +42,7 @@ export function step(state: GameState, intents: Intents = {}): void {
     if (move !== null && player.invertTicks > 0) move = OPPOSITE[move];
     if (player.alive && move !== null) {
       player.facing = move;
-      movePlayer(state.arena, player, move, blockedCellsFor(state, player.id), walkThroughCellsFor(state, player.id));
+      movePlayer(state.arena, player, move, blockedCellsFor(state, player.id), walkThroughCellsFor(state, player.id), speedFactorAt(state, player));
       tryKick(state, player, move);
     }
   }
@@ -53,6 +54,7 @@ export function step(state: GameState, intents: Intents = {}): void {
   tickEffects(state);
   advanceExplosions(state);
   applyFlameDamage(state);
+  updateHazards(state);
   updateRound(state);
   updateSidelines(state);
   state.tick += 1;

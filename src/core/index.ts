@@ -7,6 +7,7 @@ export * from './movement';
 export * from './bombs';
 export * from './explosions';
 export * from './items';
+export * from './hazards';
 export * from './sideline';
 export * from './round';
 export * from './match';

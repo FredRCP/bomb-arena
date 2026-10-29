@@ -96,7 +96,9 @@ export function createArena(options: ArenaOptions = {}): Arena {
   for (let row = 0; row < rows; row++) {
     for (let col = 0; col < cols; col++) {
       const isBorder = col === 0 || row === 0 || col === cols - 1 || row === rows - 1;
-      const isPillar = col % 2 === 0 && row % 2 === 0;
+      // Com 5 jogadores o centro é a casa do quinto: em arenas de largura 17 (coluna do meio par) o pilar cederia lugar a ele.
+      const centre = options.centerSpawn ? centerSpawn(cols, rows) : null;
+      const isPillar = col % 2 === 0 && row % 2 === 0 && !(centre && centre.col === col && centre.row === row);
 
       if (isBorder || isPillar) {
         cells.push('wall');
