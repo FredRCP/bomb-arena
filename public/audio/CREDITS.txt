@@ -1,5 +1,6 @@
 100_victories.ogg - "100 Victories", de Zane Little (https://ko-fi.com/zanelittle). Música da arena clássica (as duas).
-classic.ogg - música dos menus, enviada pelo Fred. Autor e licença A CONFIRMAR (o arquivo não traz metadados).
+menu.ogg e 8bit_bossa.mp3 - músicas dos menus (tocam alternando), enviadas pelo Fred. Autor e licença A CONFIRMAR.
+classic.ogg - não é mais usada (era a música dos menus); pode ser apagada.
 fechando_blocos.ogg - "Dizzy Racing", de Zane Little (https://ko-fi.com/zanelittle). Tocada quando o tempo acaba e os blocos começam a fechar a arena (todas as fases).
 egypt.ogg e suez.ogg - músicas da fase do Egito, enviadas pelo Fred. Origem e licença A CONFIRMAR (os arquivos não trazem autor): anote aqui o autor/licença antes de publicar.
 gelo_loop.ogg e gelo_intro.ogg - músicas da fase do Gelo, enviadas pelo Fred (arquivos icd_repeating e icd_seg1). Autor e licença A CONFIRMAR.

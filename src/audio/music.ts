@@ -5,8 +5,8 @@ import { pickTrack } from './musicPick';
 import { loadSettings } from '../menu/settingsStorage';
 import { sfx } from './sfx';
 
-/** Música dos menus e da abertura: a mesma música principal do jogo. */
-export const MENU_MUSIC = 'audio/classic.ogg';
+/** Músicas dos menus (tudo fora das batalhas): tocam uma depois da outra, sem parar. */
+export const MENU_PLAYLIST = ['audio/menu.ogg', 'audio/8bit_bossa.mp3'] as const;
 
 export { SUDDEN_DEATH_MUSIC, pickTrack };
 
@@ -24,7 +24,7 @@ class Music {
   private fadeTimer: number | undefined;
 
   /** Toca a faixa (ou nada, se não houver). Chamar de novo com a mesma faixa não reinicia. */
-  play(file: string | undefined): void {
+  play(file: string | undefined, loop = true): void {
     window.clearTimeout(this.stopTimer);
     if (!file) {
       this.stopNow();
@@ -34,7 +34,7 @@ class Music {
       if (this.current !== file || !this.element) {
         this.stopNow();
         this.element = new Audio(file);
-        this.element.loop = true;
+        this.element.loop = loop;
         this.current = file;
       }
       this.sync();
@@ -48,7 +48,28 @@ class Music {
   playMenu(): void {
     this.setLevel(loadSettings().music);
     this.setDuck(0.7);
-    this.play(MENU_MUSIC);
+    // Já está tocando uma música de menu (mudou só de tela)? Segue sem reiniciar.
+    if (this.current && (MENU_PLAYLIST as readonly string[]).includes(this.current) && this.element) {
+      window.clearTimeout(this.stopTimer);
+      this.sync();
+      return;
+    }
+    this.playMenuTrack(this.menuNext);
+  }
+
+  /** Posição, na lista dos menus, da próxima música a tocar. */
+  private menuNext = 0;
+
+  private playMenuTrack(index: number): void {
+    const i = index % MENU_PLAYLIST.length;
+    this.play(MENU_PLAYLIST[i], false);
+    this.menuNext = i + 1;
+    if (this.element) {
+      this.element.onended = () => {
+        // Ao terminar, passa para a outra (só se ainda estamos nos menus).
+        if (this.current && (MENU_PLAYLIST as readonly string[]).includes(this.current)) this.playMenuTrack(this.menuNext);
+      };
+    }
   }
 
   /** Para a música daqui a pouco, a não ser que outra partida comece logo em seguida (reiniciar a rodada). */
@@ -96,6 +117,7 @@ class Music {
 
   private stopNow(): void {
     if (this.element) {
+      this.element.onended = null;
       this.element.pause();
       this.element.src = '';
     }
