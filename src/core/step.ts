@@ -1,6 +1,7 @@
 import { advanceSlidingBombs, blockedCellsFor, placeBomb, releaseBombs, tryKick, useSpecial, walkThroughCellsFor } from './bombs';
 import { advanceExplosions, applyFlameDamage } from './explosions';
 import { speedFactorAt, updateHazards } from './hazards';
+import { updatePowers, usePower } from './powers';
 import { collectItems } from './items';
 import { collidesAt, movePlayer } from './movement';
 import { updateRound } from './round';
@@ -33,6 +34,7 @@ export function step(state: GameState, intents: Intents = {}): void {
   for (const player of state.players) {
     if (player.alive && intents[player.id]?.placeBomb) placeBomb(state, player);
     if (player.alive && intents[player.id]?.special) useSpecial(state, player);
+    if (player.alive && intents[player.id]?.power) usePower(state, player);
     if (!player.alive) sidelineAct(state, player, intents[player.id]);
   }
 
@@ -40,10 +42,20 @@ export function step(state: GameState, intents: Intents = {}): void {
     let move = intents[player.id]?.move ?? null;
     // Controles invertidos (item ruim): esquerda vira direita, cima vira baixo.
     if (move !== null && player.invertTicks > 0) move = OPPOSITE[move];
+    // Piso de gelo: ao começar a andar, o jogador desliza na mesma direção até bater em algo (parede, bloco, bomba, buraco).
+    const slippery = state.hazards?.slippery === true;
+    if (!player.alive) player.slide = null;
+    if (player.alive && slippery) {
+      if (player.slide) move = player.slide;
+      else if (move !== null) player.slide = move;
+    }
     if (player.alive && move !== null) {
       player.facing = move;
+      const beforeX = player.x;
+      const beforeY = player.y;
       movePlayer(state.arena, player, move, blockedCellsFor(state, player.id), walkThroughCellsFor(state, player.id), speedFactorAt(state, player));
       tryKick(state, player, move);
+      if (slippery && player.x === beforeX && player.y === beforeY) player.slide = null;
     }
   }
 
@@ -55,6 +67,7 @@ export function step(state: GameState, intents: Intents = {}): void {
   advanceExplosions(state);
   applyFlameDamage(state);
   updateHazards(state);
+  updatePowers(state);
   updateRound(state);
   updateSidelines(state);
   state.tick += 1;

@@ -13,6 +13,8 @@ export interface PlayerControls {
   bomb: string[];
   /** Habilidade especial: detonar bomba-relógio / arremessar a bomba em que pisa. */
   special: string[];
+  /** Superpoder do personagem (carrega sozinho; veja core/powers.ts). */
+  power: string[];
 }
 
 /** Pessoas: 1 e 2 jogam no teclado (ou com controle); de 3 a 5 só com controle de videogame (o controle N comanda o jogador N). */
@@ -24,10 +26,10 @@ export type KeyboardPlayerId = 1 | 2;
 /**
  * Jogador 1: A S D W, Espaço (bomba), E (especial).
  * Jogador 2: 2 4 8 6 (do teclado numérico; os mesmos números da fileira de cima também funcionam), Enter (bomba),
- * 9 (especial). As setas também movem o jogador 2, para quem joga sem teclado numérico.
+ * 9 (especial). Poder: F (jogador 1) e 0 (jogador 2). As setas também movem o jogador 2, para quem joga sem teclado numérico.
  */
 export const PLAYER_CONTROLS: Record<KeyboardPlayerId, PlayerControls> = {
-  1: { up: ['W'], down: ['S'], left: ['A'], right: ['D'], bomb: ['SPACE'], special: ['E'] },
+  1: { up: ['W'], down: ['S'], left: ['A'], right: ['D'], bomb: ['SPACE'], special: ['E'], power: ['F'] },
   2: {
     up: ['NUMPAD_EIGHT', 'EIGHT', 'UP'],
     down: ['NUMPAD_TWO', 'TWO', 'DOWN'],
@@ -35,6 +37,7 @@ export const PLAYER_CONTROLS: Record<KeyboardPlayerId, PlayerControls> = {
     right: ['NUMPAD_SIX', 'SIX', 'RIGHT'],
     bomb: ['ENTER'],
     special: ['NUMPAD_NINE', 'NINE'],
+    power: ['NUMPAD_ZERO', 'ZERO'],
   },
 };
 

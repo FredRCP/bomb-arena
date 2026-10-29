@@ -1,4 +1,4 @@
-classic.ogg - "100 Victories" (álbum "A Bag of Chips"), de Zane Little (https://ko-fi.com/zanelittle).
-Música da arena clássica. Confirme a licença na página do autor antes de publicar e mantenha o crédito na tela de créditos do jogo.
+classic.ogg - música principal do jogo (arena clássica e menus), enviada pelo Fred. Autor e licença A CONFIRMAR (o arquivo não traz metadados).
+(A faixa anterior "100 Victories", de Zane Little, foi substituída; pode ser usada em outra arena.)
 fechando_blocos.ogg - "Dizzy Racing", de Zane Little (https://ko-fi.com/zanelittle). Tocada quando o tempo acaba e os blocos começam a fechar a arena (todas as fases).
 egypt.ogg e suez.ogg - músicas da fase do Egito, enviadas pelo Fred. Origem e licença A CONFIRMAR (os arquivos não trazem autor): anote aqui o autor/licença antes de publicar.

@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { music } from '../audio/music';
 import { sfx } from '../audio/sfx';
 import { ARENA_COLS, ARENA_ROWS } from '../config/arena';
 import { PadNav } from '../input/padNav';
@@ -21,12 +22,19 @@ export class ControlsScene extends Phaser.Scene {
   private page = 0;
   private layer: Phaser.GameObjects.GameObject[] = [];
   private padNav!: PadNav;
+  /** Aberta por cima da partida pausada (e não vinda do menu de Opções)? */
+  private overlay = false;
 
   constructor() {
     super({ key: 'Controls' });
   }
 
+  init(data?: { overlay?: boolean }): void {
+    this.overlay = data?.overlay === true;
+  }
+
   create(): void {
+    if (!this.overlay) music.playMenu();
     placeArena(this);
     this.page = 0;
     addMenuBackground(this);
@@ -64,6 +72,11 @@ export class ControlsScene extends Phaser.Scene {
 
   private back(): void {
     sfx.play('tick');
+    if (this.overlay) {
+      this.scene.stop();
+      this.scene.resume('Game');
+      return;
+    }
     this.scene.start('Setup', { screen: 'options' });
   }
 

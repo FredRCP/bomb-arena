@@ -15,6 +15,7 @@ export interface PadSnapshot {
 export const PAD_BUTTONS = {
   bomb: [0, 2], // A/✕ ou X/□
   special: [1, 3], // B/○ ou Y/△
+  power: [4, 5, 6, 7], // LB/RB/LT/RT (os botões de cima)
   back: 8,
   start: 9,
   up: 12,
@@ -42,6 +43,7 @@ export function padDirection(pad: PadSnapshot): Direction | null {
 }
 
 export const padBomb = (pad: PadSnapshot): boolean => any(pad, PAD_BUTTONS.bomb);
+export const padPower = (pad: PadSnapshot): boolean => any(pad, PAD_BUTTONS.power);
 export const padSpecial = (pad: PadSnapshot): boolean => any(pad, PAD_BUTTONS.special);
 export const padStart = (pad: PadSnapshot): boolean => pad.pressed[PAD_BUTTONS.start] === true;
 export const padBack = (pad: PadSnapshot): boolean => pad.pressed[PAD_BUTTONS.back] === true;

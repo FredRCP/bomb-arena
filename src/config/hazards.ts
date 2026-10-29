@@ -15,3 +15,7 @@ export const DART_WARN_TICKS = 2 * 60;
 export const DART_SPEED = 0.4;
 /** Meia largura da zona de acerto do dardo, em células. */
 export const DART_HIT_HALF = 0.55;
+
+/** Gelo fino: quantas manchas (de 1 a 2 células) e quantas passagens até virar buraco. */
+export const ICE_PATCHES = 9;
+export const ICE_CRACK_LEVELS = 3;

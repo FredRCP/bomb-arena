@@ -65,6 +65,7 @@ export class SetupScene extends Phaser.Scene {
   }
 
   create(): void {
+    music.playMenu();
     placeArena(this);
     sfx.setLevel(this.menu.settings.volume);
     music.setLevel(this.menu.settings.music);

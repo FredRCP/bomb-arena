@@ -1,7 +1,8 @@
 // Tipos do core. Aqui não há Phaser, nem janela, nem documento: só dados.
 
 /** O que existe em cada célula da arena. */
-export type CellType = 'empty' | 'wall' | 'block';
+/** `hole`: buraco no gelo (impede a passagem, mas o fogo atravessa). */
+export type CellType = 'empty' | 'wall' | 'block' | 'hole';
 
 /** Posição de uma célula na grade (col = coluna, row = linha; começam em 0 no canto superior esquerdo). */
 export interface Cell {
@@ -29,6 +30,8 @@ export interface PlayerIntent {
   placeBomb?: boolean;
   /** Quer usar a habilidade especial neste passo (detonar bomba-relógio ou arremessar a bomba em que pisa)? Aperto único. */
   special?: boolean;
+  /** Quer usar o superpoder do personagem neste passo (se estiver carregado)? Aperto único. */
+  power?: boolean;
 }
 
 /** Intenção de cada jogador; quem não aparece fica parado. */
@@ -88,6 +91,22 @@ export interface PlayerState {
   sideline: number | null;
   /** Passos até poder andar de novo no anel (só nas laterais). */
   sidelineCooldown: number;
+  /** Piso de gelo: direção em que o jogador está deslizando (null/ausente = parado). */
+  slide?: Direction | null;
+  /** Superpoder do personagem e a carga dele (0 a POWER_CHARGE_TICKS). Ausente = sem poder. */
+  power?: { kind: PowerKind; charge: number };
+}
+
+/** Superpoderes que existem: o elefantinho da Ana. */
+export type PowerKind = 'elephant';
+
+/** Elefantinho em disparada: o centro dele (em células) e a direção. */
+export interface ElephantState {
+  id: number;
+  owner: PlayerId;
+  x: number;
+  y: number;
+  dir: Direction;
 }
 
 /**
@@ -157,6 +176,12 @@ export type GameEvent =
   /** Armadilha de dardos: aviso (a fileira vai ser varrida em instantes) e disparo. `dir` = 1 (da esquerda para a direita) ou -1. */
   | { type: 'dartWarn'; row: number; dir: 1 | -1 }
   | { type: 'dartFired'; row: number; dir: 1 | -1 }
+  /** Gelo fino: a célula rachou (nível 1 a 3) ou virou buraco. */
+  | { type: 'iceCracked'; col: number; row: number; level: number }
+  | { type: 'iceBroken'; col: number; row: number }
+  /** Um jogador soltou o superpoder (a carga zerou). */
+  | { type: 'powerUsed'; playerId: PlayerId; kind: PowerKind; col: number; row: number; dir: Direction }
+  | { type: 'elephantGone'; id: number; col: number; row: number }
   /** Morte súbita: a célula virou parede. */
   | { type: 'cellClosed'; col: number; row: number }
   | { type: 'roundEnded'; outcome: RoundOutcome };
@@ -206,6 +231,14 @@ export interface HazardsState {
   /** Células de areia movediça (índices de `arena.cells`): quem pisa anda bem mais devagar. */
   quicksand: number[];
   dartTrap: DartTrap | null;
+  /** Piso escorregadio: quem começa a andar desliza até bater em algo. */
+  slippery?: boolean;
+  /** Células de gelo fino (índices de `arena.cells`): racham a cada passagem e, na terceira, viram buraco. */
+  thinIce?: number[];
+  /** Nível de rachadura (1 a 3) de cada célula de gelo fino já pisada. */
+  cracks?: Record<number, number>;
+  /** Última célula em que cada jogador esteve (para contar uma passagem só quando ele ENTRA na célula). */
+  lastCell?: Partial<Record<PlayerId, number>>;
 }
 
 /** Fonte única de verdade da partida. A renderização apenas lê este estado. */
@@ -223,6 +256,8 @@ export interface GameState {
   round: RoundState;
   /** Perigos do terreno (areia movediça, dardos). Ausente = arena sem perigos. */
   hazards?: HazardsState;
+  /** Elefantinhos em disparada (poder da Ana). */
+  elephants?: ElephantState[];
   /** Quem é eliminado pode jogar das laterais e tentar voltar (veja sideline.ts)? Ausente = sim. */
   sidelineEnabled?: boolean;
   /** Quantos passos de simulação já aconteceram. Será a base dos temporizadores (bombas, chamas). */

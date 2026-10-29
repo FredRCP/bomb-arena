@@ -2,7 +2,11 @@
 // Usa um elemento de áudio comum (toca em loop, carrega aos poucos e não pesa na abertura do jogo).
 import { SUDDEN_DEATH_MUSIC } from '../config/stages';
 import { pickTrack } from './musicPick';
+import { loadSettings } from '../menu/settingsStorage';
 import { sfx } from './sfx';
+
+/** Música dos menus e da abertura: a mesma música principal do jogo. */
+export const MENU_MUSIC = 'audio/classic.ogg';
 
 export { SUDDEN_DEATH_MUSIC, pickTrack };
 
@@ -38,6 +42,13 @@ class Music {
     } catch {
       // Sem áudio: o jogo segue sem música.
     }
+  }
+
+  /** Música de fundo dos menus (volume do menu de Opções, um pouco mais baixa que na partida). */
+  playMenu(): void {
+    this.setLevel(loadSettings().music);
+    this.setDuck(0.7);
+    this.play(MENU_MUSIC);
   }
 
   /** Para a música daqui a pouco, a não ser que outra partida comece logo em seguida (reiniciar a rodada). */

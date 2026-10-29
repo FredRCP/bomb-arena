@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { music } from '../audio/music';
 import { sfx } from '../audio/sfx';
 import { ARENA_COLS, ARENA_ROWS } from '../config/arena';
 import { PadNav } from '../input/padNav';
@@ -30,6 +31,7 @@ export class MenuScene extends Phaser.Scene {
   }
 
   create(): void {
+    music.playMenu();
     placeArena(this);
     this.selected = 0;
     addMenuBackground(this);

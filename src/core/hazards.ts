@@ -1,7 +1,8 @@
-import { DART_FIRST_DELAY_TICKS, DART_HIT_HALF, DART_PERIOD_TICKS, DART_SPEED, DART_WARN_TICKS, QUICKSAND_PATCHES, QUICKSAND_SPEED_FACTOR } from '../config/hazards';
+import { ICE_CRACK_LEVELS, ICE_PATCHES, DART_FIRST_DELAY_TICKS, DART_HIT_HALF, DART_PERIOD_TICKS, DART_SPEED, DART_WARN_TICKS, QUICKSAND_PATCHES, QUICKSAND_SPEED_FACTOR } from '../config/hazards';
 import { VEST_BREAK_SHIELD_TICKS } from '../config/items';
 import { cellIndex, getCell } from './arena';
 import { dropPowerups } from './items';
+import { bodyOverlapsCell } from './movement';
 import { createRng } from './random';
 import type { Arena, Cell, GameState, HazardsState, PlayerState } from './types';
 
@@ -18,6 +19,26 @@ export interface HazardOptions {
   dartRow?: number;
   /** Esfinge no centro: três paredes na linha do meio. */
   sphinx?: boolean;
+  /** Quatro pirâmides de 2 x 2 células, uma em cada região da arena (simétricas). */
+  pyramids?: boolean;
+  /** Piso de gelo escorregadio. */
+  slippery?: boolean;
+  /** Gelo fino: células que racham a cada passagem e viram buraco. */
+  thinIce?: boolean;
+}
+
+/** Canto superior esquerdo de cada uma das 4 pirâmides (2 x 2), simétricas em relação ao centro da arena. */
+export function pyramidAnchors(cols: number, rows: number): Cell[] {
+  const left = Math.round(cols / 4);
+  const right = cols - 2 - left;
+  const top = 3;
+  const bottom = rows - 2 - top;
+  return [{ col: left, row: top }, { col: right, row: top }, { col: left, row: bottom }, { col: right, row: bottom }];
+}
+
+/** As 16 células ocupadas pelas pirâmides. */
+export function pyramidCells(cols: number, rows: number): Cell[] {
+  return pyramidAnchors(cols, rows).flatMap((a) => [0, 1].flatMap((dr) => [0, 1].map((dc) => ({ col: a.col + dc, row: a.row + dr }))));
 }
 
 /** Células da esfinge (três na horizontal, no centro da arena). */
@@ -55,29 +76,44 @@ export function createHazards(arena: Arena, options: HazardOptions | undefined, 
     dartTrap = { row, phase: 'idle', timer: DART_FIRST_DELAY_TICKS - DART_WARN_TICKS, dir: 1, x: 0 };
   }
 
-  const quicksand: number[] = [];
-  if (options.quicksand) {
-    const rng = createRng(seed * 7 + 13);
-    const taken = new Set<number>();
-    const free = (cell: Cell): boolean =>
-      getCell(arena, cell.col, cell.row) !== 'wall' && cell.row !== options.dartRow && !nearSpawn(cell, cols, rows) && !taken.has(cellIndex(arena, cell.col, cell.row));
+  if (options.pyramids) {
+    for (const cell of pyramidCells(cols, rows)) arena.cells[cellIndex(arena, cell.col, cell.row)] = 'wall';
+  }
+
+  const rng = createRng(seed * 7 + 13);
+  const taken = new Set<number>();
+  const free = (cell: Cell): boolean =>
+    getCell(arena, cell.col, cell.row) !== 'wall' && cell.row !== options.dartRow && !nearSpawn(cell, cols, rows) && !taken.has(cellIndex(arena, cell.col, cell.row));
+  /** Espalha `patches` manchas de 1 a 2 células (sem bloco por cima, à mostra desde o começo). */
+  const scatter = (patches: number, pair: boolean): number[] => {
+    const out: number[] = [];
     let guard = 0;
-    for (let patch = 0; patch < QUICKSAND_PATCHES && guard++ < 400; ) {
+    for (let patch = 0; patch < patches && guard++ < 600; ) {
       const cell = { col: 1 + Math.floor(rng() * (cols - 2)), row: 1 + Math.floor(rng() * (rows - 2)) };
       if (!free(cell)) continue;
       const side = rng() < 0.5 ? { col: cell.col + 1, row: cell.row } : { col: cell.col, row: cell.row + 1 };
       const mark = (c: Cell): void => {
         const index = cellIndex(arena, c.col, c.row);
         taken.add(index);
-        quicksand.push(index);
-        arena.cells[index] = 'empty'; // a areia fica à mostra desde o começo (sem bloco por cima)
+        out.push(index);
+        arena.cells[index] = 'empty';
       };
       mark(cell);
-      if (free(side)) mark(side);
+      if (pair && free(side)) mark(side);
       patch += 1;
     }
+    return out;
+  };
+
+  const quicksand = options.quicksand ? scatter(QUICKSAND_PATCHES, true) : [];
+  const hazards: HazardsState = { quicksand, dartTrap };
+  if (options.slippery) hazards.slippery = true;
+  if (options.thinIce) {
+    hazards.thinIce = scatter(ICE_PATCHES, true);
+    hazards.cracks = {};
+    hazards.lastCell = {};
   }
-  return { quicksand, dartTrap };
+  return hazards;
 }
 
 /** Fator de velocidade do jogador: reduzido em cima da areia movediça (pela célula do centro do corpo). */
@@ -87,10 +123,48 @@ export function speedFactorAt(state: GameState, player: Pick<PlayerState, 'x' | 
   return quicksand.includes(cellIndex(state.arena, Math.floor(player.x), Math.floor(player.y))) ? QUICKSAND_SPEED_FACTOR : 1;
 }
 
-/** Avança a armadilha de dardos um passo (chamado uma vez por passo, pelo `step`). */
+/** Avança os perigos um passo (chamado uma vez por passo, pelo `step`). */
 export function updateHazards(state: GameState): void {
+  if (state.round.phase === 'over') return;
+  updateThinIce(state);
+  updateDartTrap(state);
+}
+
+/** Gelo fino: cada entrada numa célula racha um nível; no último nível a célula vira buraco assim que ficar livre. */
+function updateThinIce(state: GameState): void {
+  const hz = state.hazards;
+  if (!hz?.thinIce || !hz.cracks || !hz.lastCell) return;
+  const arena = state.arena;
+  for (const player of state.players) {
+    if (!player.alive) {
+      delete hz.lastCell[player.id];
+      continue;
+    }
+    const index = cellIndex(arena, Math.floor(player.x), Math.floor(player.y));
+    if (hz.lastCell[player.id] === index) continue;
+    hz.lastCell[player.id] = index;
+    if (!hz.thinIce.includes(index) || arena.cells[index] !== 'empty') continue;
+    const level = Math.min(ICE_CRACK_LEVELS, (hz.cracks[index] ?? 0) + 1);
+    hz.cracks[index] = level;
+    state.events.push({ type: 'iceCracked', col: index % arena.cols, row: Math.floor(index / arena.cols), level });
+  }
+  for (const key of Object.keys(hz.cracks)) {
+    const index = Number(key);
+    if (hz.cracks[index]! < ICE_CRACK_LEVELS || arena.cells[index] !== 'empty') continue;
+    const col = index % arena.cols;
+    const row = Math.floor(index / arena.cols);
+    // Só quebra com a célula livre (sem ninguém em cima, sem bomba): ninguém cai no buraco.
+    if (state.players.some((p) => p.alive && bodyOverlapsCell(p.x, p.y, col, row))) continue;
+    if (state.bombs.some((b) => b.col === col && b.row === row)) continue;
+    arena.cells[index] = 'hole';
+    state.items = state.items.filter((item) => !(item.col === col && item.row === row));
+    state.events.push({ type: 'iceBroken', col, row });
+  }
+}
+
+function updateDartTrap(state: GameState): void {
   const trap = state.hazards?.dartTrap;
-  if (!trap || state.round.phase === 'over') return;
+  if (!trap) return;
 
   if (trap.phase === 'idle') {
     trap.timer -= 1;

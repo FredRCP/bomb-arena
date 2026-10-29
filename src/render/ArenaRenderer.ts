@@ -3,7 +3,7 @@ import type { CharacterDef } from '../characters/characters';
 import Phaser from 'phaser';
 import { getCell, inwardDirection, ringCells } from '../core';
 import type { Arena, BombState, FlameState, GameState, HazardsState, ItemState, PlayerState } from '../core';
-import { sphinxCells } from '../core';
+import { pyramidAnchors, pyramidCells, sphinxCells } from '../core';
 import { COLORS } from './palette';
 import { has, loadedBlockVariants, themeById, themeKey } from './theme';
 import type { ThemeDef } from './theme';
@@ -61,6 +61,10 @@ export function drawArena(scene: Phaser.Scene, arena: Arena, themeId = 'classic'
   const wallImages = theme.wall && has(scene, theme, 'wall');
   const pillarImages = !!theme.pillar && has(scene, theme, 'pillar');
   const sphinxOn = !!theme.sphinx && has(scene, theme, 'sphinx') && !!hazards;
+  const glyphs = theme.borderGlyphs ?? 0;
+  const glyphImages = glyphs > 0 && has(scene, theme, 'glyph1');
+  const pyramidOn = !!theme.pyramids && has(scene, theme, 'pyramid') && !!hazards;
+  const pyramidAt = new Set(pyramidOn ? pyramidCells(arena.cols, arena.rows).map((c) => c.row * arena.cols + c.col) : []);
   const sphinxAt = new Set(sphinxOn ? sphinxCells(arena.cols, arena.rows).map((c) => c.row * arena.cols + c.col) : []);
 
   for (let row = 0; row < arena.rows; row++) {
@@ -70,12 +74,26 @@ export function drawArena(scene: Phaser.Scene, arena: Arena, themeId = 'classic'
       if (floorImages) scene.add.image(x + TILE_SIZE / 2, y + TILE_SIZE / 2, themeKey(theme, (col + row) % 2 === 0 ? 'floorA' : 'floorB')).setDisplaySize(TILE_SIZE, TILE_SIZE).setDepth(0);
       else drawFloor(g, x, y, col, row);
       if (getCell(arena, col, row) !== 'wall') continue;
-      if (sphinxAt.has(row * arena.cols + col)) continue; // a esfinge é uma imagem só, desenhada depois
+      if (sphinxAt.has(row * arena.cols + col) || pyramidAt.has(row * arena.cols + col)) continue; // imagens grandes, desenhadas depois
       const inner = col > 0 && row > 0 && col < arena.cols - 1 && row < arena.rows - 1;
+      if (!inner && glyphImages) {
+        // Borda em blocos de hieróglifo (a variação depende só da posição).
+        const n = 1 + ((col * 5 + row * 11) % glyphs);
+        const image = scene.add.image((col + 0.5) * TILE_SIZE, (row + 1) * TILE_SIZE - 1, themeKey(theme, `glyph${n}`)).setOrigin(0.5, 1).setDepth(6);
+        image.setScale(theme.wallWidth / image.width);
+        continue;
+      }
       // A parede em imagem é mais alta que a célula: fica na frente das chamas e das bombas (depth 6), para o fogo nunca cobri-la.
       if (pillarImages && inner) addPillarImage(scene, theme, col, row, 6);
       else if (wallImages) addWallImage(scene, theme, col, row, 6);
       else drawWall(g, x, y);
+    }
+  }
+
+  if (pyramidOn) {
+    for (const a of pyramidAnchors(arena.cols, arena.rows)) {
+      const image = scene.add.image((a.col + 1) * TILE_SIZE, (a.row + 2) * TILE_SIZE - 1, themeKey(theme, 'pyramid')).setOrigin(0.5, 1).setDepth(6);
+      image.setScale((2 * TILE_SIZE - 4) / image.width);
     }
   }
 

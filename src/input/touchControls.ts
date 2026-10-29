@@ -12,11 +12,13 @@ const STICK = { x: 165, y: 690, r: 120 };
 /** Região da tela em que um toque começa a alavanca (generosa: o dedo não precisa acertar o desenho). */
 const STICK_ZONE = { maxX: 330, minY: 250 };
 
-type Role = 'stick' | 'bomb' | 'special' | 'pause' | 'menu';
+type Role = 'stick' | 'bomb' | 'special' | 'power' | 'pause' | 'menu';
 
 export class TouchControls {
   private readonly bomb: TouchButton;
   private readonly special: TouchButton;
+  /** Botão do superpoder (só aparece para quem tem poder). */
+  private readonly power: TouchButton;
   private readonly pause: TouchButton;
   private readonly menu: TouchButton;
   private readonly base: Phaser.GameObjects.Graphics;
@@ -27,6 +29,7 @@ export class TouchControls {
   constructor(
     scene: Phaser.Scene,
     private readonly input: KeyboardInput,
+    hasPower = false,
   ) {
     ensureTouchPointers(scene, 4); // alavanca, bomba, especial e pausa ao mesmo tempo
 
@@ -36,6 +39,8 @@ export class TouchControls {
 
     this.bomb = makeTouchButton(scene, 1445, 700, 95, 'BOMBA', 30);
     this.special = makeTouchButton(scene, 1350, 535, 58, 'ESP.', 24);
+    this.power = makeTouchButton(scene, 1215, 690, 62, 'PODER', 20);
+    setTouchButtonVisible(this.power, hasPower);
     this.pause = makeTouchButton(scene, 1550, 40, 34, 'II', 28);
     this.menu = makeTouchButton(scene, 1445, 40, 34, 'MENU', 18);
     setTouchButtonVisible(this.menu, false);
@@ -55,6 +60,7 @@ export class TouchControls {
 
   private roleAt(x: number, y: number): Role | null {
     if (inCircle(x, y, this.bomb.x, this.bomb.y, this.bomb.r + 25)) return 'bomb';
+    if (this.power.text.visible && inCircle(x, y, this.power.x, this.power.y, this.power.r + 20)) return 'power';
     if (inCircle(x, y, this.special.x, this.special.y, this.special.r + 20)) return 'special';
     if (inCircle(x, y, this.pause.x, this.pause.y, this.pause.r + 18)) return 'pause';
     if (this.menu.text.visible && inCircle(x, y, this.menu.x, this.menu.y, this.menu.r + 18)) return 'menu';
@@ -72,6 +78,9 @@ export class TouchControls {
     } else if (role === 'special') {
       this.input.touchSpecial(1);
       drawTouchButton(this.special, true);
+    } else if (role === 'power') {
+      this.input.touchPower(1);
+      drawTouchButton(this.power, true);
     } else if (role === 'pause') {
       this.input.touchStart();
     } else if (role === 'menu') {
@@ -90,6 +99,7 @@ export class TouchControls {
     this.roles.delete(pointer.id);
     if (role === 'bomb') drawTouchButton(this.bomb, false);
     else if (role === 'special') drawTouchButton(this.special, false);
+    else if (role === 'power') drawTouchButton(this.power, false);
     else if (role === 'stick') {
       this.direction = null;
       this.input.setTouchMove(1, null);

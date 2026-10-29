@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { music } from '../audio/music';
 import { sfx } from '../audio/sfx';
 import { PadNav } from '../input/padNav';
 import { CHARACTERS } from '../characters/characters';
@@ -48,6 +49,7 @@ export class SelectScene extends Phaser.Scene {
   }
 
   create(): void {
+    music.playMenu();
     this.humans = this.session.config.players;
     this.picker = createPicker(this.humans);
     this.overlay = [];

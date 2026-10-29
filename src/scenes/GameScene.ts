@@ -8,13 +8,17 @@ import { COUNTDOWN_SECONDS } from '../config/round';
 import { TICKS_PER_SECOND } from '../config/simulation';
 import { characterById, defaultChoices } from '../characters/characters';
 import type { CharacterChoices } from '../characters/characters';
-import { applyItem, createAi, createScoreboard, rankPlayers, recordEvents, recordMatchScore, recordRoundScore, createFixedStepper, createGameState, createMatch, drainEvents, nextRound, recordRound, step, teamOfOutcome } from '../core';
+import { aiShouldUsePower, applyItem, givePower, createAi, createScoreboard, rankPlayers, recordEvents, recordMatchScore, recordRoundScore, createFixedStepper, createGameState, createMatch, drainEvents, nextRound, recordRound, step, teamOfOutcome } from '../core';
 import type { AiController, GameState, MatchState, PlayerId, Scoreboard } from '../core';
 import type { HumanId } from '../input/controls';
 import { KeyboardInput } from '../input/keyboardInput';
 import { TouchControls } from '../input/touchControls';
 import { wantsTouchControls } from '../input/touchUi';
 import { parseGameConfig } from '../menu/gameConfig';
+import { saveSettings } from '../menu/settingsStorage';
+import { readPad } from '../input/padReader';
+import { startPadMemory, stepPadNav } from '../input/padNavLogic';
+import type { NavAction, PadMemory } from '../input/padNavLogic';
 import type { GameConfig } from '../menu/gameConfig';
 import {
   TILE_SIZE,
@@ -40,6 +44,7 @@ import { FLAME_TICKS } from '../config/bombs';
 import { createHud } from '../render/Hud';
 import { SCREEN_HEIGHT, SCREEN_WIDTH, TOP_HEIGHT, placeArena, sideWidthFor } from '../render/layout';
 import { HazardsView } from '../render/HazardsView';
+import { ElephantView } from '../render/ElephantView';
 import { addMenuBackground } from '../render/menuBackground';
 import { has, themeById, themeKey } from '../render/theme';
 import type { Hud } from '../render/Hud';
@@ -85,6 +90,7 @@ export class GameScene extends Phaser.Scene {
   private itemSprites!: ItemSprites;
   private closedView!: ClosedView;
   private hazardsView!: HazardsView;
+  private elephantView!: ElephantView;
   /** A música da morte súbita já começou nesta rodada? */
   private suddenMusic = false;
   private hud!: Hud;
@@ -99,6 +105,10 @@ export class GameScene extends Phaser.Scene {
   private countdownText: Phaser.GameObjects.Text | null = null;
   private lastCountdownShown = '';
   private pauseObjects: Phaser.GameObjects.GameObject[] = [];
+  /** Menu da pausa: linha selecionada e os textos (atualizados quando algo muda). */
+  private pauseRow = 0;
+  private pauseTexts: Phaser.GameObjects.Text[] = [];
+  private readonly padMemory = new Map<number, PadMemory>();
   /** Diagnóstico de velocidade (?debug=1): quantos passos de simulação rodaram no último segundo. */
   private debugText: Phaser.GameObjects.Text | null = null;
   private debugMs = 0;
@@ -146,6 +156,11 @@ export class GameScene extends Phaser.Scene {
     const cpuNames: Record<number, string> = {};
     for (const player of this.gameState.players) if (player.cpu) cpuNames[player.id] = characterById(this.characters[player.id]).name;
     setCpuNames(cpuNames);
+    // Superpoder de cada personagem (a carga começa vazia a cada rodada).
+    for (const player of this.gameState.players) {
+      const power = characterById(this.characters[player.id]).power;
+      if (power) givePower(player, power);
+    }
     this.session.scores ??= createScoreboard(this.gameState.players);
     this.humans = this.gameState.players.filter((player) => !player.cpu).map((player) => player.id);
     this.ais = this.gameState.players
@@ -189,6 +204,7 @@ export class GameScene extends Phaser.Scene {
     this.itemSprites = new ItemSprites(this);
     this.closedView = createClosedView(this, theme.id);
     this.hazardsView = new HazardsView(this, this.gameState);
+    this.elephantView = new ElephantView(this);
     this.suddenMusic = false;
     for (const player of this.gameState.players) {
       this.playerViews.set(player.id, createPlayerView(this, player, characterById(this.characters[player.id])));
@@ -203,12 +219,22 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.keyboardInput = new KeyboardInput(this, this.humans as HumanId[]);
-    this.touchControls = this.humans.includes(1) && wantsTouchControls() ? new TouchControls(this, this.keyboardInput) : null;
+    this.pauseRow = 0;
+    this.pauseTexts = [];
+    const onPauseKey = (event: KeyboardEvent): void => {
+      if (this.pauseObjects.length === 0 || event.repeat) return;
+      const actions: Record<string, NavAction> = { ArrowUp: 'up', KeyW: 'up', ArrowDown: 'down', KeyS: 'down', ArrowLeft: 'left', KeyA: 'left', ArrowRight: 'right', KeyD: 'right', Enter: 'confirm', Space: 'confirm' };
+      const action = actions[event.code];
+      if (action) this.pauseAction(action);
+    };
+    this.input.keyboard?.on('keydown', onPauseKey);
+    this.touchControls = this.humans.includes(1) && wantsTouchControls() ? new TouchControls(this, this.keyboardInput, !!this.gameState.players[0]?.power) : null;
     music.setLevel(loadSettings().music);
     music.setDuck(this.countdownTicks > 0 ? COUNTDOWN_MUSIC_DUCK : 1); // música baixinha durante a contagem
     this.session.track ??= pickTrack(stage.id);
     music.play(this.session.track);
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
+      this.input.keyboard?.off('keydown', onPauseKey);
       this.keyboardInput.destroy();
       music.release();
     });
@@ -225,7 +251,7 @@ export class GameScene extends Phaser.Scene {
    * Chamado a cada quadro da tela. O tempo real (delta, em ms) vira um número inteiro de passos de
    * simulação: em monitores de 60 ou de 144 Hz o jogador anda exatamente a mesma distância por segundo.
    */
-  update(): void {
+  update(time: number): void {
     // Tempo real do quadro, medido aqui. NÃO usamos o `delta` do Phaser: ele suaviza e limita os quadros lentos
     // (um quadro de 100 ms chega como ~16 ms), e aí o jogo anda em câmera lenta sempre que a máquina engasga,
     // por exemplo nos primeiros segundos depois de abrir a cena. Com o tempo real, o passo fixo recupera o atraso.
@@ -266,6 +292,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     const ticks = this.stepper.advance(delta);
+    if (paused) this.pollPausePads(time);
     if (paused) {
       this.keyboardInput.getIntents(); // descarta apertos de bomba feitos durante a pausa
       return;
@@ -297,7 +324,12 @@ export class GameScene extends Phaser.Scene {
 
     for (let i = 0; i < playTicks; i++) {
       const intents = this.keyboardInput.getIntents();
-      for (const ai of this.ais) intents[ai.playerId] = ai.decide(this.gameState);
+      for (const ai of this.ais) {
+        const intent = ai.decide(this.gameState);
+        const self = this.gameState.players.find((p) => p.id === ai.playerId);
+        if (self && aiShouldUsePower(this.gameState, self)) intent.power = true;
+        intents[ai.playerId] = intent;
+      }
       step(this.gameState, intents);
     }
 
@@ -346,17 +378,119 @@ export class GameScene extends Phaser.Scene {
     }
   }
 
+  /** Itens do menu da pausa (a ordem é a da tela). */
+  private static readonly PAUSE_ITEMS = ['resume', 'sfx', 'music', 'controls', 'restart', 'quit'] as const;
+
   private setPaused(paused: boolean): void {
     if (!paused) {
       for (const object of this.pauseObjects) object.destroy();
       this.pauseObjects = [];
+      this.pauseTexts = [];
       return;
     }
-    this.pauseObjects = showOutcomeOverlay(this, this.gameState.arena.cols * TILE_SIZE, this.gameState.arena.rows * TILE_SIZE, {
-      title: 'Pausado',
-      tone: 'neutral',
-      hint: 'Esc/Start: continuar   R: reiniciar a rodada   Q/Select: menu',
+    const width = this.gameState.arena.cols * TILE_SIZE;
+    const height = this.gameState.arena.rows * TILE_SIZE;
+    const font = 'system-ui, "Segoe UI", Roboto, sans-serif';
+    this.pauseObjects = [
+      this.add.rectangle(width / 2, height / 2, width, height, 0x0b0c1a, 0.72).setDepth(100),
+      this.add.text(width / 2, height / 2 - 230, 'Pausado', { fontFamily: font, fontSize: '72px', fontStyle: 'bold', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 8 }).setOrigin(0.5).setDepth(101),
+      this.add.text(width / 2, height / 2 + 250, '↑ ↓ escolher     ← → ajustar     Enter confirmar     Esc continuar', { fontFamily: font, fontSize: '22px', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 4 }).setOrigin(0.5).setDepth(101),
+    ];
+    this.pauseRow = 0;
+    this.pauseTexts = GameScene.PAUSE_ITEMS.map((id, index) => {
+      const text = this.add
+        .text(width / 2, height / 2 - 120 + index * 62, '', { fontFamily: font, fontSize: '38px', fontStyle: 'bold', color: '#e3e7ff', stroke: '#1b1f3b', strokeThickness: 6 })
+        .setOrigin(0.5)
+        .setDepth(101)
+        .setInteractive({ useHandCursor: true });
+      // Toque/mouse: tocar numa linha a seleciona e confirma; nas linhas de volume, tocar na metade esquerda diminui e na direita aumenta.
+      text.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
+        this.pauseRow = index;
+        if (id === 'sfx' || id === 'music') this.pauseAction(pointer.worldX < text.x ? 'left' : 'right');
+        else this.pauseAction('confirm');
+      });
+      this.pauseObjects.push(text);
+      return text;
     });
+    this.renderPause();
+  }
+
+  private renderPause(): void {
+    const settings = loadSettings();
+    const pct = (v: number): string => (v === 0 ? 'mudo' : `${v * 10}%`);
+    const labels: Record<(typeof GameScene.PAUSE_ITEMS)[number], string> = {
+      resume: 'Continuar',
+      sfx: `◀  Volume dos sons: ${pct(settings.volume)}  ▶`,
+      music: `◀  Volume da música: ${pct(settings.music)}  ▶`,
+      controls: 'Controles',
+      restart: 'Reiniciar a rodada',
+      quit: 'Sair para o menu',
+    };
+    this.pauseTexts.forEach((text, index) => {
+      text.setText(labels[GameScene.PAUSE_ITEMS[index]!]);
+      text.setColor(index === this.pauseRow ? '#ffe66d' : '#e3e7ff');
+    });
+  }
+
+  /** Uma ação no menu da pausa (teclado, controle ou toque). */
+  private pauseAction(action: NavAction): void {
+    const count = GameScene.PAUSE_ITEMS.length;
+    const item = GameScene.PAUSE_ITEMS[this.pauseRow]!;
+    if (action === 'up' || action === 'down') {
+      this.pauseRow = (this.pauseRow + (action === 'up' ? -1 : 1) + count) % count;
+      sfx.play('tick');
+    } else if (action === 'back') {
+      this.setPaused(false);
+      return;
+    } else if ((action === 'left' || action === 'right') && (item === 'sfx' || item === 'music')) {
+      const settings = loadSettings();
+      const delta = action === 'left' ? -1 : 1;
+      if (item === 'sfx') {
+        settings.volume = Math.min(10, Math.max(0, settings.volume + delta));
+        sfx.setLevel(settings.volume);
+      } else {
+        settings.music = Math.min(10, Math.max(0, settings.music + delta));
+        music.setLevel(settings.music);
+      }
+      saveSettings(settings);
+      sfx.play('tick');
+    } else if (action === 'confirm') {
+      if (item === 'resume') {
+        this.setPaused(false);
+        return;
+      }
+      if (item === 'restart') {
+        this.restart(false);
+        return;
+      }
+      if (item === 'quit') {
+        this.scene.start('Menu');
+        return;
+      }
+      if (item === 'controls') {
+        sfx.play('confirm');
+        this.scene.launch('Controls', { overlay: true });
+        this.scene.pause();
+        return;
+      }
+    }
+    this.renderPause();
+  }
+
+  /** Controle de videogame no menu da pausa (direcional/alavanca, A confirma, B continua). */
+  private pollPausePads(time: number): void {
+    const plugin = this.input.gamepad;
+    if (!plugin) return;
+    for (let index = 0; index < plugin.total; index++) {
+      const snapshot = readPad(plugin.getPad(index));
+      if (!snapshot) continue;
+      const memory = this.padMemory.get(index);
+      if (!memory) {
+        this.padMemory.set(index, startPadMemory(snapshot, time));
+        continue;
+      }
+      for (const action of stepPadNav(memory, snapshot, time)) this.pauseAction(action);
+    }
   }
 
   /** Reage ao que o core informou que aconteceu: som, redesenho dos blocos e tela de resultado. */
@@ -377,6 +511,9 @@ export class GameScene extends Phaser.Scene {
       }
       if (event.type === 'dartWarn') heard.add('tick');
       if (event.type === 'dartFired') heard.add('place');
+      if (event.type === 'powerUsed') heard.add('pickup');
+      if (event.type === 'iceCracked') heard.add('tick');
+      if (event.type === 'iceBroken') heard.add('place');
       if (event.type === 'bombPlaced' || event.type === 'bombKicked' || event.type === 'bombThrown') heard.add('place');
       if (event.type === 'bombPlaced') triggerBombPose(this.playerViews.get(event.owner), this.gameState.tick);
       if (event.type === 'bombExploded') heard.add('explode');
@@ -386,6 +523,7 @@ export class GameScene extends Phaser.Scene {
       if (event.type === 'roundEnded') this.showResult(event.outcome);
     }
 
+    this.elephantView.onEvents(events);
     this.fx.onEvents(events, this.gameState);
     this.flameSprites.onEvents(events, this.gameState, FLAME_TICKS);
     if (blocksChanged) redrawBlocks(this.blocksView, this.gameState.arena);
@@ -443,6 +581,7 @@ export class GameScene extends Phaser.Scene {
       music.play(SUDDEN_DEATH_MUSIC);
     }
     this.hazardsView.update(this.gameState);
+    this.elephantView.update(this.gameState);
     drawItems(this.itemsView, this.gameState, (kind) => hasItemIcon(this, kind));
     this.itemSprites.update(this.gameState);
     const spriteFlames = this.flameSprites.ready;

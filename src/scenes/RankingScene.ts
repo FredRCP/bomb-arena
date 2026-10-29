@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { music } from '../audio/music';
 import { sfx } from '../audio/sfx';
 import { ARENA_COLS, ARENA_ROWS } from '../config/arena';
 import { RANKING_SIZE } from '../config/score';
@@ -23,6 +24,7 @@ export class RankingScene extends Phaser.Scene {
   }
 
   create(): void {
+    music.playMenu();
     placeArena(this);
     addMenuBackground(this);
     addPanel(this, WIDTH / 2, 470, WIDTH - 60, 700);

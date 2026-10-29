@@ -4,7 +4,7 @@ import { DIRECTIONS, MUTE_KEY, PAUSE_KEY, PLAYER_CONTROLS, QUIT_KEY, RESTART_KEY
 describe('controles dos jogadores', () => {
   const all = [
     ...Object.entries(PLAYER_CONTROLS).flatMap(([id, c]) =>
-      [...c.up, ...c.down, ...c.left, ...c.right, ...c.bomb, ...c.special].map((key) => ({ id, key })),
+      [...c.up, ...c.down, ...c.left, ...c.right, ...c.bomb, ...c.special, ...c.power].map((key) => ({ id, key })),
     ),
     { id: 'partida', key: RESTART_KEY },
     { id: 'partida', key: MUTE_KEY },
@@ -25,11 +25,12 @@ describe('controles dos jogadores', () => {
       for (const direction of DIRECTIONS) expect(controls[direction].length).toBeGreaterThan(0);
       expect(controls.bomb.length).toBeGreaterThan(0);
       expect(controls.special.length).toBeGreaterThan(0);
+      expect(controls.power.length).toBeGreaterThan(0);
     }
   });
 
   it('jogador 1: A S D W, Espaço (bomba), E (especial)', () => {
-    expect(PLAYER_CONTROLS[1]).toEqual({ up: ['W'], down: ['S'], left: ['A'], right: ['D'], bomb: ['SPACE'], special: ['E'] });
+    expect(PLAYER_CONTROLS[1]).toEqual({ up: ['W'], down: ['S'], left: ['A'], right: ['D'], bomb: ['SPACE'], special: ['E'], power: ['F'] });
   });
 
   it('jogador 2: 8 2 4 6 (teclado numérico ou fileira de cima), Enter (bomba), 9 (especial); setas também andam', () => {

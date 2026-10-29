@@ -3,7 +3,7 @@ import type { Direction, Intents, PlayerIntent } from '../core';
 import { DIRECTIONS, MUTE_KEY, PAUSE_KEY, PLAYER_CONTROLS, QUIT_KEY, RESTART_KEY } from './controls';
 import type { HumanId } from './controls';
 import { DirectionStack } from './directionStack';
-import { padBack, padBomb, padDirection, padSpecial, padStart } from './gamepad';
+import { padBack, padBomb, padDirection, padPower, padSpecial, padStart } from './gamepad';
 import { readPad } from './padReader';
 
 // Lê o teclado de verdade (via Phaser) e o transforma em "intenções" para o core.
@@ -14,6 +14,8 @@ interface PlayerInput {
   /** Aperto único: guardado até o próximo passo da simulação consumir. Segurar a tecla não repete. */
   bombPressed: boolean;
   specialPressed: boolean;
+  powerPressed: boolean;
+  padPower: boolean;
   /** Estado do controle no quadro anterior (para detectar o aperto, e não o botão segurado). */
   padBomb: boolean;
   padSpecial: boolean;
@@ -43,6 +45,7 @@ export class KeyboardInput {
       input.stack.clear();
       input.bombPressed = false;
       input.specialPressed = false;
+      input.powerPressed = false;
       input.padMove = null;
       input.touchMove = null;
     }
@@ -56,7 +59,7 @@ export class KeyboardInput {
     // addKey também impede que as setas e o espaço rolem a página do navegador.
     if (this.keyboard) {
       for (const id of playerIds) {
-        const input: PlayerInput = { stack: new DirectionStack(), bombPressed: false, specialPressed: false, padBomb: false, padSpecial: false, padMove: null, touchMove: null };
+        const input: PlayerInput = { stack: new DirectionStack(), bombPressed: false, specialPressed: false, powerPressed: false, padPower: false, padBomb: false, padSpecial: false, padMove: null, touchMove: null };
         this.players.set(id, input);
         const controls = id <= 2 ? PLAYER_CONTROLS[id as 1 | 2] : undefined; // 3 a 5: só controle de videogame
         if (!controls) continue;
@@ -77,6 +80,13 @@ export class KeyboardInput {
             if (!event?.repeat) input.bombPressed = true;
           });
           this.keys.push(bombKey);
+        }
+        for (const name of controls.power) {
+          const powerKey = this.keyboard.addKey(name);
+          powerKey.on('down', (_key: unknown, event: KeyboardEvent) => {
+            if (!event?.repeat) input.powerPressed = true;
+          });
+          this.keys.push(powerKey);
         }
         for (const name of controls.special) {
           const specialKey = this.keyboard.addKey(name);
@@ -123,9 +133,11 @@ export class KeyboardInput {
         move: input.stack.current() ?? input.padMove ?? input.touchMove,
         placeBomb: input.bombPressed,
         special: input.specialPressed,
+        power: input.powerPressed,
       };
       input.bombPressed = false;
       input.specialPressed = false;
+      input.powerPressed = false;
       intents[id] = intent;
     }
     return intents;
@@ -145,6 +157,7 @@ export class KeyboardInput {
         input.padMove = null;
         input.padBomb = false;
         input.padSpecial = false;
+        input.padPower = false;
         continue;
       }
       input.padMove = padDirection(snapshot);
@@ -154,6 +167,9 @@ export class KeyboardInput {
       if (special && !input.padSpecial) input.specialPressed = true;
       input.padBomb = bomb;
       input.padSpecial = special;
+      const power = padPower(snapshot);
+      if (power && !input.padPower) input.powerPressed = true;
+      input.padPower = power;
     }
     for (let index = 0; index < plugin.total; index++) {
       const snapshot = readPad(plugin.getPad(index));
@@ -175,6 +191,10 @@ export class KeyboardInput {
   touchBomb(id: HumanId): void {
     const input = this.players.get(id);
     if (input) input.bombPressed = true;
+  }
+  touchPower(id: HumanId): void {
+    const input = this.players.get(id);
+    if (input) input.powerPressed = true;
   }
   touchSpecial(id: HumanId): void {
     const input = this.players.get(id);

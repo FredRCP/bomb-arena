@@ -8,9 +8,13 @@ import { TILE_SIZE } from './ArenaRenderer';
 export class HazardsView {
   private readonly g: Phaser.GameObjects.Graphics;
   private readonly warn: Phaser.GameObjects.Text[] = [];
+  /** Gelo fino (manchas, rachaduras e buracos): redesenhado só quando algo muda. */
+  private readonly ice: Phaser.GameObjects.Graphics;
+  private iceKey = '';
 
   constructor(private readonly scene: Phaser.Scene, state: GameState) {
     this.g = scene.add.graphics().setDepth(9);
+    this.ice = scene.add.graphics().setDepth(0.8);
     const trap = state.hazards?.dartTrap;
     if (!trap) return;
     // Aviso escrito, nas bordas da fileira (fica fora da arena, no fundo da tela).
@@ -33,7 +37,43 @@ export class HazardsView {
     for (const x of [TILE_SIZE - 14, (state.arena.cols - 1) * TILE_SIZE + 2]) strip.fillRoundedRect(x, y + 24, 12, 16, 3);
   }
 
+  /** Gelo fino: mancha clara com rachaduras por nível; célula quebrada vira um buraco escuro. */
+  private drawIce(state: GameState): void {
+    const hz = state.hazards;
+    if (!hz?.thinIce || !hz.cracks) return;
+    const arena = state.arena;
+    const key = hz.thinIce.map((i) => `${arena.cells[i] === 'hole' ? 'h' : hz.cracks![i] ?? 0}`).join('');
+    if (key === this.iceKey) return;
+    this.iceKey = key;
+    const g = this.ice;
+    g.clear();
+    for (const index of hz.thinIce) {
+      const x = (index % arena.cols) * TILE_SIZE;
+      const y = Math.floor(index / arena.cols) * TILE_SIZE;
+      if (arena.cells[index] === 'hole') {
+        g.fillStyle(0x0a1d3a, 1).fillRoundedRect(x + 3, y + 3, TILE_SIZE - 6, TILE_SIZE - 6, 10);
+        g.fillStyle(0x03101f, 1).fillRoundedRect(x + 9, y + 9, TILE_SIZE - 18, TILE_SIZE - 18, 8);
+        g.lineStyle(3, 0xcdeeff, 0.9).strokeRoundedRect(x + 3, y + 3, TILE_SIZE - 6, TILE_SIZE - 6, 10);
+        continue;
+      }
+      const level = hz.cracks[index] ?? 0;
+      g.fillStyle(0xdff6ff, 0.45).fillRoundedRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4, 8);
+      g.lineStyle(2, 0xffffff, 0.8).strokeRoundedRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4, 8);
+      g.lineStyle(3, 0x2f6f9f, 0.95);
+      if (level >= 1) {
+        g.lineBetween(x + 12, y + 14, x + 30, y + 30);
+        g.lineBetween(x + 30, y + 30, x + 26, y + 44);
+      }
+      if (level >= 2) {
+        g.lineBetween(x + 30, y + 30, x + 52, y + 22);
+        g.lineBetween(x + 40, y + 27, x + 48, y + 46);
+        g.lineBetween(x + 26, y + 44, x + 14, y + 54);
+      }
+    }
+  }
+
   update(state: GameState): void {
+    this.drawIce(state);
     const trap = state.hazards?.dartTrap;
     const g = this.g;
     g.clear();

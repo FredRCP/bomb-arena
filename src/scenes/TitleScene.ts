@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { music } from '../audio/music';
 import { sfx } from '../audio/sfx';
 import { ARENA_COLS, ARENA_ROWS } from '../config/arena';
 import { CHARACTERS, characterById } from '../characters/characters';
@@ -35,6 +36,7 @@ export class TitleScene extends Phaser.Scene {
   }
 
   create(): void {
+    music.playMenu();
     // Aberto com parâmetros de teste no endereço (?players=1...): pula tudo e começa a jogar direto.
     if (hasGameParams(window.location.search)) {
       this.scene.start('Game');

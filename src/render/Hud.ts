@@ -6,6 +6,7 @@ import { drawItemPlate } from './ArenaRenderer';
 import { hasItemIcon, itemTexture } from './ItemSprites';
 import { addCharacter, setFace } from './CharacterView';
 import { SCREEN_WIDTH, TOP_HEIGHT, arenaWidthFor, sideWidthFor } from './layout';
+import { powerFraction, powerReady } from '../core';
 import { formatClock, isTeamGame, playerLabel } from './outcomeText';
 
 const FONT = 'system-ui, "Segoe UI", Roboto, sans-serif';
@@ -104,7 +105,8 @@ export function createHud(scene: Phaser.Scene, state: GameState, choices: Charac
     const name = scene.add.text(x + 58, cardY + 15, playerLabel(player, players), style(18, hex(accent), 3)).setOrigin(0, 0.5).setDepth(5);
     const info = scene.add.text(x + 58, cardY + 37, '', style(15, '#e3e7ff', 2)).setOrigin(0, 0.5).setDepth(5);
     const icons = scene.add.graphics().setDepth(5);
-    return { player, x, name, info, icons, face, iconImages: [] as Phaser.GameObjects.Image[] };
+    const powerBar = scene.add.graphics().setDepth(5);
+    return { player, x, name, info, icons, powerBar, face, iconImages: [] as Phaser.GameObjects.Image[] };
   });
 
   // Teclas gerais, no canto esquerdo da tela (o fundo colorido, ao lado da arena)
@@ -119,6 +121,20 @@ export function createHud(scene: Phaser.Scene, state: GameState, choices: Charac
 
   return {
     update(current, match, scores) {
+      // Barra de carga do superpoder (muda a cada passo, por isso fica antes da checagem de "nada mudou").
+      for (const card of cards) {
+        const live = current.players.find((p) => p.id === card.player.id);
+        card.powerBar.clear();
+        if (!live?.power) continue;
+        const fraction = powerFraction(live);
+        const ready = powerReady(live);
+        const bx = card.x + 58;
+        const by = cardY + CARD_H - 6;
+        card.powerBar.fillStyle(0x0b0c1a, 0.9).fillRoundedRect(bx, by, 96, 4, 2);
+        const pulse = ready ? 0.65 + 0.35 * Math.sin(current.tick / 5) : 1;
+        card.powerBar.fillStyle(ready ? 0xffe66d : 0x74c0fc, pulse).fillRoundedRect(bx, by, Math.max(2, 96 * fraction), 4, 2);
+      }
+
       const clockText = formatClock(current.round.ticksLeft);
       if (clockText !== lastClock) {
         lastClock = clockText;

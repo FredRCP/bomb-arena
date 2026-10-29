@@ -1,4 +1,5 @@
 import Phaser from 'phaser';
+import { music } from '../audio/music';
 import { sfx } from '../audio/sfx';
 import { characterById } from '../characters/characters';
 import { PadNav } from '../input/padNav';
@@ -46,6 +47,7 @@ export class TeamsScene extends Phaser.Scene {
   }
 
   create(): void {
+    music.playMenu();
     const { config } = this.session;
     const total = config.players + config.enemies;
     this.teams = createTeams(total, sidesFromAssignment(config.teamAssignment, total));

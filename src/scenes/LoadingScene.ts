@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import { preloadCharacters } from '../render/CharacterView';
 import { preloadFlames } from '../render/FlameSprites';
 import { preloadItems } from '../render/ItemSprites';
+import { preloadElephant } from '../render/ElephantView';
 import { addMenuBackground } from '../render/menuBackground';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../render/layout';
 import { preloadThemes } from '../render/theme';
@@ -32,6 +33,7 @@ export class LoadingScene extends Phaser.Scene {
     preloadCharacters(this);
     preloadThemes(this);
     preloadFlames(this);
+    preloadElephant(this);
     preloadItems(this);
   }
 
