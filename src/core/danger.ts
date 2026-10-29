@@ -1,4 +1,5 @@
 import { BOMB_FUSE_TICKS, FLAME_TICKS } from '../config/bombs';
+import { BOULDER_SPEED } from '../config/hazards';
 import { cellIndex, getCell } from './arena';
 import { slideProjection } from './bombs';
 import { blastOf } from './explosions';
@@ -75,6 +76,15 @@ export function buildHazards(state: GameState, extraBomb?: BombState, selfId?: P
   blasts.forEach((blast, i) => {
     for (const index of blast.cells) windows[index]!.push([explodeAt[i]!, unknownRemote[i] ? Number.MAX_SAFE_INTEGER : explodeAt[i]! + FLAME_TICKS]);
   });
+
+  // Pedra gigante: a coluna dela é perigosa do aviso até ela passar (a IA sai do caminho).
+  const boulder = state.hazards?.boulder;
+  if (boulder && boulder.phase !== 'idle') {
+    const rollTicks = Math.ceil((arena.rows - 0.5) / BOULDER_SPEED);
+    const from = boulder.phase === 'warn' ? Math.max(0, boulder.timer - 30) : 0;
+    const to = boulder.phase === 'warn' ? boulder.timer + rollTicks : Math.ceil((arena.rows - boulder.y) / BOULDER_SPEED);
+    for (let row = 1; row < arena.rows - 1; row++) windows[cellIndex(arena, boulder.col, row)]!.push([from, to]);
+  }
 
   // Morte súbita: as células que vão virar parede são perigosas dali em diante, para sempre.
   for (const { cell, closesIn } of closingHazards(state)) windows[cellIndex(arena, cell.col, cell.row)]!.push([closesIn, Number.MAX_SAFE_INTEGER]);

@@ -322,16 +322,16 @@ describe('menu: níveis', () => {
 });
 
 describe('menu: fase e resumo', () => {
-  it('a fase percorre a lista (4 fases, todas jogáveis)', () => {
+  it('a fase percorre a lista (5 fases, todas jogáveis)', () => {
     const menu = createMenu(DEFAULT_SETTINGS, 'stage');
     goTo(menu, 'stage');
-    const expected: Array<[string, boolean]> = [['Arena Clássica', true], ['Arena Clássica Grande', true], ['Fase do Gelo', true], ['Fase do Egito', true]];
+    const expected: Array<[string, boolean]> = [['Arena Clássica', true], ['Arena Clássica Grande', true], ['Fase do Gelo', true], ['Fase do Egito', true], ['Templo Perdido', true]];
     for (const [name, playable] of expected) {
       expect(describeRow(menu.settings, 'stage').value).toBe(name);
       expect(canStart(menu.settings)).toBe(playable);
       changeValue(menu, 1);
     }
-    expect(menu.settings.stage).toBe('classic'); // deu a volta nas 4 fases
+    expect(menu.settings.stage).toBe('classic'); // deu a volta nas 5 fases
   });
 
   it('stageIssue: celular não joga arena grande; fase pequena demais não comporta todos', () => {

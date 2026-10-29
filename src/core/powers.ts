@@ -1,4 +1,4 @@
-import { AIRPLANE_DROP_TICKS, AIRPLANE_SPEED, AIRPLANE_SPREAD, ELEPHANT_MAX_BLOCKS, ELEPHANT_SPEED, POWER_CHARGE_TICKS } from '../config/powers';
+import { AIRPLANE_BOMBS, AIRPLANE_DROP_TICKS, AIRPLANE_ENTRY_TICKS, AIRPLANE_FIRST_DROP, AIRPLANE_LAPS, AIRPLANE_LAP_TICKS, AIRPLANE_RADIUS, ELEPHANT_MAX_BLOCKS, ELEPHANT_SPEED, POWER_CHARGE_TICKS } from '../config/powers';
 import { cellIndex, getCell } from './arena';
 import { dropBomb } from './bombs';
 import { createRng } from './random';
@@ -7,7 +7,7 @@ import type { Direction, GameState, PlayerState, PowerKind } from './types';
 
 // Superpoderes. Cada jogador pode ter um poder (veja `givePower`) que carrega sozinho em POWER_CHARGE_TICKS e é
 // disparado pela intenção `power`. Poder atual:
-// - airplane (Lucas): um avião cruza a arena na linha do jogador largando bombas em células aleatórias perto dela.
+// - airplane (Lucas): um avião dá 2 voltas em círculo em volta do jogador, largando 5 bombas em células aleatórias.
 // - elephant (Ana): um elefantinho sai correndo na direção para onde o jogador olha, em linha reta, e quebra todos os
 //   blocos do caminho (os itens escondidos aparecem). Ele não machuca ninguém e para ao bater numa parede.
 
@@ -39,12 +39,24 @@ export function usePower(state: GameState, player: PlayerState): void {
   const col = Math.floor(player.x);
   const row = Math.floor(player.y);
   if (player.power.kind === 'airplane') {
-    // O avião entra pela borda de trás e cruza a arena na linha (ou coluna) do jogador, na direção em que ele olha.
-    const { dx, dy } = VECTORS[player.facing];
+    // O avião sai da mão do jogador e gira em torno desse ponto (o centro é ajustado para o círculo caber na arena).
     const planes = (state.planes ??= []);
-    const x = dx === 0 ? col + 0.5 : dx > 0 ? -1.5 : state.arena.cols + 1.5;
-    const y = dy === 0 ? row + 0.5 : dy > 0 ? -1.5 : state.arena.rows + 1.5;
-    planes.push({ id: state.tick * 8 + player.id, owner: player.id, x, y, dir: player.facing, nextDrop: 1 });
+    const cx = Math.min(Math.max(player.x, AIRPLANE_RADIUS + 0.5), Math.max(AIRPLANE_RADIUS + 0.5, state.arena.cols - AIRPLANE_RADIUS - 0.5));
+    const cy = Math.min(Math.max(player.y, AIRPLANE_RADIUS + 0.5), Math.max(AIRPLANE_RADIUS + 0.5, state.arena.rows - AIRPLANE_RADIUS - 0.5));
+    const start = { right: 0, down: Math.PI / 2, left: Math.PI, up: -Math.PI / 2 }[player.facing];
+    planes.push({
+      id: state.tick * 8 + player.id,
+      owner: player.id,
+      x: player.x,
+      y: player.y,
+      dir: 'right',
+      cx,
+      cy,
+      start,
+      age: 0,
+      dropsLeft: AIRPLANE_BOMBS,
+      nextDrop: AIRPLANE_FIRST_DROP,
+    });
     state.events.push({ type: 'powerUsed', playerId: player.id, kind: 'airplane', col, row, dir: player.facing });
     return;
   }
@@ -91,34 +103,41 @@ export function updatePowers(state: GameState): void {
   }
 }
 
-/** Aviões: voam e, de tempos em tempos, largam uma bomba numa célula livre aleatória perto da linha de voo. */
+/** Aviões: giram em círculo (espiral para fora, 2 voltas, espiral para dentro) e largam uma bomba de tempos em tempos perto de onde estão. */
 function updatePlanes(state: GameState): void {
   const planes = state.planes;
   if (!planes || planes.length === 0) return;
-  const arena = state.arena;
+  const total = AIRPLANE_LAPS * AIRPLANE_LAP_TICKS;
   for (const plane of [...planes]) {
-    const { dx, dy } = VECTORS[plane.dir];
-    plane.x += dx * AIRPLANE_SPEED;
-    plane.y += dy * AIRPLANE_SPEED;
-    const along = dx !== 0 ? plane.x : plane.y;
-    const length = dx !== 0 ? arena.cols : arena.rows;
-    if (along < -2 || along > length + 2) {
+    plane.age += 1;
+    if (plane.age >= total) {
       planes.splice(planes.indexOf(plane), 1);
       state.events.push({ type: 'planeGone', id: plane.id });
       continue;
     }
+    const grow = Math.min(1, plane.age / AIRPLANE_ENTRY_TICKS, (total - plane.age) / AIRPLANE_ENTRY_TICKS);
+    const radius = AIRPLANE_RADIUS * grow * grow * (3 - 2 * grow);
+    const theta = plane.start + (2 * Math.PI * plane.age) / AIRPLANE_LAP_TICKS;
+    plane.x = plane.cx + Math.cos(theta) * radius;
+    plane.y = plane.cy + Math.sin(theta) * radius;
+    plane.dir = Math.sin(theta) < 0 ? 'right' : 'left';
     plane.nextDrop -= 1;
-    if (plane.nextDrop > 0 || along < 0.5 || along > length - 0.5) continue;
-    plane.nextDrop = AIRPLANE_DROP_TICKS;
+    if (plane.nextDrop > 0 || plane.dropsLeft <= 0) continue;
     const owner = state.players.find((p) => p.id === plane.owner);
     if (!owner) continue;
     const rng = createRng(state.tick * 131 + plane.id);
-    for (let attempt = 0; attempt < 8; attempt++) {
-      const offset = Math.floor(rng() * (2 * AIRPLANE_SPREAD + 1)) - AIRPLANE_SPREAD;
-      const col = dx !== 0 ? Math.floor(plane.x) + (rng() < 0.5 ? 0 : 1) : Math.floor(plane.x) + offset;
-      const row = dx !== 0 ? Math.floor(plane.y) + offset : Math.floor(plane.y) + (rng() < 0.5 ? 0 : 1);
+    let dropped = false;
+    for (let attempt = 0; attempt < 10 && !dropped; attempt++) {
+      const col = Math.floor(plane.x) + Math.floor(rng() * 3) - 1;
+      const row = Math.floor(plane.y) + Math.floor(rng() * 3) - 1;
       if (Math.abs(col - Math.floor(owner.x)) + Math.abs(row - Math.floor(owner.y)) <= 1) continue; // nada colado no dono
-      if (dropBomb(state, owner, col, row)) break;
+      dropped = dropBomb(state, owner, col, row);
+    }
+    if (dropped) {
+      plane.dropsLeft -= 1;
+      plane.nextDrop = AIRPLANE_DROP_TICKS;
+    } else {
+      plane.nextDrop = 6; // sem lugar agora: tenta de novo daqui a pouco
     }
   }
 }
@@ -130,8 +149,8 @@ function updatePlanes(state: GameState): void {
 export function aiShouldUsePower(state: GameState, player: PlayerState): boolean {
   if (!powerReady(player)) return false;
   if (player.power?.kind === 'airplane') {
-    // Avião: vale a pena com algum inimigo por perto (as bombas caem perto da linha de voo).
-    return state.players.some((p) => p.alive && p.team !== player.team && Math.abs(p.x - player.x) + Math.abs(p.y - player.y) <= 7);
+    // Avião: vale a pena com algum inimigo por perto (as bombas caem num círculo em volta do dono).
+    return state.players.some((p) => p.alive && p.team !== player.team && Math.abs(p.x - player.x) + Math.abs(p.y - player.y) <= 6);
   }
   const { dx, dy } = VECTORS[player.facing];
   let col = Math.floor(player.x);

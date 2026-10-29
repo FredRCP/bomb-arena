@@ -42,6 +42,18 @@ export const STAGES: readonly StageDef[] = [
     hazards: { quicksand: true, dartRow: 9, pyramid: true },
     music: ['audio/egypt.ogg', 'audio/suez.ogg'],
   },
+  {
+    id: 'temple',
+    name: 'Templo Perdido',
+    available: true,
+    tagline: 'Um abismo no meio, três pontes de corda e uma pedra gigante que desce esmagando tudo. Atenção ao tremor!',
+    cols: 17,
+    rows: 13,
+    maxPlayers: 4,
+    mobileOk: false,
+    hazards: { chasm: true, boulder: true },
+    music: ['audio/100_victories.ogg'],
+  },
 ];
 
 export const DEFAULT_STAGE = 'classic';

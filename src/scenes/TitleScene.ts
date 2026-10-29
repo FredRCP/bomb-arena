@@ -36,7 +36,7 @@ export class TitleScene extends Phaser.Scene {
   }
 
   create(): void {
-    music.release(); // a tela de início fica sem música
+    music.playMenu(); // a tela de início toca as mesmas músicas dos menus (o navegador só libera o som depois do primeiro toque)
     // Aberto com parâmetros de teste no endereço (?players=1...): pula tudo e começa a jogar direto.
     if (hasGameParams(window.location.search)) {
       this.scene.start('Game');
@@ -83,6 +83,7 @@ export class TitleScene extends Phaser.Scene {
     if (this.leaving) return;
     this.leaving = true;
     sfx.play('confirm');
+    music.sync(); // o toque que avançou a tela libera o áudio: a música começa agora se o navegador a tinha segurado
     this.scene.start('Menu');
   }
 }

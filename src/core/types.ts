@@ -119,14 +119,24 @@ export interface RollerState {
   y: number;
 }
 
-/** Avião do Lucas (superpoder): voa em linha reta pela arena largando bombas em células aleatórias perto da linha de voo. */
+/** Avião do Lucas (superpoder): dá 2 voltas em círculo em torno de (cx, cy) largando 5 bombas em células aleatórias perto dele. */
 export interface PlaneState {
   id: number;
   owner: PlayerId;
-  /** Posição do centro, em células (pode estar fora da arena, na entrada e na saída). */
+  /** Posição do centro, em células. */
   x: number;
   y: number;
+  /** Para onde o avião está indo na horizontal (só para o desenho: `right` ou `left`). */
   dir: Direction;
+  /** Centro do círculo, em células. */
+  cx: number;
+  cy: number;
+  /** Ângulo de partida (radianos; 0 = direita, π/2 = baixo). */
+  start: number;
+  /** Passos de voo até agora. */
+  age: number;
+  /** Bombas que ainda faltam largar. */
+  dropsLeft: number;
   /** Passos até a próxima bomba. */
   nextDrop: number;
 }
@@ -190,7 +200,7 @@ export type GameEvent =
   | { type: 'bombPlaced'; col: number; row: number; owner: PlayerId }
   | { type: 'bombExploded'; col: number; row: number; owner: PlayerId }
   | { type: 'blockDestroyed'; col: number; row: number }
-  /** `killers` = donos das bombas que o eliminaram (sem ele mesmo); vazio = ele mesmo; `crushed` = esmagado pela morte súbita. */
+  /** `killers` = donos das bombas que o eliminaram (sem ele mesmo); vazio = ele mesmo; `crushed` = esmagado pela morte súbita ou pela pedra gigante. */
   | { type: 'playerHit'; playerId: PlayerId; killers: PlayerId[]; crushed?: boolean; dart?: boolean }
   /** O colete aguentou uma explosão e se desfez (o jogador segue vivo). */
   | { type: 'vestBroken'; playerId: PlayerId }
@@ -216,6 +226,9 @@ export type GameEvent =
   /** A neve fez crescer um bloco destrutível. */
   | { type: 'blockGrown'; col: number; row: number }
   | { type: 'rollerGone'; id: number; col: number; row: number }
+  | { type: 'boulderWarn'; col: number }
+  | { type: 'boulderRoll'; col: number }
+  | { type: 'boulderGone'; col: number }
   /** Um jogador soltou o superpoder (a carga zerou). */
   | { type: 'powerUsed'; playerId: PlayerId; kind: PowerKind; col: number; row: number; dir: Direction }
   | { type: 'elephantGone'; id: number; col: number; row: number }
@@ -264,6 +277,19 @@ export interface DartTrap {
   x: number;
 }
 
+/** Pedra gigante do Templo Perdido: parada (idle), avisando (warn, a coluna pisca) ou descendo (roll). */
+export interface BoulderState {
+  phase: 'idle' | 'warn' | 'roll';
+  /** Passos até a próxima fase (idle e warn). */
+  timer: number;
+  /** Coluna sorteada para a queda. */
+  col: number;
+  /** Posição vertical do centro da pedra, em células (só em roll). */
+  y: number;
+  /** Última coluna usada (a próxima queda é sempre em outra). */
+  last: number;
+}
+
 /** Perigos do terreno de algumas arenas (veja hazards.ts). */
 export interface HazardsState {
   /** Células de areia movediça (índices de `arena.cells`): quem pisa anda bem mais devagar. */
@@ -279,6 +305,11 @@ export interface HazardsState {
   blockSpots?: number[];
   /** Passos até crescer o próximo bloco de neve. */
   regrowTimer?: number;
+  /** Células (índices) do abismo (são `hole` na arena): ninguém anda nelas, mas o fogo passa. */
+  chasm?: number[];
+  /** Células (índices) das pontes de corda sobre o abismo (livres, onde se anda). */
+  bridges?: number[];
+  boulder?: BoulderState;
   /** Células (índices) do túnel da pirâmide: escondem quem passa e não aceitam bombas. */
   tunnel?: number[];
   /** Células de gelo fino (índices de `arena.cells`): racham a cada passagem e, na terceira, viram buraco. */

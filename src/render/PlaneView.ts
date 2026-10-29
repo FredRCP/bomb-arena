@@ -3,15 +3,17 @@ import type { GameState } from '../core';
 import { TILE_SIZE } from './ArenaRenderer';
 
 // Desenho do avião do Lucas (superpoder): biplano que cruza a arena, com sombra no chão. Imagens em
-// public/powers/airplane/ (plane1 e plane2 = hélice em dois quadros, de perfil, virado para a direita). Sem as imagens,
+// public/powers/airplane/plane1.png (biplano em três quartos, com o nariz virado para a esquerda). Sem as imagens,
 // nada aparece (o poder continua funcionando). Só desenho: as regras estão em core/powers.ts.
 
 const key = (name: string): string => `plane-${name}`;
 /** Largura do avião na arena, em pixels lógicos (a célula tem 64). */
 const WIDTH = 150;
+/** Altura (em pixels) a que o avião voa acima do chão. */
+const HEIGHT_ABOVE = 26;
 
 export function preloadPlane(scene: Phaser.Scene): void {
-  for (const name of ['plane1', 'plane2']) if (!scene.textures.exists(key(name))) scene.load.image(key(name), `powers/airplane/${name}.png`);
+  for (const name of ['plane1']) if (!scene.textures.exists(key(name))) scene.load.image(key(name), `powers/airplane/${name}.png`);
 }
 
 export class PlaneView {
@@ -34,14 +36,13 @@ export class PlaneView {
       }
       const x = plane.x * TILE_SIZE;
       const y = plane.y * TILE_SIZE;
-      view.plane.setTexture(key(Math.floor(state.tick / 3) % 2 === 0 ? 'plane1' : 'plane2')).setScale(WIDTH / view.plane.width);
-      // Para a direita: como está. Esquerda: espelhado. Cima/baixo: girado (o avião "cai" ou "sobe" na tela).
-      view.plane.setFlipX(plane.dir === 'left');
-      view.plane.setAngle(plane.dir === 'down' ? 90 : plane.dir === 'up' ? -90 : 0);
+      view.plane.setScale(WIDTH / view.plane.width);
+      // O nariz da imagem aponta para a esquerda: espelha quando o avião vai para a direita e inclina como numa curva.
+      const goingRight = plane.dir === 'right';
+      view.plane.setFlipX(goingRight).setAngle(goingRight ? 7 : -7);
       const bob = Math.sin(state.tick / 6) * 3;
-      view.plane.setPosition(x, y - 22 + bob);
+      view.plane.setPosition(x, y - HEIGHT_ABOVE + bob);
       view.shadow.setPosition(x, y + 20);
-      view.shadow.setSize(plane.dir === 'up' || plane.dir === 'down' ? 26 : WIDTH * 0.8, plane.dir === 'up' || plane.dir === 'down' ? WIDTH * 0.8 : 26);
     }
     for (const [id, view] of this.images) {
       if (alive.has(id)) continue;

@@ -1,6 +1,7 @@
 import Phaser from 'phaser';
 import type { GameState } from '../core';
 import { TILE_SIZE } from './ArenaRenderer';
+import { BOULDER_WARN_TICKS } from '../config/hazards';
 
 // Desenho da armadilha de dardos: uma faixa discreta na fileira (sempre visível), setas vermelhas piscando nas duas bordas
 // durante o aviso e os dardos voando quando disparam. Só desenho; as regras estão em core/hazards.ts.
@@ -13,12 +14,16 @@ export class HazardsView {
   private iceKey = '';
   /** Brilho de fogo por cima da pirâmide (para ninguém ser pego por uma chama escondida no túnel). */
   private readonly glow: Phaser.GameObjects.Graphics;
+  /** Pedra gigante do Templo Perdido (desenhada por cima dos jogadores). */
+  private readonly boulderG: Phaser.GameObjects.Graphics;
 
   constructor(private readonly scene: Phaser.Scene, state: GameState) {
     this.g = scene.add.graphics().setDepth(9);
     this.ice = scene.add.graphics().setDepth(0.8);
     this.glow = scene.add.graphics().setDepth(11);
     this.drawSlippery(state);
+    this.drawChasm(state);
+    this.boulderG = scene.add.graphics().setDepth(10.2);
     const trap = state.hazards?.dartTrap;
     if (!trap) return;
     // Aviso escrito, nas bordas da fileira (fica fora da arena, no fundo da tela).
@@ -27,6 +32,114 @@ export class HazardsView {
     this.warn.push(scene.add.text(-6, y, '⚠', style).setOrigin(1, 0.5).setDepth(10).setVisible(false));
     this.warn.push(scene.add.text(state.arena.cols * TILE_SIZE + 6, y, '⚠', style).setOrigin(0, 0.5).setDepth(10).setVisible(false));
     this.drawStrip(state);
+  }
+
+  /** Abismo do Templo Perdido (fundo escuro com neblina e bordas de pedra) e as pontes de corda por cima. Desenhado uma vez. */
+  private drawChasm(state: GameState): void {
+    const hz = state.hazards;
+    if (!hz?.chasm || hz.chasm.length === 0) return;
+    const arena = state.arena;
+    const cols = arena.cols;
+    const all = new Set([...hz.chasm, ...(hz.bridges ?? [])]);
+    const g = this.scene.add.graphics().setDepth(0.9);
+    const fogSeed = (n: number): number => ((n * 9301 + 49297) % 233280) / 233280;
+    for (const index of all) {
+      const col = index % cols;
+      const row = Math.floor(index / cols);
+      const x = col * TILE_SIZE;
+      const y = row * TILE_SIZE;
+      // Profundidade: mais escuro no meio do abismo, um pouco mais claro perto das margens.
+      const mid = Math.floor(cols / 2);
+      const edge = Math.min(Math.abs(col - (mid - 1)), Math.abs(col - (mid + 1))); // 0 nas margens
+      g.fillStyle(0x070816, 1).fillRect(x, y, TILE_SIZE, TILE_SIZE);
+      g.fillStyle(0x16103a, edge === 0 ? 0.55 : 0.25).fillRect(x, y, TILE_SIZE, TILE_SIZE);
+      for (let k = 0; k < 2; k++) {
+        const fx = x + fogSeed(index * 3 + k) * 54 + 5;
+        const fy = y + fogSeed(index * 5 + k + 1) * 54 + 5;
+        g.fillStyle(0x8e9bff, 0.07).fillEllipse(fx, fy, 46, 20);
+      }
+      // Beira de pedra onde o abismo encontra o chão (esquerda, direita, cima e baixo).
+      const here = (c: number, r: number): boolean => all.has(r * cols + c);
+      g.fillStyle(0x6d5a3a, 1);
+      if (!here(col - 1, row)) g.fillRect(x, y, 7, TILE_SIZE).fillStyle(0x3a2d18, 1).fillRect(x + 7, y, 4, TILE_SIZE).fillStyle(0x6d5a3a, 1);
+      if (!here(col + 1, row)) g.fillRect(x + TILE_SIZE - 7, y, 7, TILE_SIZE).fillStyle(0x3a2d18, 1).fillRect(x + TILE_SIZE - 11, y, 4, TILE_SIZE).fillStyle(0x6d5a3a, 1);
+      if (!here(col, row - 1)) g.fillRect(x, y, TILE_SIZE, 7).fillStyle(0x3a2d18, 1).fillRect(x, y + 7, TILE_SIZE, 4).fillStyle(0x6d5a3a, 1);
+      if (!here(col, row + 1)) g.fillRect(x, y + TILE_SIZE - 7, TILE_SIZE, 7);
+    }
+    // Pontes: tábuas de madeira com duas cordas e postes nas pontas.
+    const bridges = [...(hz.bridges ?? [])];
+    const byRow = new Map<number, number[]>();
+    for (const index of bridges) byRow.set(Math.floor(index / cols), [...(byRow.get(Math.floor(index / cols)) ?? []), index % cols]);
+    for (const [row, list] of byRow) {
+      const first = Math.min(...list);
+      const last = Math.max(...list);
+      const x0 = first * TILE_SIZE - 6;
+      const x1 = (last + 1) * TILE_SIZE + 6;
+      const y = row * TILE_SIZE;
+      g.fillStyle(0x0a0a18, 0.55).fillRect(x0, y + 10, x1 - x0, TILE_SIZE - 14); // sombra no abismo
+      for (let x = x0, k = 0; x < x1 - 4; x += 13, k++) {
+        g.fillStyle(k % 2 === 0 ? 0xa8743a : 0x935f2b, 1).fillRect(x, y + 8, 11, TILE_SIZE - 16);
+        g.fillStyle(0x5c3a17, 1).fillRect(x, y + 8, 11, 2).fillRect(x, y + TILE_SIZE - 10, 11, 2);
+        g.fillStyle(0xc99358, 0.7).fillRect(x + 2, y + 12, 2, TILE_SIZE - 24);
+      }
+      // Cordas levemente caídas no meio.
+      for (const base of [y + 5, y + TILE_SIZE - 5]) {
+        g.lineStyle(4, 0xe0c88c, 1);
+        let px = x0;
+        let py = base;
+        for (let t = 1; t <= 24; t++) {
+          const nx = x0 + ((x1 - x0) * t) / 24;
+          const ny = base + Math.sin((Math.PI * t) / 24) * 4;
+          g.lineBetween(px, py, nx, ny);
+          px = nx;
+          py = ny;
+        }
+        g.lineStyle(1.5, 0x8a6a30, 0.9).lineBetween(x0, base + 1, x1, base + 1);
+      }
+      for (const px of [x0 + 4, x1 - 4]) {
+        for (const py of [y + 5, y + TILE_SIZE - 5]) g.fillStyle(0x4a2f12, 1).fillCircle(px, py, 6).fillStyle(0x7a5424, 1).fillCircle(px - 1, py - 1, 3);
+      }
+    }
+  }
+
+  /** Pedra gigante: coluna piscando e tremendo no aviso; depois a pedra rolando, com sombra e poeira. */
+  private drawBoulder(state: GameState): void {
+    const g = this.boulderG;
+    g.clear();
+    const boulder = state.hazards?.boulder;
+    if (!boulder || boulder.phase === 'idle') return;
+    const x = (boulder.col + 0.5) * TILE_SIZE;
+    const height = state.arena.rows * TILE_SIZE;
+    if (boulder.phase === 'warn') {
+      const left = boulder.timer / 60;
+      const on = Math.floor(left * (left < 1 ? 8 : 4)) % 2 === 0;
+      g.fillStyle(0xff3b3b, on ? 0.2 : 0.07).fillRect(boulder.col * TILE_SIZE, TILE_SIZE, TILE_SIZE, height - 2 * TILE_SIZE);
+      // A pedra aparece rachando o teto: poeira e pedrinhas caindo no topo da coluna.
+      const progress = 1 - boulder.timer / BOULDER_WARN_TICKS;
+      for (let k = 0; k < 6; k++) {
+        const fall = ((state.tick * 3 + k * 37) % 60) / 60;
+        g.fillStyle(0xb9a98a, 0.8).fillCircle(x + Math.sin(k * 2.3) * 22, TILE_SIZE * 0.4 + fall * TILE_SIZE * 1.3, 2 + (k % 3));
+      }
+      g.fillStyle(0x7d7364, 0.9).fillCircle(x, TILE_SIZE * 0.2, 14 + progress * 18); // a pedra espiando por cima
+      g.lineStyle(3, 0x2b261c, 1).strokeCircle(x, TILE_SIZE * 0.2, 14 + progress * 18);
+      return;
+    }
+    const y = boulder.y * TILE_SIZE;
+    const spin = boulder.y * 2.4;
+    for (let k = 1; k <= 5; k++) g.fillStyle(0xcdbf9f, 0.35 - k * 0.05).fillCircle(x + Math.sin(k * 3.1 + y * 0.02) * 26, y - 40 - k * 14, 10 + k * 3); // poeira
+    g.fillStyle(0x1b1f3b, 0.3).fillEllipse(x + 6, y + 36, 96, 22); // sombra
+    g.fillStyle(0x7b7466, 1).fillCircle(x, y, 47);
+    g.fillStyle(0x938b7a, 1).fillCircle(x - 9, y - 11, 34);
+    g.fillStyle(0xc2baa7, 0.55).fillCircle(x - 17, y - 21, 14);
+    g.fillStyle(0x5f9a3f, 0.85).fillEllipse(x + Math.cos(spin) * 22, y + Math.sin(spin) * 22, 20, 12); // musgo girando
+    g.fillStyle(0x5f9a3f, 0.7).fillEllipse(x + Math.cos(spin + 2.4) * 30, y + Math.sin(spin + 2.4) * 30, 14, 9);
+    g.lineStyle(3, 0x403a2e, 0.9);
+    for (const a of [0.6, 2.4, 4.1]) {
+      const r1 = 8;
+      const r2 = 30;
+      g.lineBetween(x + Math.cos(spin + a) * r1, y + Math.sin(spin + a) * r1, x + Math.cos(spin + a + 0.3) * r2, y + Math.sin(spin + a + 0.3) * r2);
+    }
+    g.lineStyle(4, 0x2b261c, 1).strokeCircle(x, y, 47);
   }
 
   /** Faixa fixa que marca a fileira da armadilha (pequenos buracos nas laterais, como a saída dos dardos). */
@@ -143,6 +256,7 @@ export class HazardsView {
 
   update(state: GameState): void {
     this.drawIce(state);
+    this.drawBoulder(state);
     const tunnel = state.hazards?.tunnel;
     if (tunnel) {
       this.glow.clear();

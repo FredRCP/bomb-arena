@@ -1,8 +1,9 @@
 import { describe, expect, it } from 'vitest';
 import { ICE_CRACK_LEVELS } from '../../src/config/hazards';
 import { ELEPHANT_SPEED, POWER_CHARGE_TICKS } from '../../src/config/powers';
+import { AIRPLANE_BOMBS, AIRPLANE_LAPS, AIRPLANE_LAP_TICKS } from '../../src/config/powers';
 import { stageById } from '../../src/config/stages';
-import { aiShouldUsePower, createGameState, drainEvents, getCell, givePower, powerFraction, powerReady, step, createAi, iglooCells, placeBomb, pyramidOrigin, pyramidTunnelCells, pyramidWallCells } from '../../src/core';
+import { aiShouldUsePower, createGameState, drainEvents, getCell, givePower, powerFraction, powerReady, step, createAi, iglooCells, placeBomb, pyramidExitCells, pyramidOrigin, pyramidTunnelCells, pyramidWallCells } from '../../src/core';
 import type { GameState } from '../../src/core';
 import { stateFromText } from '../helpers/stateFromText';
 
@@ -12,18 +13,18 @@ describe('Egito: pirâmide central, esfinge e borda', () => {
   const egypt = stageById('egypt');
   const make = () => createGameState({ cols: egypt.cols, rows: egypt.rows, hazards: egypt.hazards!, players: 2, seed: 2 });
 
-  it('pirâmide 5 x 5 no centro: 16 paredes e um túnel em cruz de 9 células com os portais ligados às fileiras livres', () => {
+  it('pirâmide 3 x 3 no centro: 4 paredes e um túnel em cruz de 5 células, com a saída de cada porta sempre livre (sem pilar)', () => {
     const state = make();
     const tunnel = pyramidTunnelCells(17, 13);
-    expect(tunnel).toHaveLength(9);
-    expect(pyramidWallCells(17, 13)).toHaveLength(16);
+    expect(tunnel).toHaveLength(5);
+    expect(pyramidWallCells(17, 13)).toHaveLength(4);
     for (const c of pyramidWallCells(17, 13)) expect(getCell(state.arena, c.col, c.row)).toBe('wall');
     for (const c of tunnel) expect(getCell(state.arena, c.col, c.row)).toBe('empty');
-    expect(state.hazards!.tunnel).toHaveLength(9);
-    // portais: a célula de fora de cada ponta do túnel está numa fileira/coluna livre (índice ímpar)
-    const o = pyramidOrigin(17, 13);
-    expect([o.row - 1, o.row + 5].every((r) => r % 2 === 1)).toBe(true);
-    expect([o.col - 1, o.col + 5].every((c) => c % 2 === 1)).toBe(true);
+    expect(state.hazards!.tunnel).toHaveLength(5);
+    // as quatro saídas (uma no meio de cada lado) são células livres, mesmo caindo onde ficaria um pilar
+    const exits = pyramidExitCells(17, 13);
+    expect(exits.map((c) => [c.col, c.row])).toEqual([[8, 4], [8, 8], [6, 6], [10, 6]]);
+    for (const c of exits) expect(getCell(state.arena, c.col, c.row)).toBe('empty');
   });
 
   it('sem esfinge, e ninguém nasce em parede', () => {
@@ -39,9 +40,9 @@ describe('Egito: pirâmide central, esfinge e borda', () => {
     // bomba no portal de cima (fora do túnel), com alcance de sobra: as chamas descem pela coluna do túnel
     const p = state.players[0]!;
     p.bombRange = 5;
-    p.x = o.col + 2.5;
+    p.x = o.col + 1.5;
     p.y = o.row - 0.5;
-    state.arena.cells[(o.row - 1) * 17 + o.col + 2] = 'empty';
+    state.arena.cells[(o.row - 1) * 17 + o.col + 1] = 'empty';
     placeBomb(state, p);
     for (let i = 0; i < 300 && state.flames.length === 0; i++) step(state);
     const burning = state.flames.map((f) => f.row * 17 + f.col);
@@ -62,19 +63,19 @@ describe('Egito: pirâmide central, esfinge e borda', () => {
     const p = state.players[0]!;
     state.hazards!.quicksand = [];
     const o = pyramidOrigin(17, 13);
-    state.arena.cells[(o.row + 2) * 17 + o.col + 5] = 'empty'; // o portal da direita dá numa célula livre
+    state.arena.cells[(o.row + 1) * 17 + o.col + 3] = 'empty'; // o portal da direita dá numa célula livre
     p.x = o.col + 0.5;
-    p.y = o.row + 2.5;
+    p.y = o.row + 1.5;
     for (let i = 0; i < 200; i++) step(state, { 1: { move: 'right' } });
-    expect(p.x).toBeGreaterThan(o.col + 5);
+    expect(p.x).toBeGreaterThan(o.col + 3);
   });
 });
 
 describe('Gelo: iglu, faixas e IA', () => {
-  it('dois iglus na lateral de cima, simétricos, com a porta (livre) para baixo', () => {
+  it('dois iglus (3 paredes cada) na lateral de cima, simétricos, com a porta (livre) no meio de cada um, para baixo', () => {
     const state = ice({ players: 2 });
     const cells = iglooCells(15, 13);
-    expect(cells.map((c) => c.col)).toEqual([4, 5, 9, 10]);
+    expect(cells.map((c) => c.col)).toEqual([4, 5, 6, 8, 9, 10]);
     for (const c of cells) {
       expect(c.row).toBe(1);
       expect(getCell(state.arena, c.col, c.row)).toBe('wall');
@@ -355,28 +356,31 @@ describe('superpoder do Lucas: avião', () => {
     return state;
   };
 
-  it('carregado, o avião cruza a arena na linha do jogador largando bombas, e some na outra borda', () => {
+  it('carregado, o avião dá 2 voltas em círculo em volta do jogador largando 5 bombas e some', () => {
     const state = field();
     const p = state.players[0]!;
     givePower(p, 'airplane');
     p.power!.charge = POWER_CHARGE_TICKS;
     p.facing = 'right';
-    expect(aiShouldUsePower(state, p)).toBe(true); // há inimigo a menos de 7 células
+    expect(aiShouldUsePower(state, p)).toBe(true); // há inimigo a menos de 6 células
     step(state, { 1: { move: null, power: true } });
     expect(state.planes).toHaveLength(1);
+    const plane = state.planes![0]!;
     let placed = 0;
     let gone = false;
-    for (let i = 0; i < 400; i++) {
+    let maxDist = 0;
+    for (let i = 0; i < AIRPLANE_LAPS * AIRPLANE_LAP_TICKS + 30; i++) {
       step(state);
+      if (state.planes![0]) maxDist = Math.max(maxDist, Math.hypot(plane.x - plane.cx, plane.y - plane.cy));
       for (const e of drainEvents(state)) {
         if (e.type === 'bombPlaced') placed += 1;
         if (e.type === 'planeGone') gone = true;
       }
     }
-    expect(placed).toBeGreaterThanOrEqual(4);
+    expect(placed).toBe(AIRPLANE_BOMBS);
+    expect(maxDist).toBeGreaterThan(2.9); // chegou ao raio do círculo
     expect(gone).toBe(true);
     expect(state.planes).toHaveLength(0);
-    for (const bomb of state.bombs) expect(Math.abs(bomb.row - 3)).toBeLessThanOrEqual(3);
   });
 
   it('as bombas do avião não ocupam o limite de bombas do dono', () => {
@@ -386,7 +390,7 @@ describe('superpoder do Lucas: avião', () => {
     givePower(p, 'airplane');
     p.power!.charge = POWER_CHARGE_TICKS;
     step(state, { 1: { move: null, power: true } });
-    for (let i = 0; i < 100; i++) step(state);
+    for (let i = 0; i < 160; i++) step(state);
     expect(state.bombs.filter((b) => b.owner === 1).length).toBeGreaterThanOrEqual(2); // mais que o limite de 1
   });
 });

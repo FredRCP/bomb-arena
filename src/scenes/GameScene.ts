@@ -59,6 +59,8 @@ import type { RankedPlayer } from '../core';
 
 /** Volume da música durante a contagem regressiva (1 = normal). */
 const COUNTDOWN_MUSIC_DUCK = 0.3;
+/** Ao fim da partida, a música da arena baixa até o zero em 6 s. */
+const MATCH_END_FADE_MS = 6000;
 
 /** Tudo que atravessa o reinício da cena: a configuração da partida e o placar. A rodada em si é descartada. */
 export interface GameSession {
@@ -516,6 +518,14 @@ export class GameScene extends Phaser.Scene {
         heard.add('tick');
       }
       if (event.type === 'dartWarn') heard.add('tick');
+      if (event.type === 'boulderWarn') {
+        heard.add('tick');
+        this.cameras.main.shake(2400, 0.0012); // o chão treme até a pedra cair
+      }
+      if (event.type === 'boulderRoll') {
+        heard.add('explode');
+        this.cameras.main.shake(1400, 0.0025);
+      }
       if (event.type === 'dartFired') heard.add('place');
       if (event.type === 'powerUsed') heard.add('pickup');
       if (event.type === 'iceCracked') heard.add('tick');
@@ -548,7 +558,10 @@ export class GameScene extends Phaser.Scene {
     const scores = this.session.scores!;
     recordRound(match, outcome, players);
     recordRoundScore(scores, outcome, players);
-    if (match.finished) recordMatchScore(scores, match, players);
+    if (match.finished) {
+      recordMatchScore(scores, match, players);
+      music.fadeOut(MATCH_END_FADE_MS); // a música da arena vai sumindo aos poucos até o zero
+    }
     const ranked = rankPlayers(scores, players);
     const text = describeRoundEnd(outcome, match, players);
     text.lines = rankingLines(ranked, players);

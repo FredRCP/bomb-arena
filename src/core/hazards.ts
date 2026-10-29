@@ -1,4 +1,4 @@
-import { BLOCK_REGROW_TICKS, ROLLER_BREAKS_BLOCKS, ROLLER_PERIOD_TICKS, ROLLER_SPEED, ICE_CRACK_LEVELS, ICE_PATCHES, DART_FIRST_DELAY_TICKS, DART_HIT_HALF, DART_PERIOD_TICKS, DART_SPEED, DART_WARN_TICKS, QUICKSAND_PATCHES, QUICKSAND_SPEED_FACTOR } from '../config/hazards';
+import { BOULDER_FIRST_DELAY_TICKS, BOULDER_HIT_HALF, BOULDER_PERIOD_TICKS, BOULDER_SPEED, BOULDER_WARN_TICKS, CHASM_WIDTH, PYRAMID_SIZE, BLOCK_REGROW_TICKS, ROLLER_BREAKS_BLOCKS, ROLLER_PERIOD_TICKS, ROLLER_SPEED, ICE_CRACK_LEVELS, ICE_PATCHES, DART_FIRST_DELAY_TICKS, DART_HIT_HALF, DART_PERIOD_TICKS, DART_SPEED, DART_WARN_TICKS, QUICKSAND_PATCHES, QUICKSAND_SPEED_FACTOR } from '../config/hazards';
 import { VEST_BREAK_SHIELD_TICKS } from '../config/items';
 import { cellIndex, getCell, isTunnel } from './arena';
 import { dropPowerups, revealItem } from './items';
@@ -10,7 +10,7 @@ import type { Arena, Cell, GameState, HazardsState, PlayerState } from './types'
 // - Areia movediça: células em que o jogador anda bem mais devagar.
 // - Armadilha de dardos: uma fileira SEM blocos; de tempos em tempos pisca um aviso nas bordas e, 2 s depois, dardos
 //   varrem a fileira de um lado a outro (alternando o lado). Quem estiver na frente é atingido (colete e escudo valem).
-// - Esfinge: três células de parede no alto da arena. Pirâmide: quadrado 5 x 5 no centro com túnel em cruz. Iglu: 3 x 3.
+// - Pirâmide: quadrado 3 x 3 no centro com túnel em cruz. Iglus: dois, no alto da arena, com a porta para baixo.
 // - Gelo escorregadio: só em poucas faixas marcadas (veja slipperyCells).
 
 export interface HazardOptions {
@@ -20,9 +20,9 @@ export interface HazardOptions {
   dartRow?: number;
   /** Esfinge no alto da arena, no meio: três paredes na primeira fileira. */
   sphinx?: boolean;
-  /** Pirâmide de 5 x 5 no centro, com um túnel em cruz (quatro portais) por onde os jogadores passam escondidos. */
+  /** Pirâmide de 3 x 3 no centro, com um túnel em cruz (quatro portais) por onde os jogadores passam escondidos. */
   pyramid?: boolean;
-  /** Iglu de 3 x 1 (mais a borda de cima) no meio do alto da arena, com a porta para baixo. */
+  /** Dois iglus de 3 x 1 (mais a borda de cima) no alto da arena, com a porta para baixo. */
   igloo?: boolean;
   /** A neve faz crescer de novo, aos poucos, os blocos destrutíveis que foram quebrados. */
   regrow?: boolean;
@@ -30,52 +30,69 @@ export interface HazardOptions {
   slippery?: boolean;
   /** Gelo fino: células que racham a cada passagem e viram buraco. */
   thinIce?: boolean;
+  /** Abismo no meio da arena (3 colunas) com três pontes de corda. */
+  chasm?: boolean;
+  /** Pedra gigante que desce por uma coluna esmagando tudo (avisa 2,5 s antes). */
+  boulder?: boolean;
 }
 
-/** Células da esfinge: três na horizontal, na fileira de cima, no meio da arena. */
+/** Células da esfinge: três na horizontal, na fileira de cima, no meio da arena (opção antiga, hoje a esfinge fica na borda). */
 export function sphinxCells(cols: number, _rows: number): Cell[] {
   const col = Math.floor(cols / 2);
   return [-1, 0, 1].map((d) => ({ col: col + d, row: 1 }));
 }
 
-/** Canto superior esquerdo da pirâmide (5 x 5, centrada na arena). */
+/** Canto superior esquerdo da pirâmide (quadrado de PYRAMID_SIZE células, centrado na arena). */
 export function pyramidOrigin(cols: number, rows: number): Cell {
-  return { col: Math.floor(cols / 2) - 2, row: Math.floor(rows / 2) - 2 };
+  const half = Math.floor(PYRAMID_SIZE / 2);
+  return { col: Math.floor(cols / 2) - half, row: Math.floor(rows / 2) - half };
 }
 
 /**
- * Túnel da pirâmide: uma cruz pelo meio (linha e coluna centrais). Os quatro portais ficam nas pontas, em células
- * ligadas às fileiras livres do mapa (a de cima, a de baixo e as colunas dos lados).
+ * Túnel da pirâmide: uma cruz pelo meio (linha e coluna centrais). As quatro pontas são as portas, uma no meio de cada lado.
  */
 export function pyramidTunnelCells(cols: number, rows: number): Cell[] {
   const o = pyramidOrigin(cols, rows);
+  const half = Math.floor(PYRAMID_SIZE / 2);
   const out: Cell[] = [];
-  for (let d = 0; d < 5; d++) {
-    out.push({ col: o.col + d, row: o.row + 2 });
-    if (d !== 2) out.push({ col: o.col + 2, row: o.row + d });
+  for (let d = 0; d < PYRAMID_SIZE; d++) {
+    out.push({ col: o.col + d, row: o.row + half });
+    if (d !== half) out.push({ col: o.col + half, row: o.row + d });
   }
   return out;
 }
 
-/** As 16 células de parede da pirâmide (as 25 do quadrado, menos o túnel). */
+/** Células de parede da pirâmide (o quadrado, menos o túnel). */
 export function pyramidWallCells(cols: number, rows: number): Cell[] {
   const o = pyramidOrigin(cols, rows);
   const tunnel = new Set(pyramidTunnelCells(cols, rows).map((c) => c.row * cols + c.col));
   const out: Cell[] = [];
-  for (let r = 0; r < 5; r++) for (let c = 0; c < 5; c++) if (!tunnel.has((o.row + r) * cols + o.col + c)) out.push({ col: o.col + c, row: o.row + r });
+  for (let r = 0; r < PYRAMID_SIZE; r++) for (let c = 0; c < PYRAMID_SIZE; c++) if (!tunnel.has((o.row + r) * cols + o.col + c)) out.push({ col: o.col + c, row: o.row + r });
   return out;
 }
 
+/** As quatro células logo à frente das portas da pirâmide (a saída de cada porta): ficam sempre livres, sem pilar nem bloco. */
+export function pyramidExitCells(cols: number, rows: number): Cell[] {
+  const o = pyramidOrigin(cols, rows);
+  const half = Math.floor(PYRAMID_SIZE / 2);
+  return [
+    { col: o.col + half, row: o.row - 1 },
+    { col: o.col + half, row: o.row + PYRAMID_SIZE },
+    { col: o.col - 1, row: o.row + half },
+    { col: o.col + PYRAMID_SIZE, row: o.row + half },
+  ];
+}
+
 /**
- * Células dos dois iglus dentro da arena: dois pares na fileira 1 (a borda de cima completa cada iglu), simétricos e
- * com o mesmo espaço entre eles e as laterais. Em 15 colunas: colunas 4-5 e 9-10.
+ * Células dos dois iglus dentro da arena: três paredes cada, na fileira 1 (a borda de cima completa o iglu), simétricos.
+ * Em 15 colunas: colunas 4-6 e 8-10 (a porta de cada um fica na coluna do meio dele: 5 e 9).
  */
 export function iglooCells(cols: number, _rows: number): Cell[] {
   const c = Math.floor(cols / 2);
-  return [c - 3, c - 2, c + 2, c + 3].map((col) => ({ col, row: 1 }));
+  return [c - 3, c - 2, c - 1, c + 1, c + 2, c + 3].map((col) => ({ col, row: 1 }));
 }
 
-/** Portas dos iglus: logo abaixo, nas colunas (livres) 5 e 9; elas ficam voltadas uma para a outra. */
+/** Portas dos iglus: logo abaixo da coluna do meio de cada um, nas colunas livres 5 e 9; ficam voltadas uma para a outra. */
 export function iglooDoors(cols: number, _rows: number): Cell[] {
   const c = Math.floor(cols / 2);
   return [c - 2, c + 2].map((col) => ({ col, row: 2 }));
@@ -87,6 +104,27 @@ export function slipperyCells(cols: number, rows: number): Cell[] {
   const cy = Math.floor(rows / 2);
   const out: Cell[] = [];
   for (let d = 2; d <= 5; d++) out.push({ col: cx - d, row: cy - 1 }, { col: cx + d, row: cy + 1 });
+  return out;
+}
+
+/** Células do abismo: CHASM_WIDTH colunas no meio, da primeira à última fileira de dentro. */
+export function chasmCells(cols: number, rows: number): Cell[] {
+  const first = Math.floor(cols / 2) - Math.floor(CHASM_WIDTH / 2);
+  const out: Cell[] = [];
+  for (let col = first; col < first + CHASM_WIDTH; col++) for (let row = 1; row < rows - 1; row++) out.push({ col, row });
+  return out;
+}
+
+/** Fileiras das pontes: três, simétricas em relação ao centro (3, 6 e 9 em 13 fileiras). */
+export function bridgeRows(rows: number): number[] {
+  return [3, Math.floor(rows / 2), rows - 4];
+}
+
+/** Colunas por onde a pedra pode descer: as ímpares (sem pilar no caminho) que não são do abismo. */
+export function boulderColumns(cols: number): number[] {
+  const first = Math.floor(cols / 2) - Math.floor(CHASM_WIDTH / 2);
+  const out: number[] = [];
+  for (let col = 1; col < cols - 1; col += 2) if (col < first || col >= first + CHASM_WIDTH) out.push(col);
   return out;
 }
 
@@ -123,6 +161,8 @@ export function createHazards(arena: Arena, options: HazardOptions | undefined, 
     for (const cell of pyramidWallCells(cols, rows)) arena.cells[cellIndex(arena, cell.col, cell.row)] = 'wall';
     tunnel = pyramidTunnelCells(cols, rows).map((cell) => cellIndex(arena, cell.col, cell.row));
     for (const index of tunnel) arena.cells[index] = 'empty';
+    // A saída de cada porta nunca nasce tapada (pilar ou bloco).
+    for (const cell of pyramidExitCells(cols, rows)) arena.cells[cellIndex(arena, cell.col, cell.row)] = 'empty';
   }
 
   let doors: Cell[] | undefined;
@@ -130,6 +170,27 @@ export function createHazards(arena: Arena, options: HazardOptions | undefined, 
     for (const cell of iglooCells(cols, rows)) arena.cells[cellIndex(arena, cell.col, cell.row)] = 'wall';
     doors = iglooDoors(cols, rows);
     for (const door of doors) arena.cells[cellIndex(arena, door.col, door.row)] = 'empty'; // a porta nunca nasce tapada
+  }
+
+  let chasm: number[] | undefined;
+  let bridges: number[] | undefined;
+  if (options.chasm) {
+    // Abismo = `hole` (ninguém pisa, o fogo passa); nas fileiras das pontes as células ficam livres e os pilares das margens saem.
+    const rowsOfBridge = bridgeRows(rows);
+    chasm = [];
+    bridges = [];
+    for (const cell of chasmCells(cols, rows)) {
+      const index = cellIndex(arena, cell.col, cell.row);
+      if (rowsOfBridge.includes(cell.row)) {
+        arena.cells[index] = 'empty';
+        bridges.push(index);
+      } else {
+        arena.cells[index] = 'hole';
+        chasm.push(index);
+      }
+    }
+    const first = Math.floor(cols / 2) - Math.floor(CHASM_WIDTH / 2);
+    for (const row of rowsOfBridge) for (const col of [first - 1, first + CHASM_WIDTH]) arena.cells[cellIndex(arena, col, row)] = 'empty';
   }
 
   const rng = createRng(seed * 7 + 13);
@@ -163,6 +224,11 @@ export function createHazards(arena: Arena, options: HazardOptions | undefined, 
 
   const quicksand = options.quicksand ? scatter(QUICKSAND_PATCHES, true) : [];
   const hazards: HazardsState = { quicksand, dartTrap };
+  if (chasm && bridges) {
+    hazards.chasm = chasm;
+    hazards.bridges = bridges;
+  }
+  if (options.boulder) hazards.boulder = { phase: 'idle', timer: BOULDER_FIRST_DELAY_TICKS - BOULDER_WARN_TICKS, col: -1, y: 0, last: -1 };
   if (tunnel) hazards.tunnel = tunnel;
   if (doors) {
     // O segundo iglu sai 10 s depois do primeiro e começa pelo pinguim.
@@ -203,6 +269,7 @@ export function updateHazards(state: GameState): void {
   updateDartTrap(state);
   updateRollers(state);
   updateRegrow(state);
+  updateBoulder(state);
 }
 
 /** Gelo fino: cada entrada numa célula racha um nível; no último nível a célula vira buraco assim que ficar livre. */
@@ -291,6 +358,72 @@ function updateRollers(state: GameState): void {
     if (stopped) {
       hz.rollers.splice(hz.rollers.indexOf(roller), 1);
       state.events.push({ type: 'rollerGone', id: roller.id, col, row: Math.floor(roller.y) });
+    }
+  }
+}
+
+/**
+ * Pedra gigante (Templo Perdido): a cada BOULDER_PERIOD_TICKS uma coluna sorteada treme (aviso de 2,5 s) e a pedra desce por ela de
+ * cima a baixo, esmagando tudo: quebra os blocos (os itens aparecem e também são esmagados), some com bombas e itens e elimina quem
+ * estiver no caminho (o colete aguenta uma vez; o escudo e o herói protegem).
+ */
+function updateBoulder(state: GameState): void {
+  const boulder = state.hazards?.boulder;
+  if (!boulder) return;
+  const arena = state.arena;
+  if (boulder.phase === 'idle') {
+    if (state.round.phase !== 'playing') return;
+    boulder.timer -= 1;
+    if (boulder.timer > 0) return;
+    const options = boulderColumns(arena.cols).filter((col) => col !== boulder.last);
+    const rng = createRng(state.tick * 13 + 7);
+    boulder.col = options[Math.floor(rng() * options.length)]!;
+    boulder.phase = 'warn';
+    boulder.timer = BOULDER_WARN_TICKS;
+    state.events.push({ type: 'boulderWarn', col: boulder.col });
+    return;
+  }
+  if (boulder.phase === 'warn') {
+    boulder.timer -= 1;
+    if (boulder.timer > 0) return;
+    boulder.phase = 'roll';
+    boulder.y = 0.5;
+    state.events.push({ type: 'boulderRoll', col: boulder.col });
+    return;
+  }
+  boulder.y += BOULDER_SPEED;
+  const col = boulder.col;
+  const front = Math.floor(boulder.y + 0.45);
+  const finish = (): void => {
+    boulder.phase = 'idle';
+    boulder.timer = BOULDER_PERIOD_TICKS - BOULDER_WARN_TICKS;
+    boulder.last = col;
+    state.events.push({ type: 'boulderGone', col });
+  };
+  if (front >= arena.rows - 1) return finish();
+  if (front >= 1) {
+    const cell = getCell(arena, col, front);
+    if (cell === 'wall') return finish(); // parede (morte súbita): a pedra se desfaz
+    if (cell === 'block') {
+      arena.cells[cellIndex(arena, col, front)] = 'empty';
+      state.events.push({ type: 'blockDestroyed', col, row: front });
+      revealItem(state, col, front);
+    }
+  }
+  const under = (row: number): boolean => Math.abs(row + 0.5 - boulder.y) < 0.75;
+  state.bombs = state.bombs.filter((bomb) => !(bomb.col === col && under(bomb.row)));
+  state.items = state.items.filter((item) => !(item.col === col && under(item.row)));
+  for (const player of state.players) {
+    if (!player.alive || player.shieldTicks > 0 || player.heroTicks > 0) continue;
+    if (Math.abs(player.x - (col + 0.5)) > BOULDER_HIT_HALF || Math.abs(player.y - boulder.y) > BOULDER_HIT_HALF + 0.1) continue;
+    if (player.vest) {
+      player.vest = false;
+      player.shieldTicks = VEST_BREAK_SHIELD_TICKS;
+      state.events.push({ type: 'vestBroken', playerId: player.id });
+    } else {
+      player.alive = false;
+      state.events.push({ type: 'playerHit', playerId: player.id, killers: [], crushed: true });
+      dropPowerups(state, player);
     }
   }
 }

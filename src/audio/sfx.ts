@@ -7,6 +7,8 @@ export class Sfx {
   muted = false;
   /** Volume de 0 a 1 (o menu usa 0 a 10; veja setLevel). */
   private volume = 0.7;
+  /** Ganho fixo dos efeitos: deixa o som geral um pouco mais baixo do que o nível do menu indica. */
+  private static readonly GAIN = 0.7;
   private context: AudioContext | null = null;
   /** Controle de volume geral: todos os sons passam por ele antes de sair. */
   private master: GainNode | null = null;
@@ -43,7 +45,7 @@ export class Sfx {
   setLevel(level: number): void {
     const clamped = Math.min(10, Math.max(0, level));
     this.volume = (clamped / 10) ** 2;
-    if (this.master) this.master.gain.value = this.volume;
+    if (this.master) this.master.gain.value = this.volume * Sfx.GAIN;
   }
 
   /** Volume atual, de 0 a 1 (já com a curva do menu). */
@@ -62,7 +64,7 @@ export class Sfx {
     if (typeof AudioContext === 'undefined') return null;
     this.context = new AudioContext();
     this.master = this.context.createGain();
-    this.master.gain.value = this.volume;
+    this.master.gain.value = this.volume * Sfx.GAIN;
     this.master.connect(this.context.destination);
     return this.context;
   }

@@ -11,7 +11,7 @@ export const MENU_PLAYLIST = ['audio/menu.ogg', 'audio/8bit_bossa.mp3'] as const
 export { SUDDEN_DEATH_MUSIC, pickTrack };
 
 /** A música fica bem abaixo dos efeitos para não cobrir os estrondos. */
-const MUSIC_GAIN = 0.8;
+const MUSIC_GAIN = 0.7;
 
 class Music {
   private element: HTMLAudioElement | null = null;
@@ -70,6 +70,13 @@ class Music {
         if (this.current && (MENU_PLAYLIST as readonly string[]).includes(this.current)) this.playMenuTrack(this.menuNext);
       };
     }
+  }
+
+  /** Fim da partida: a música baixa devagar até o zero (em `ms` milissegundos) e então para. */
+  fadeOut(ms: number): void {
+    this.fadeDuckTo(0, ms);
+    window.clearTimeout(this.stopTimer);
+    this.stopTimer = window.setTimeout(() => this.stopNow(), ms + 150);
   }
 
   /** Para a música daqui a pouco, a não ser que outra partida comece logo em seguida (reiniciar a rodada). */

@@ -16,6 +16,9 @@ export const DART_SPEED = 0.4;
 /** Meia largura da zona de acerto do dardo, em células. */
 export const DART_HIT_HALF = 0.55;
 
+/** Lado da pirâmide do Egito, em células (quadrado no centro da arena, com túnel em cruz). */
+export const PYRAMID_SIZE = 3;
+
 /** Gelo fino: quantas manchas (de 1 a 2 células) e quantas passagens (4) até virar buraco. */
 export const ICE_PATCHES = 5;
 export const ICE_CRACK_LEVELS = 4;
@@ -30,3 +33,15 @@ export const ROLLER_SPEED = { snowball: 0.07, penguin: 0.11 } as const;
 
 /** A bola de neve e o pinguim quebram os blocos pelo caminho (senão parariam no primeiro bloco, que é quase sempre logo abaixo da porta). */
 export const ROLLER_BREAKS_BLOCKS = true;
+
+/** Templo Perdido: o abismo ocupa 3 colunas no meio da arena e tem pontes de corda de uma margem à outra nestas fileiras (a do meio e as duas a 3 casas das bordas). */
+export const CHASM_WIDTH = 3;
+
+/** Pedra gigante: primeira queda 25 s depois do início, depois uma a cada 14 s; aviso (a coluna pisca e treme) 2,5 s antes. */
+export const BOULDER_FIRST_DELAY_TICKS = 25 * 60;
+export const BOULDER_PERIOD_TICKS = 14 * 60;
+export const BOULDER_WARN_TICKS = 150;
+/** Células por passo (0,12 = 7,2 células/s: atravessa a arena em menos de 2 s). */
+export const BOULDER_SPEED = 0.12;
+/** Meia largura (em células) da zona de esmagamento ao redor do centro da pedra. */
+export const BOULDER_HIT_HALF = 0.68;
