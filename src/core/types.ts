@@ -98,7 +98,7 @@ export interface PlayerState {
 }
 
 /** Superpoderes que existem: o elefantinho da Ana. */
-export type PowerKind = 'elephant' | 'airplane';
+export type PowerKind = 'elephant' | 'airplane' | 'shield' | 'teleport' | 'stork' | 'confuse' | 'ghost';
 
 /** Elefantinho em disparada: o centro dele (em células) e a direção. */
 /** Porta de um iglu: de onde saem as bolas de neve e os pinguins, com os passos até a próxima saída e quantas já saíram. */
@@ -119,7 +119,7 @@ export interface RollerState {
   y: number;
 }
 
-/** Avião do Lucas (superpoder): dá 2 voltas em círculo em torno de (cx, cy) largando 5 bombas em células aleatórias perto dele. */
+/** Avião do Lucas (superpoder): dá 4 voltas pela arena toda (espiral fechando) largando 6 bombas em células aleatórias perto dele. */
 export interface PlaneState {
   id: number;
   owner: PlayerId;
@@ -128,10 +128,13 @@ export interface PlaneState {
   y: number;
   /** Para onde o avião está indo na horizontal (só para o desenho: `right` ou `left`). */
   dir: Direction;
-  /** Centro do círculo, em células. */
+  /** Centro da pista (o centro da arena), em células. */
   cx: number;
   cy: number;
-  /** Ângulo de partida (radianos; 0 = direita, π/2 = baixo). */
+  /** De onde saiu (a posição do dono ao usar o poder). */
+  ox: number;
+  oy: number;
+  /** Ângulo de partida na pista (radianos; 0 = direita, π/2 = baixo). */
   start: number;
   /** Passos de voo até agora. */
   age: number;
@@ -226,6 +229,7 @@ export type GameEvent =
   /** A neve fez crescer um bloco destrutível. */
   | { type: 'blockGrown'; col: number; row: number }
   | { type: 'rollerGone'; id: number; col: number; row: number }
+  | { type: 'teleported'; playerId: PlayerId; fromCol: number; fromRow: number; col: number; row: number }
   | { type: 'boulderWarn'; col: number }
   | { type: 'boulderRoll'; col: number }
   | { type: 'boulderGone'; col: number }
@@ -282,12 +286,12 @@ export interface BoulderState {
   phase: 'idle' | 'warn' | 'roll';
   /** Passos até a próxima fase (idle e warn). */
   timer: number;
-  /** Coluna sorteada para a queda. */
-  col: number;
-  /** Posição vertical do centro da pedra, em células (só em roll). */
+  /** Colunas em queda (uma de cada lado do abismo). */
+  cols: number[];
+  /** Posição vertical do centro das pedras, em células (só em roll). */
   y: number;
-  /** Última coluna usada (a próxima queda é sempre em outra). */
-  last: number;
+  /** Últimas colunas usadas (a próxima queda é sempre em outras). */
+  last: number[];
 }
 
 /** Perigos do terreno de algumas arenas (veja hazards.ts). */

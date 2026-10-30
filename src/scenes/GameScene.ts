@@ -47,6 +47,7 @@ import { HazardsView } from '../render/HazardsView';
 import { ElephantView } from '../render/ElephantView';
 import { PlaneView } from '../render/PlaneView';
 import { SnowView } from '../render/SnowView';
+import { POWER_LABELS } from '../config/powers';
 import { addMenuBackground } from '../render/menuBackground';
 import { has, themeById, themeKey } from '../render/theme';
 import type { Hud } from '../render/Hud';
@@ -527,7 +528,11 @@ export class GameScene extends Phaser.Scene {
         this.cameras.main.shake(1400, 0.0025);
       }
       if (event.type === 'dartFired') heard.add('place');
-      if (event.type === 'powerUsed') heard.add('pickup');
+      if (event.type === 'powerUsed') {
+        heard.add('pickup');
+        this.showPowerLabel(event.playerId, POWER_LABELS[event.kind]);
+      }
+      if (event.type === 'teleported') heard.add('confirm');
       if (event.type === 'iceCracked') heard.add('tick');
       if (event.type === 'iceBroken') heard.add('place');
       if (event.type === 'bombPlaced' || event.type === 'bombKicked' || event.type === 'bombThrown') heard.add('place');
@@ -548,6 +553,18 @@ export class GameScene extends Phaser.Scene {
     if (heard.has('explode')) sfx.play('explode');
     if (heard.has('hit')) sfx.play('hit');
     if (heard.has('pickup')) sfx.play('pickup');
+    if (heard.has('confirm')) sfx.play('confirm');
+  }
+
+  /** Nome do poder subindo e sumindo em cima de quem o usou. */
+  private showPowerLabel(playerId: number, label: string): void {
+    const player = this.gameState.players.find((p) => p.id === playerId);
+    if (!player) return;
+    const text = this.add
+      .text(player.x * TILE_SIZE, player.y * TILE_SIZE - 58, label, { fontFamily: 'system-ui, "Segoe UI", Roboto, sans-serif', fontSize: '28px', fontStyle: 'bold', color: '#ffe66d', stroke: '#1b1f3b', strokeThickness: 6 })
+      .setOrigin(0.5)
+      .setDepth(30);
+    this.tweens.add({ targets: text, y: text.y - 46, alpha: 0, duration: 1100, ease: 'Sine.easeOut', onComplete: () => text.destroy() });
   }
 
   private showResult(outcome: NonNullable<GameState['round']['outcome']>): void {

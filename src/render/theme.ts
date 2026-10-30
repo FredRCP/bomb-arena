@@ -38,6 +38,10 @@ export interface ThemeDef {
   columns?: boolean;
   /** Esfinge no bloco do meio da borda de cima (sphinx.png, um bloco com a esfinge sobre a pedra)? */
   sphinx?: boolean;
+  /** Templo 3 x 3 no meio do abismo (island.png)? */
+  island?: boolean;
+  /** Convés de navio 5 x 5 no centro (deck.png), só enfeite no chão? */
+  deck?: boolean;
   /** Pergaminho (scroll.png) alternando com as outras pedras da borda? */
   scrolls?: boolean;
   /** Areia movediça em imagem (quicksand.png)? */
@@ -47,8 +51,9 @@ export interface ThemeDef {
 export const THEMES: Record<string, ThemeDef> = {
   classic: { id: 'classic', floors: false, wall: true, wallWidth: 62, blockVariants: 1, blockWidth: 62, rubble: false, background: false, chips: [0xd9822b, 0xa65a1c, 0x6e3a12] },
   egypt: { id: 'egypt', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xf3d896, 0xe0b868, 0xb88f46], borderGlyphs: 22, pyramid: true, floorFull: true, columns: true, quicksand: true, sphinx: true, scrolls: true },
-  temple: { id: 'temple', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xc9965c, 0x9b6b3a, 0x5f8f3f] },
-  ice: { id: 'ice', floors: true, wall: true, wallWidth: 56, blockVariants: 3, blockWidth: 62, rubble: true, background: true, chips: [0xe3f6ff, 0xb9e3f7, 0x7fc4e8], igloo: true },
+  temple: { id: 'temple', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xc9965c, 0x9b6b3a, 0x5f8f3f], island: true },
+  pirates: { id: 'pirates', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xb07a3c, 0x8a5a2a, 0xd9b36a], deck: true },
+  ice: { id: 'ice', floors: true, wall: true, wallWidth: 56, blockVariants: 3, blockWidth: 62, rubble: true, background: true, chips: [0xe3f6ff, 0xb9e3f7, 0x7fc4e8], igloo: true, snow: true },
 };
 
 export function themeById(id: string | undefined): ThemeDef {
@@ -76,6 +81,8 @@ export function preloadThemes(scene: Phaser.Scene): void {
     if (theme.igloo) add('igloo', 'igloo.png');
     if (theme.sphinx) add('sphinx', 'sphinx.png');
     if (theme.scrolls) add('scroll', 'scroll.png');
+    if (theme.island) add('island', 'island.png');
+    if (theme.deck) add('deck', 'deck.png');
     if (theme.floorFull) add('floorFull', 'floor.jpg');
     if (theme.columns) add('column', 'column.png');
     if (theme.quicksand) add('quicksand', 'quicksand.png');

@@ -22,6 +22,8 @@ export interface HazardOptions {
   sphinx?: boolean;
   /** Pirâmide de 3 x 3 no centro, com um túnel em cruz (quatro portais) por onde os jogadores passam escondidos. */
   pyramid?: boolean;
+  /** Convés de navio 5 x 5 no centro (só enfeite): a área fica livre de blocos e pilares. */
+  deck?: boolean;
   /** Dois iglus de 3 x 1 (mais a borda de cima) no alto da arena, com a porta para baixo. */
   igloo?: boolean;
   /** A neve faz crescer de novo, aos poucos, os blocos destrutíveis que foram quebrados. */
@@ -32,8 +34,10 @@ export interface HazardOptions {
   thinIce?: boolean;
   /** Abismo no meio da arena (3 colunas) com três pontes de corda. */
   chasm?: boolean;
-  /** Pedra gigante que desce por uma coluna esmagando tudo (avisa 2,5 s antes). */
+  /** Pedras gigantes que descem por uma coluna de cada lado do abismo esmagando tudo (avisam 2,5 s antes). */
   boulder?: boolean;
+  /** Templo 3 x 3 no meio do abismo, com um túnel (a ponte do meio passa por dentro dele). Precisa de `chasm`. */
+  island?: boolean;
 }
 
 /** Células da esfinge: três na horizontal, na fileira de cima, no meio da arena (opção antiga, hoje a esfinge fica na borda). */
@@ -43,6 +47,15 @@ export function sphinxCells(cols: number, _rows: number): Cell[] {
 }
 
 /** Canto superior esquerdo da pirâmide (quadrado de PYRAMID_SIZE células, centrado na arena). */
+/** Células do convés 5 x 5 no centro da arena. */
+export function deckCells(cols: number, rows: number): Cell[] {
+  const c = Math.floor(cols / 2);
+  const m = Math.floor(rows / 2);
+  const out: Cell[] = [];
+  for (let row = m - 2; row <= m + 2; row++) for (let col = c - 2; col <= c + 2; col++) out.push({ col, row });
+  return out;
+}
+
 export function pyramidOrigin(cols: number, rows: number): Cell {
   const half = Math.floor(PYRAMID_SIZE / 2);
   return { col: Math.floor(cols / 2) - half, row: Math.floor(rows / 2) - half };
@@ -128,6 +141,26 @@ export function boulderColumns(cols: number): number[] {
   return out;
 }
 
+/** As colunas da esquerda e da direita do abismo: a cada queda sai uma pedra de cada lado. */
+export function boulderSides(cols: number): [number[], number[]] {
+  const first = Math.floor(cols / 2) - Math.floor(CHASM_WIDTH / 2);
+  const all = boulderColumns(cols);
+  return [all.filter((col) => col < first), all.filter((col) => col >= first)];
+}
+
+/** Células do templo no meio do abismo: um quadrado 3 x 3 com a fileira do meio livre (o túnel, que é a ponte do meio). */
+export function templeCells(cols: number, rows: number): { walls: Cell[]; tunnel: Cell[] } {
+  const c = Math.floor(cols / 2);
+  const m = Math.floor(rows / 2);
+  const walls: Cell[] = [];
+  const tunnel: Cell[] = [];
+  for (let d = -1; d <= 1; d++) {
+    walls.push({ col: c + d, row: m - 1 }, { col: c + d, row: m + 1 });
+    tunnel.push({ col: c + d, row: m });
+  }
+  return { walls, tunnel };
+}
+
 function nearSpawn(cell: Cell, cols: number, rows: number): boolean {
   // Cantos de nascimento: nada de areia a menos de 4 células (distância de grade) deles.
   const corners: Cell[] = [{ col: 1, row: 1 }, { col: cols - 2, row: 1 }, { col: 1, row: rows - 2 }, { col: cols - 2, row: rows - 2 }];
@@ -165,6 +198,10 @@ export function createHazards(arena: Arena, options: HazardOptions | undefined, 
     for (const cell of pyramidExitCells(cols, rows)) arena.cells[cellIndex(arena, cell.col, cell.row)] = 'empty';
   }
 
+  if (options.deck) {
+    for (const cell of deckCells(cols, rows)) arena.cells[cellIndex(arena, cell.col, cell.row)] = 'empty';
+  }
+
   let doors: Cell[] | undefined;
   if (options.igloo) {
     for (const cell of iglooCells(cols, rows)) arena.cells[cellIndex(arena, cell.col, cell.row)] = 'wall';
@@ -174,6 +211,7 @@ export function createHazards(arena: Arena, options: HazardOptions | undefined, 
 
   let chasm: number[] | undefined;
   let bridges: number[] | undefined;
+  let islandTunnel: number[] | undefined;
   if (options.chasm) {
     // Abismo = `hole` (ninguém pisa, o fogo passa); nas fileiras das pontes as células ficam livres e os pilares das margens saem.
     const rowsOfBridge = bridgeRows(rows);
@@ -188,6 +226,15 @@ export function createHazards(arena: Arena, options: HazardOptions | undefined, 
         arena.cells[index] = 'hole';
         chasm.push(index);
       }
+    }
+    if (options.island) {
+      const { walls, tunnel: inside } = templeCells(cols, rows);
+      const wallIndexes = new Set(walls.map((c) => cellIndex(arena, c.col, c.row)));
+      for (const index of wallIndexes) arena.cells[index] = 'wall';
+      chasm = chasm.filter((index) => !wallIndexes.has(index));
+      const tunnelIndexes = inside.map((c) => cellIndex(arena, c.col, c.row));
+      bridges = bridges.filter((index) => !tunnelIndexes.includes(index));
+      islandTunnel = tunnelIndexes;
     }
     const first = Math.floor(cols / 2) - Math.floor(CHASM_WIDTH / 2);
     for (const row of rowsOfBridge) for (const col of [first - 1, first + CHASM_WIDTH]) arena.cells[cellIndex(arena, col, row)] = 'empty';
@@ -228,7 +275,8 @@ export function createHazards(arena: Arena, options: HazardOptions | undefined, 
     hazards.chasm = chasm;
     hazards.bridges = bridges;
   }
-  if (options.boulder) hazards.boulder = { phase: 'idle', timer: BOULDER_FIRST_DELAY_TICKS - BOULDER_WARN_TICKS, col: -1, y: 0, last: -1 };
+  if (islandTunnel) hazards.tunnel = islandTunnel;
+  if (options.boulder) hazards.boulder = { phase: 'idle', timer: BOULDER_FIRST_DELAY_TICKS - BOULDER_WARN_TICKS, cols: [], y: 0, last: [] };
   if (tunnel) hazards.tunnel = tunnel;
   if (doors) {
     // O segundo iglu sai 10 s depois do primeiro e começa pelo pinguim.
@@ -375,12 +423,17 @@ function updateBoulder(state: GameState): void {
     if (state.round.phase !== 'playing') return;
     boulder.timer -= 1;
     if (boulder.timer > 0) return;
-    const options = boulderColumns(arena.cols).filter((col) => col !== boulder.last);
+    // Uma pedra de cada lado do abismo, sempre em colunas diferentes das da queda anterior.
     const rng = createRng(state.tick * 13 + 7);
-    boulder.col = options[Math.floor(rng() * options.length)]!;
+    boulder.cols = boulderSides(arena.cols).map((side) => {
+      const options = side.filter((col) => !boulder.last.includes(col));
+      const pool = options.length > 0 ? options : side;
+      return pool[Math.floor(rng() * pool.length)]!;
+    });
+    boulder.last = [...boulder.cols];
     boulder.phase = 'warn';
     boulder.timer = BOULDER_WARN_TICKS;
-    state.events.push({ type: 'boulderWarn', col: boulder.col });
+    for (const col of boulder.cols) state.events.push({ type: 'boulderWarn', col });
     return;
   }
   if (boulder.phase === 'warn') {
@@ -388,43 +441,52 @@ function updateBoulder(state: GameState): void {
     if (boulder.timer > 0) return;
     boulder.phase = 'roll';
     boulder.y = 0.5;
-    state.events.push({ type: 'boulderRoll', col: boulder.col });
+    for (const col of boulder.cols) state.events.push({ type: 'boulderRoll', col });
     return;
   }
   boulder.y += BOULDER_SPEED;
-  const col = boulder.col;
   const front = Math.floor(boulder.y + 0.45);
-  const finish = (): void => {
-    boulder.phase = 'idle';
-    boulder.timer = BOULDER_PERIOD_TICKS - BOULDER_WARN_TICKS;
-    boulder.last = col;
+  const done = (col: number): void => {
+    boulder.cols = boulder.cols.filter((c) => c !== col);
     state.events.push({ type: 'boulderGone', col });
   };
-  if (front >= arena.rows - 1) return finish();
-  if (front >= 1) {
-    const cell = getCell(arena, col, front);
-    if (cell === 'wall') return finish(); // parede (morte súbita): a pedra se desfaz
-    if (cell === 'block') {
-      arena.cells[cellIndex(arena, col, front)] = 'empty';
-      state.events.push({ type: 'blockDestroyed', col, row: front });
-      revealItem(state, col, front);
+  for (const col of [...boulder.cols]) {
+    if (front >= arena.rows - 1) {
+      done(col);
+      continue;
+    }
+    if (front >= 1) {
+      const cell = getCell(arena, col, front);
+      if (cell === 'wall') {
+        done(col); // parede (morte súbita): a pedra se desfaz
+        continue;
+      }
+      if (cell === 'block') {
+        arena.cells[cellIndex(arena, col, front)] = 'empty';
+        state.events.push({ type: 'blockDestroyed', col, row: front });
+        revealItem(state, col, front);
+      }
+    }
+    const under = (row: number): boolean => Math.abs(row + 0.5 - boulder.y) < 0.75;
+    state.bombs = state.bombs.filter((bomb) => !(bomb.col === col && under(bomb.row)));
+    state.items = state.items.filter((item) => !(item.col === col && under(item.row)));
+    for (const player of state.players) {
+      if (!player.alive || player.shieldTicks > 0 || player.heroTicks > 0) continue;
+      if (Math.abs(player.x - (col + 0.5)) > BOULDER_HIT_HALF || Math.abs(player.y - boulder.y) > BOULDER_HIT_HALF + 0.1) continue;
+      if (player.vest) {
+        player.vest = false;
+        player.shieldTicks = VEST_BREAK_SHIELD_TICKS;
+        state.events.push({ type: 'vestBroken', playerId: player.id });
+      } else {
+        player.alive = false;
+        state.events.push({ type: 'playerHit', playerId: player.id, killers: [], crushed: true });
+        dropPowerups(state, player);
+      }
     }
   }
-  const under = (row: number): boolean => Math.abs(row + 0.5 - boulder.y) < 0.75;
-  state.bombs = state.bombs.filter((bomb) => !(bomb.col === col && under(bomb.row)));
-  state.items = state.items.filter((item) => !(item.col === col && under(item.row)));
-  for (const player of state.players) {
-    if (!player.alive || player.shieldTicks > 0 || player.heroTicks > 0) continue;
-    if (Math.abs(player.x - (col + 0.5)) > BOULDER_HIT_HALF || Math.abs(player.y - boulder.y) > BOULDER_HIT_HALF + 0.1) continue;
-    if (player.vest) {
-      player.vest = false;
-      player.shieldTicks = VEST_BREAK_SHIELD_TICKS;
-      state.events.push({ type: 'vestBroken', playerId: player.id });
-    } else {
-      player.alive = false;
-      state.events.push({ type: 'playerHit', playerId: player.id, killers: [], crushed: true });
-      dropPowerups(state, player);
-    }
+  if (boulder.cols.length === 0) {
+    boulder.phase = 'idle';
+    boulder.timer = BOULDER_PERIOD_TICKS - BOULDER_WARN_TICKS;
   }
 }
 

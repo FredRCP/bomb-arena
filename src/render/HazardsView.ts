@@ -108,12 +108,17 @@ export class HazardsView {
     g.clear();
     const boulder = state.hazards?.boulder;
     if (!boulder || boulder.phase === 'idle') return;
-    const x = (boulder.col + 0.5) * TILE_SIZE;
     const height = state.arena.rows * TILE_SIZE;
+    for (const col of boulder.cols) this.drawOneBoulder(state, boulder, col, height);
+  }
+
+  private drawOneBoulder(state: GameState, boulder: NonNullable<NonNullable<GameState['hazards']>['boulder']>, col: number, height: number): void {
+    const g = this.boulderG;
+    const x = (col + 0.5) * TILE_SIZE;
     if (boulder.phase === 'warn') {
       const left = boulder.timer / 60;
       const on = Math.floor(left * (left < 1 ? 8 : 4)) % 2 === 0;
-      g.fillStyle(0xff3b3b, on ? 0.2 : 0.07).fillRect(boulder.col * TILE_SIZE, TILE_SIZE, TILE_SIZE, height - 2 * TILE_SIZE);
+      g.fillStyle(0xff3b3b, on ? 0.2 : 0.07).fillRect(col * TILE_SIZE, TILE_SIZE, TILE_SIZE, height - 2 * TILE_SIZE);
       // A pedra aparece rachando o teto: poeira e pedrinhas caindo no topo da coluna.
       const progress = 1 - boulder.timer / BOULDER_WARN_TICKS;
       for (let k = 0; k < 6; k++) {

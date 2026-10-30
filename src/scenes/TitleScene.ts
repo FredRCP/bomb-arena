@@ -7,10 +7,10 @@ import { PadNav } from '../input/padNav';
 import { hasGameParams } from '../menu/gameConfig';
 import { loadSettings } from '../menu/settingsStorage';
 import { TILE_SIZE } from '../render/ArenaRenderer';
-import { addCardArt, preloadCharacters } from '../render/CharacterView';
+import { addCardArt, addCharacter, preloadCharacters } from '../render/CharacterView';
 import { placeArena, SCREEN_HEIGHT, SCREEN_WIDTH } from '../render/layout';
 import { preloadFlames } from '../render/FlameSprites';
-import { preloadItems } from '../render/ItemSprites';
+import { hasItemIcon, ITEM_KINDS, itemTexture, preloadItems } from '../render/ItemSprites';
 import { preloadThemes } from '../render/theme';
 import { addMenuBackground } from '../render/menuBackground';
 
@@ -58,6 +58,8 @@ export class TitleScene extends Phaser.Scene {
       this.tweens.add({ targets: art, y: art.y - 14, duration: 650 + index * 60, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: 900 + index * 110 });
     });
 
+    this.addDecorations();
+
     this.add
       .text(WIDTH / 2, HEIGHT * 0.22, 'BOMB ARENA', { fontFamily: FONT, fontSize: '110px', fontStyle: 'bold', color: '#ffe66d', stroke: '#1b1f3b', strokeThickness: 12 })
       .setOrigin(0.5);
@@ -72,6 +74,40 @@ export class TitleScene extends Phaser.Scene {
     // Um pequeno atraso evita que a tecla que abriu a página já avance a tela.
     this.time.delayedCall(300, () => this.input.keyboard?.on('keydown', () => this.next()));
     this.input.on('pointerdown', () => this.next());
+  }
+
+  /** Enfeites da abertura: os 7 virtuais flutuando de cada lado do nome, itens girando no alto e estrelinhas piscando. */
+  private addDecorations(): void {
+    // Estrelinhas piscando (atrás de tudo o que vem depois).
+    for (let i = 0; i < 26; i++) {
+      const x = 40 + ((i * 197) % (SCREEN_WIDTH - 80));
+      const y = 30 + ((i * 131) % 420);
+      const star = this.add.text(x, y, '✦', { fontFamily: FONT, fontSize: `${14 + (i % 4) * 6}px`, color: i % 3 === 0 ? '#ffe66d' : '#ffffff' }).setOrigin(0.5).setAlpha(0.15).setScrollFactor(0);
+      this.tweens.add({ targets: star, alpha: 0.9, scale: 1.3, duration: 700 + (i % 5) * 220, yoyo: true, repeat: -1, delay: (i * 137) % 1500 });
+    }
+    // Itens (power-ups): uma fileira no alto e dois grupinhos nas laterais, flutuando e balançando.
+    const spots: Array<[number, number]> = [];
+    for (let i = 0; i < 6; i++) spots.push([500 + i * 120, 62 + (i % 2) * 22]);
+    spots.push([60, 410], [170, 450], [1430, 410], [1540, 450], [320, 60], [1280, 60]);
+    spots.forEach(([x, y], index) => {
+      const kind = ITEM_KINDS[(index * 5 + 3) % ITEM_KINDS.length]!;
+      if (!hasItemIcon(this, kind)) return;
+      const icon = this.add.image(x, y, itemTexture(kind)).setDisplaySize(50, 50).setScrollFactor(0).setAlpha(0);
+      this.tweens.add({ targets: icon, alpha: 1, duration: 400, delay: 300 + index * 90 });
+      this.tweens.add({ targets: icon, y: y - 12, angle: index % 2 === 0 ? 10 : -10, duration: 900 + index * 70, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: index * 120 });
+    });
+    // Os 7 virtuais, três à esquerda e quatro à direita do nome.
+    const blobs = CHARACTERS.filter((c) => !c.custom);
+    const places: Array<[number, number]> = [[110, 150], [245, 275], [360, 140], [1240, 140], [1355, 265], [1480, 150], [1490, 330]];
+    blobs.forEach((blob, index) => {
+      const place = places[index];
+      if (!place) return;
+      const piece = addCharacter(this, blob, place[0], place[1], 36);
+      piece.setScrollFactor(0).setAlpha(0);
+      this.tweens.add({ targets: piece, alpha: 1, duration: 450, delay: 500 + index * 140 });
+      this.tweens.add({ targets: piece, y: place[1] - 16, duration: 800 + index * 90, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: index * 150 });
+      this.tweens.add({ targets: piece, angle: index % 2 === 0 ? 6 : -6, duration: 1100 + index * 70, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
+    });
   }
 
   update(time: number): void {

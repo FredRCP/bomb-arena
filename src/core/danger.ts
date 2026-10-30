@@ -83,7 +83,7 @@ export function buildHazards(state: GameState, extraBomb?: BombState, selfId?: P
     const rollTicks = Math.ceil((arena.rows - 0.5) / BOULDER_SPEED);
     const from = boulder.phase === 'warn' ? Math.max(0, boulder.timer - 30) : 0;
     const to = boulder.phase === 'warn' ? boulder.timer + rollTicks : Math.ceil((arena.rows - boulder.y) / BOULDER_SPEED);
-    for (let row = 1; row < arena.rows - 1; row++) windows[cellIndex(arena, boulder.col, row)]!.push([from, to]);
+    for (const col of boulder.cols) for (let row = 1; row < arena.rows - 1; row++) windows[cellIndex(arena, col, row)]!.push([from, to]);
   }
 
   // Morte súbita: as células que vão virar parede são perigosas dali em diante, para sempre.

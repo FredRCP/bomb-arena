@@ -111,6 +111,20 @@ export function drawArena(scene: Phaser.Scene, arena: Arena, themeId = 'classic'
     scene.add.image((o.col + PYRAMID_SIZE / 2) * TILE_SIZE, (o.row + PYRAMID_SIZE / 2) * TILE_SIZE, themeKey(theme, 'pyramid')).setDisplaySize(size, size).setDepth(10.5);
   }
 
+  if (theme.island && has(scene, theme, 'island') && hazards?.tunnel) {
+    // Templo no meio do abismo (3 x 3), por cima dos jogadores: quem passa pelo túnel some enquanto atravessa.
+    const c = Math.floor(arena.cols / 2);
+    const m = Math.floor(arena.rows / 2);
+    scene.add.image(c * TILE_SIZE + TILE_SIZE / 2, m * TILE_SIZE + TILE_SIZE / 2, themeKey(theme, 'island')).setDisplaySize(3 * TILE_SIZE, 3 * TILE_SIZE).setDepth(10.5);
+  }
+
+  if (theme.deck && has(scene, theme, 'deck')) {
+    // Convés de navio 5 x 5 no chão, no centro: só enfeite (os buracos deixam ver a areia).
+    const c = Math.floor(arena.cols / 2);
+    const m = Math.floor(arena.rows / 2);
+    scene.add.image((c + 0.5) * TILE_SIZE, (m + 0.5) * TILE_SIZE, themeKey(theme, 'deck')).setDisplaySize(5 * TILE_SIZE, 5 * TILE_SIZE).setDepth(0.4);
+  }
+
   if (iglooOn) {
     // Dois iglus iguais na lateral de cima, com a porta para baixo, centrados na coluna da porta (a arte fica como foi desenhada).
     for (const door of iglooDoors(arena.cols, arena.rows)) {

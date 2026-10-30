@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ICE_CRACK_LEVELS } from '../../src/config/hazards';
 import { ELEPHANT_SPEED, POWER_CHARGE_TICKS } from '../../src/config/powers';
-import { AIRPLANE_BOMBS, AIRPLANE_LAPS, AIRPLANE_LAP_TICKS } from '../../src/config/powers';
+import { AIRPLANE_BOMBS, AIRPLANE_LAPS, AIRPLANE_LAP_TICKS, CONFUSE_POWER_TICKS, SHIELD_POWER_TICKS } from '../../src/config/powers';
 import { stageById } from '../../src/config/stages';
 import { aiShouldUsePower, createGameState, drainEvents, getCell, givePower, powerFraction, powerReady, step, createAi, iglooCells, placeBomb, pyramidExitCells, pyramidOrigin, pyramidTunnelCells, pyramidWallCells } from '../../src/core';
 import type { GameState } from '../../src/core';
@@ -356,29 +356,34 @@ describe('superpoder do Lucas: avião', () => {
     return state;
   };
 
-  it('carregado, o avião dá 2 voltas em círculo em volta do jogador largando 5 bombas e some', () => {
+  it('carregado, o avião sobrevoa a arena toda em 4 voltas largando 6 bombas e some', () => {
     const state = field();
     const p = state.players[0]!;
     givePower(p, 'airplane');
     p.power!.charge = POWER_CHARGE_TICKS;
-    p.facing = 'right';
-    expect(aiShouldUsePower(state, p)).toBe(true); // há inimigo a menos de 6 células
+    expect(aiShouldUsePower(state, p)).toBe(true);
     step(state, { 1: { move: null, power: true } });
     expect(state.planes).toHaveLength(1);
     const plane = state.planes![0]!;
     let placed = 0;
     let gone = false;
-    let maxDist = 0;
+    let minX = 99;
+    let maxX = -99;
     for (let i = 0; i < AIRPLANE_LAPS * AIRPLANE_LAP_TICKS + 30; i++) {
       step(state);
-      if (state.planes![0]) maxDist = Math.max(maxDist, Math.hypot(plane.x - plane.cx, plane.y - plane.cy));
+      if (state.planes![0]) {
+        minX = Math.min(minX, plane.x);
+        maxX = Math.max(maxX, plane.x);
+      }
       for (const e of drainEvents(state)) {
         if (e.type === 'bombPlaced') placed += 1;
         if (e.type === 'planeGone') gone = true;
       }
     }
     expect(placed).toBe(AIRPLANE_BOMBS);
-    expect(maxDist).toBeGreaterThan(2.9); // chegou ao raio do círculo
+    expect(AIRPLANE_BOMBS).toBe(6);
+    expect(AIRPLANE_LAPS).toBe(4);
+    expect(maxX - minX).toBeGreaterThan(state.arena.cols * 0.6); // cobriu a largura da arena
     expect(gone).toBe(true);
     expect(state.planes).toHaveLength(0);
   });
@@ -390,7 +395,79 @@ describe('superpoder do Lucas: avião', () => {
     givePower(p, 'airplane');
     p.power!.charge = POWER_CHARGE_TICKS;
     step(state, { 1: { move: null, power: true } });
-    for (let i = 0; i < 160; i++) step(state);
+    for (let i = 0; i < 300; i++) step(state);
     expect(state.bombs.filter((b) => b.owner === 1).length).toBeGreaterThanOrEqual(2); // mais que o limite de 1
+  });
+});
+
+describe('superpoderes dos outros personagens', () => {
+  const field = (): GameState => {
+    const state = stateFromText(['#############', '#...........#', '#...........#', '#...........#', '#...........#', '#...........#', '#############'], [{ id: 1, col: 2, row: 3 }, { id: 2, col: 10, row: 3 }]);
+    state.round.phase = 'playing';
+    return state;
+  };
+  const use = (state: GameState, kind: Parameters<typeof givePower>[1]) => {
+    const p = state.players[0]!;
+    givePower(p, kind);
+    p.power!.charge = POWER_CHARGE_TICKS;
+    step(state, { 1: { move: null, power: true } });
+    return p;
+  };
+
+  it('Fred: escudo de 5 s (e o poder zera a carga)', () => {
+    const state = field();
+    const p = use(state, 'shield');
+    expect(p.shieldTicks).toBeGreaterThan(SHIELD_POWER_TICKS - 5);
+    expect(powerFraction(p)).toBeLessThan(0.01);
+  });
+
+  it('Filippe: fantasma (atravessa blocos) e Glauceste: inimigos ficam com os controles invertidos', () => {
+    const state = field();
+    const f = use(state, 'ghost');
+    expect(f.ghostTicks).toBeGreaterThan(400);
+    const state2 = field();
+    use(state2, 'confuse');
+    expect(state2.players[1]!.invertTicks).toBeGreaterThan(CONFUSE_POWER_TICKS - 5);
+    expect(state2.players[0]!.invertTicks).toBe(0);
+  });
+
+  it('Van: teletransporta para uma célula livre a pelo menos 4 células, e avisa', () => {
+    const state = field();
+    state.arena.cells[3 * 13 + 5] = 'block';
+    const p = state.players[0]!;
+    const fromCol = Math.floor(p.x);
+    const fromRow = Math.floor(p.y);
+    givePower(p, 'teleport');
+    p.power!.charge = POWER_CHARGE_TICKS;
+    step(state, { 1: { move: null, power: true } });
+    const events = drainEvents(state);
+    expect(events.some((e) => e.type === 'teleported')).toBe(true);
+    expect(Math.abs(Math.floor(p.x) - fromCol) + Math.abs(Math.floor(p.y) - fromRow)).toBeGreaterThanOrEqual(4);
+    expect(getCell(state.arena, Math.floor(p.x), Math.floor(p.y))).toBe('empty');
+  });
+
+  it('Wal: a cegonha solta 3 itens bons num raio de 3 células', () => {
+    const state = field();
+    use(state, 'stork');
+    expect(state.items).toHaveLength(3);
+    for (const item of state.items) {
+      expect(Math.max(Math.abs(item.col - 2), Math.abs(item.row - 3))).toBeLessThanOrEqual(3);
+      expect(['bomb', 'range', 'speed', 'vest', 'kick']).toContain(item.kind);
+    }
+  });
+
+  it('a IA usa escudo/teleporte/fantasma só com perigo por perto, e a confusão com inimigo perto', () => {
+    const state = field();
+    const p = state.players[0]!;
+    givePower(p, 'shield');
+    p.power!.charge = POWER_CHARGE_TICKS;
+    expect(aiShouldUsePower(state, p)).toBe(false);
+    state.bombs.push({ owner: 2, col: 3, row: 3, ticksLeft: 40, range: 2, walkThrough: [], pierce: false });
+    expect(aiShouldUsePower(state, p)).toBe(true);
+    givePower(p, 'confuse');
+    p.power!.charge = POWER_CHARGE_TICKS;
+    expect(aiShouldUsePower(state, p)).toBe(false); // inimigo a 8 células
+    state.players[1]!.x = 6.5;
+    expect(aiShouldUsePower(state, p)).toBe(true);
   });
 });

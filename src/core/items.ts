@@ -160,7 +160,7 @@ export function dropPowerups(state: GameState, player: PlayerState): void {
 }
 
 /** Casas onde um item pode cair: livres, sem bomba, sem chama e sem outro item (índices de célula). */
-function freeItemCells(state: GameState): number[] {
+export function freeItemCells(state: GameState): number[] {
   const { arena } = state;
   const taken = new Set<number>();
   for (const bomb of state.bombs) taken.add(cellIndex(arena, bomb.col, bomb.row));

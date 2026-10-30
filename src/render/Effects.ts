@@ -16,6 +16,9 @@ const SPARK_COLORS = [0xffe66d, 0xffa94d, 0xff6b35, 0xffffff] as const;
 const SMOKE_COLORS = [0x6c6f7a, 0x8a8d99, 0xa4a7b3] as const;
 const DUST_COLOR = 0xe8dcc0;
 
+/** Cor do brilho de cada superpoder. */
+const POWER_COLORS = { shield: 0x74c0fc, teleport: 0xf783ac, stork: 0xe599f7, confuse: 0xb2f2bb, ghost: 0xced4da } as const;
+
 export class Effects {
   private readonly particles = new ParticleSystem();
   private readonly g: Phaser.GameObjects.Graphics;
@@ -44,6 +47,15 @@ export class Effects {
       if (event.type === 'bombExploded') this.bombBlast(event.col, event.row);
       if (event.type === 'blockDestroyed') this.breakBlock(event.col, event.row);
       if (event.type === 'bombPlaced') this.puff((event.col + 0.5) * TILE_SIZE, (event.row + 0.9) * TILE_SIZE, 3, 0.35);
+      if (event.type === 'powerUsed' && event.kind !== 'elephant' && event.kind !== 'airplane') {
+        const p = state.players.find((q) => q.id === event.playerId);
+        if (p) this.powerBurst(p.x * TILE_SIZE, p.y * TILE_SIZE - 10, POWER_COLORS[event.kind]);
+        if (event.kind === 'confuse') for (const q of state.players) if (q.alive && q.id !== event.playerId && q.invertTicks > 0) this.stars(q.x * TILE_SIZE, q.y * TILE_SIZE - 30);
+      }
+      if (event.type === 'teleported') {
+        this.powerBurst((event.fromCol + 0.5) * TILE_SIZE, (event.fromRow + 0.5) * TILE_SIZE, POWER_COLORS.teleport);
+        this.powerBurst((event.col + 0.5) * TILE_SIZE, (event.row + 0.5) * TILE_SIZE, POWER_COLORS.teleport);
+      }
       if (event.type === 'itemPicked' || event.type === 'playerRevived') {
         const p = state.players.find((q) => q.id === (event.type === 'itemPicked' ? event.playerId : event.playerId));
         if (p) this.sparkle(p.x * TILE_SIZE, p.y * TILE_SIZE - 20, event.type === 'itemPicked' ? 0xffe66d : 0x7ed957);
@@ -118,6 +130,16 @@ export class Effects {
   private puff(x: number, y: number, count: number, life: number): void {
     for (let i = 0; i < count; i++) {
       this.particles.spawn({ kind: 'smoke', x: x + rand(-14, 14), y: y + rand(-6, 6), vx: rand(-30, 30), vy: rand(-26, -6), gravity: -8, life: rand(life * 0.7, life), size0: 7, size1: 22, color: DUST_COLOR });
+    }
+  }
+
+  /** Explosão de brilho de um superpoder: dois anéis e um leque de faíscas. */
+  private powerBurst(x: number, y: number, color: number): void {
+    this.particles.spawn({ kind: 'ring', x, y, vx: 0, vy: 0, gravity: 0, life: 0.6, size0: 10, size1: 70, color });
+    this.particles.spawn({ kind: 'ring', x, y, vx: 0, vy: 0, gravity: 0, life: 0.45, size0: 6, size1: 46, color: 0xffffff });
+    for (let i = 0; i < 14; i++) {
+      const angle = (i / 14) * Math.PI * 2;
+      this.particles.spawn({ kind: 'spark', x, y, vx: Math.cos(angle) * 150, vy: Math.sin(angle) * 150 - 30, gravity: 100, life: rand(0.5, 0.8), size0: 5, size1: 1, color: i % 2 ? color : 0xffffff });
     }
   }
 

@@ -4,3 +4,5 @@ classic.ogg - não é mais usada (era a música dos menus); pode ser apagada.
 fechando_blocos.ogg - "Dizzy Racing", de Zane Little (https://ko-fi.com/zanelittle). Tocada quando o tempo acaba e os blocos começam a fechar a arena (todas as fases).
 egypt.ogg e suez.ogg - músicas da fase do Egito, enviadas pelo Fred. Origem e licença A CONFIRMAR (os arquivos não trazem autor): anote aqui o autor/licença antes de publicar.
 gelo_loop.ogg e gelo_intro.ogg - músicas da fase do Gelo, enviadas pelo Fred (arquivos icd_repeating e icd_seg1). Autor e licença A CONFIRMAR.
+
+temple_a.ogg (battleThemeA), temple_b.ogg (battleThemeB), sinister_abode.ogg — músicas do Templo Perdido enviadas pelo Fred. Autores/licença: a confirmar.
