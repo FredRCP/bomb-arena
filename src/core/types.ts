@@ -18,7 +18,7 @@ export interface Arena {
 }
 
 /** 1 e 2 são jogadores humanos; de 3 a 5 só existem como inimigos controlados pelo computador (máximo de 5 na arena). */
-export type PlayerId = 1 | 2 | 3 | 4 | 5;
+export type PlayerId = 1 | 2 | 3 | 4 | 5 | 6 | 7;
 
 export type Direction = 'up' | 'down' | 'left' | 'right';
 
@@ -76,6 +76,8 @@ export interface PlayerState {
   ghostTicks: number;
   /** Passos que faltam do item ruim "controles invertidos". 0 = controles normais. */
   invertTicks: number;
+  /** Passos de lentidão (flecha do Egito): velocidade mínima do jogo enquanto for maior que zero. */
+  slowTicks: number;
   /** Passos de proteção contra chamas (depois de voltar à arena). 0 = sem proteção. */
   shieldTicks: number;
   /** Colete à prova de bala: aguenta uma explosão e se desfaz. */
@@ -93,12 +95,16 @@ export interface PlayerState {
   sidelineCooldown: number;
   /** Piso de gelo: direção em que o jogador está deslizando (null/ausente = parado). */
   slide?: Direction | null;
+  /** Bolt: passos que faltam de velocidade máxima. */
+  sprintTicks?: number;
+  /** Violeta: passos que faltam invisível. */
+  invisibleTicks?: number;
   /** Superpoder do personagem e a carga dele (0 a POWER_CHARGE_TICKS). Ausente = sem poder. */
   power?: { kind: PowerKind; charge: number };
 }
 
 /** Superpoderes que existem: o elefantinho da Ana. */
-export type PowerKind = 'elephant' | 'airplane' | 'shield' | 'freeze' | 'stork' | 'confuse' | 'ghost';
+export type PowerKind = 'elephant' | 'airplane' | 'shield' | 'freeze' | 'stork' | 'confuse' | 'ghost' | 'jump' | 'sprint' | 'slime' | 'invisible' | 'twinbombs' | 'fog' | 'chocolate';
 
 /** Elefantinho em disparada: o centro dele (em células) e a direção. */
 /** Porta de um iglu: de onde saem as bolas de neve e os pinguins, com os passos até a próxima saída e quantas já saíram. */
@@ -186,7 +192,7 @@ export interface BombState {
   /** Bomba-relógio: só explode quando o dono detona (ou quando o pavio longo de segurança acaba). */
   remote?: boolean;
   /** Bomba chutada deslizando: direção e passos desde o último deslize. null/ausente = parada. */
-  slide?: { direction: Direction; ticks: number } | null;
+  slide?: { direction: Direction; ticks: number; /** Passos por célula (chute: KICK_SLIDE_TICKS; correnteza: mais lento). */ interval?: number } | null;
   /** Congelada (poder da Van): o pavio não anda enquanto isto for maior que zero. */
   frozenTicks?: number;
 }
@@ -206,6 +212,17 @@ export type GameEvent =
   | { type: 'bombExploded'; col: number; row: number; owner: PlayerId }
   | { type: 'blockDestroyed'; col: number; row: number }
   /** `killers` = donos das bombas que o eliminaram (sem ele mesmo); vazio = ele mesmo; `crushed` = esmagado pela morte súbita ou pela pedra gigante. */
+  | { type: 'slowed'; playerId: PlayerId }
+  | { type: 'volcanoErupt' }
+  | { type: 'lavaShot'; col: number; row: number }
+  | { type: 'lavaImpact'; col: number; row: number }
+  | { type: 'lavaRiver'; col: number }
+  | { type: 'bridgeWarn'; row: number }
+  | { type: 'bridgeFall'; row: number }
+  | { type: 'bridgeRestored'; row: number }
+  | { type: 'cannonShot'; col: number; row: number }
+  | { type: 'cannonImpact'; col: number; row: number }
+  | { type: 'stunned'; playerId: PlayerId }
   | { type: 'playerHit'; playerId: PlayerId; killers: PlayerId[]; crushed?: boolean; dart?: boolean }
   /** O colete aguentou uma explosão e se desfez (o jogador segue vivo). */
   | { type: 'vestBroken'; playerId: PlayerId }
@@ -321,8 +338,69 @@ export interface HazardsState {
   thinIce?: number[];
   /** Nível de rachadura (1 a 3) de cada célula de gelo fino já pisada. */
   cracks?: Record<number, number>;
+  /** Fundo do mar: faixas de correnteza (cada uma empurra quem está nelas na direção dx/dy). */
+  currents?: CurrentLane[];
+  /** Vulcão: lava que escorre pelas colunas e substitui a morte súbita. */
+  lava?: LavaState;
+  /** Vulcão: erupções que lançam bolas de lava, que caem em células sorteadas (com sombra 2 s antes). */
+  volcano?: VolcanoState;
+  /** Ilha dos Piratas: canhões do navio (mesma mecânica das bolas do vulcão, com sombra no chão). */
+  cannon?: VolcanoState;
+  /** Templo: uma das pontes cai de tempos em tempos. */
+  bridgeFall?: BridgeFallState;
   /** Última célula em que cada jogador esteve (para contar uma passagem só quando ele ENTRA na célula). */
   lastCell?: Partial<Record<PlayerId, number>>;
+}
+
+export interface CurrentLane {
+  /** Células (índices) da faixa. */
+  cells: number[];
+  dx: number;
+  dy: number;
+}
+
+/** Rio de lava: de 60 em 60 s desce por uma coluna (de uma ponta à outra) e sai da arena. */
+export interface LavaState {
+  phase: 'idle' | 'warn' | 'flow';
+  /** Passos até a próxima fase (idle e warn). */
+  timer: number;
+  /** Coluna do rio e sentido (1 = de cima para baixo). */
+  col: number;
+  dir: 1 | -1;
+  /** Posição da frente do rio, em células (só em flow). */
+  y: number;
+}
+
+/** A ponte do templo que está caindo: fileira, fase e passos até a próxima. */
+export interface BridgeFallState {
+  phase: 'idle' | 'warn' | 'down';
+  timer: number;
+  /** Fileira da ponte que cai (só em warn e down). */
+  row: number;
+}
+
+/** Célula de gosma (poder do Musgo): quem pisa, menos o dono, fica lento. */
+export interface SlimeCell {
+  col: number;
+  row: number;
+  owner: PlayerId;
+  ticks: number;
+}
+
+export interface LavaShot {
+  col: number;
+  row: number;
+  /** Passos até a bola de lava cair (a sombra aparece desde o lançamento). */
+  ticks: number;
+}
+
+export interface VolcanoState {
+  phase: 'idle' | 'erupt';
+  timer: number;
+  /** Bolas ainda por lançar nesta erupção e passos até a próxima. */
+  remaining: number;
+  gap: number;
+  shots: LavaShot[];
 }
 
 /** Fonte única de verdade da partida. A renderização apenas lê este estado. */
@@ -343,6 +421,12 @@ export interface GameState {
   /** Elefantinhos em disparada (poder da Ana). */
   elephants?: ElephantState[];
   planes?: PlaneState[];
+  /** Gosma do Musgo no chão. */
+  slime?: SlimeCell[];
+  /** Células (índices) de blocos de chocolate do Cacau (só para o desenho). */
+  chocolate?: number[];
+  /** Neblina do Nimbo: passos que faltam e quem a criou (ele enxerga em volta). */
+  fog?: { ticks: number; owner: PlayerId };
   /** Quem é eliminado pode jogar das laterais e tentar voltar (veja sideline.ts)? Ausente = sim. */
   sidelineEnabled?: boolean;
   /** Quantos passos de simulação já aconteceram. Será a base dos temporizadores (bombas, chamas). */

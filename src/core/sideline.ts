@@ -161,6 +161,7 @@ export function revive(state: GameState, player: PlayerState): boolean {
   player.shieldTicks = REVIVE_SHIELD_TICKS;
   player.ghostTicks = 0;
   player.invertTicks = 0;
+  player.slowTicks = 0;
   state.events.push({ type: 'playerRevived', playerId: player.id, col: cell.col, row: cell.row });
   return true;
 }

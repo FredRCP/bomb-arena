@@ -1,7 +1,7 @@
 import { addCharacter, animateSprite, createSpriteView, hasSprites, isSpriteView } from './CharacterView';
 import type { CharacterDef } from '../characters/characters';
 import Phaser from 'phaser';
-import { getCell, inwardDirection, ringCells } from '../core';
+import { getCell, inwardDirection, ringCells, slideOffset } from '../core';
 import type { Arena, BombState, FlameState, GameState, HazardsState, ItemState, PlayerState } from '../core';
 import { iglooCells, iglooDoors, pyramidOrigin, pyramidWallCells } from '../core';
 import { PYRAMID_SIZE } from '../config/hazards';
@@ -179,7 +179,8 @@ export function createBlocksView(scene: Phaser.Scene, arena: Arena, themeId = 'c
 }
 
 /** Atualiza os blocos: desenha os que ainda existem no estado do core e tira os que sumiram. */
-export function redrawBlocks(view: BlocksView, arena: Arena): void {
+export function redrawBlocks(view: BlocksView, arena: Arena, chocolate: readonly number[] = []): void {
+  const choc = new Set(chocolate);
   view.g.clear();
   for (let row = 0; row < arena.rows; row++) {
     for (let col = 0; col < arena.cols; col++) {
@@ -197,10 +198,12 @@ export function redrawBlocks(view: BlocksView, arena: Arena): void {
           const variant = 1 + ((col * 7 + row * 13) % view.variants);
           const made = view.scene.add.image((col + 0.5) * TILE_SIZE, (row + 1) * TILE_SIZE - 1, themeKey(view.theme, `block${variant}`)).setOrigin(0.5, 1).setDepth(1);
           made.setScale(view.theme.blockWidth / made.width);
+          if (choc.has(index)) made.setTint(0x8a4b25); // bloco de chocolate do Cacau
           view.images.set(index, made);
         }
       } else {
         drawBlock(view.g, col * TILE_SIZE, row * TILE_SIZE);
+        if (choc.has(index)) view.g.fillStyle(0x5a2e12, 0.7).fillRect(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
       }
     }
   }
@@ -404,9 +407,9 @@ export function createEffectsView(scene: Phaser.Scene): Graphics {
   return g;
 }
 
-function drawBomb(g: Graphics, bomb: BombState, tick: number): void {
-  const cx = (bomb.col + 0.5) * TILE_SIZE;
-  const cy = (bomb.row + 0.5) * TILE_SIZE;
+function drawBomb(g: Graphics, bomb: BombState, tick: number, offset: { x: number; y: number } = { x: 0, y: 0 }, mine = false): void {
+  const cx = (bomb.col + 0.5 + offset.x) * TILE_SIZE;
+  const cy = (bomb.row + 0.5 + offset.y) * TILE_SIZE;
 
   // A bomba "pulsa" e pulsa mais rápido quando falta pouco para explodir.
   const frozen = (bomb.frozenTicks ?? 0) > 0;
@@ -416,7 +419,7 @@ function drawBomb(g: Graphics, bomb: BombState, tick: number): void {
 
   g.fillStyle(COLORS.shadow, 0.25);
   g.fillEllipse(cx, cy + 20, 40, 12);
-  if (bomb.pierce) {
+  if (bomb.pierce || mine) {
     // perfurante: mina marítima (como o ícone do item): corpo azul-marinho com oito pontas
     const spike = 8;
     for (let k = 0; k < 8; k++) {
@@ -431,7 +434,7 @@ function drawBomb(g: Graphics, bomb: BombState, tick: number): void {
       g.fillCircle(cx + ux * (tip - 1), cy + 3 + uy * (tip - 1), 2.4);
     }
   }
-  g.fillStyle(frozen ? 0x7fc8e8 : bomb.pierce ? 0x232a45 : COLORS.bombBody);
+  g.fillStyle(frozen ? 0x7fc8e8 : mine ? 0x4a4f36 : bomb.pierce ? 0x232a45 : COLORS.bombBody);
   g.fillCircle(cx, cy + 3, r);
   if (bomb.remote) {
     // bomba-relógio: luz roxa piscando no meio
@@ -464,6 +467,14 @@ function drawBomb(g: Graphics, bomb: BombState, tick: number): void {
     g.lineBetween(cx + 6, cy - r + 6, cx + 14, cy - r - 4);
     g.fillStyle(0xbdeeff);
     g.fillCircle(cx + 15, cy - r - 6, 3);
+    return;
+  }
+
+  if (mine) {
+    // Mina marinha: corpo verde-oliva com ferrugem e uma luz vermelha piscando no topo (em vez do pavio).
+    g.fillStyle(0x6b6f4a, 0.8).fillCircle(cx + 7, cy + 10, 5);
+    g.fillStyle(0x33361f, 1).fillRect(cx - 4, cy - r - 4, 8, 8);
+    g.fillStyle(tick % 24 < 12 ? 0xff3b3b : 0x7a1414, 1).fillCircle(cx, cy - r - 6, 5);
     return;
   }
 
@@ -545,7 +556,7 @@ function drawFlames(g: Graphics, flames: readonly FlameState[], tick: number): v
 export function drawEffects(g: Graphics, state: GameState, spriteFlames = false): void {
   g.clear();
   if (!spriteFlames) drawFlames(g, state.flames, state.tick);
-  for (const bomb of state.bombs) drawBomb(g, bomb, state.tick);
+  for (const bomb of state.bombs) drawBomb(g, bomb, state.tick, slideOffset(state, bomb), !!state.hazards?.currents);
   // Em equipes, um anel fino na cor do time embaixo de cada jogador (azul = time 1, vermelho = time 2).
   const teamGame = state.players.some((a) => state.players.some((b) => b.id !== a.id && b.team === a.team));
   if (teamGame) {
@@ -595,15 +606,20 @@ export function syncPlayerView(view: Movable, player: PlayerState, arena?: Arena
   // Personagem de corpo inteiro: a pose (andando, bomba, vitória, derrota) vem do animateSprite, que também decide quando some.
   if (isSpriteView(view)) {
     view.setVisible(animateSprite(view.scene, view, player, tick, celebrate ? 'win' : 'play'));
-    if (player.shieldTicks > 0) view.setAlpha(tick % 10 < 5 ? 0.35 : 1);
-    else view.setAlpha(player.ghostTicks > 0 ? 0.5 : 1);
+    view.setAlpha(playerAlpha(player, tick));
     return;
   }
   // Quem foi atingido some; o resultado da rodada aparece pela tela de resultado.
   view.setVisible(player.alive);
   // Fantasma (atravessando blocos): meio transparente. Recém-voltado à arena (proteção): pisca.
-  if (player.shieldTicks > 0) view.setAlpha(tick % 10 < 5 ? 0.35 : 1);
-  else view.setAlpha(player.ghostTicks > 0 ? 0.5 : 1);
+  view.setAlpha(playerAlpha(player, tick));
+}
+
+/** Transparência do jogador: invisível (Violeta) quase some; escudo pisca; fantasma fica meio transparente. */
+function playerAlpha(player: PlayerState, tick: number): number {
+  if ((player.invisibleTicks ?? 0) > 0) return player.invisibleTicks! < 60 && tick % 8 < 4 ? 0.5 : 0.1;
+  if (player.shieldTicks > 0) return tick % 10 < 5 ? 0.35 : 1;
+  return player.ghostTicks > 0 ? 0.5 : 1;
 }
 
 /** Cria o desenho do jogador (o personagem escolhido) já na posição correta. */

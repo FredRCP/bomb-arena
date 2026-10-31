@@ -96,12 +96,12 @@ describe('Templo Perdido: templo no meio do abismo', () => {
 
 describe('Templo Perdido: pedras gigantes', () => {
   const columns = boulderColumns(17);
-  it('só descem por colunas ímpares fora do abismo, uma de cada lado', () => {
+  it('cada pedra ocupa 3 colunas: o centro fica fora do abismo e da borda, uma pedra de cada lado', () => {
     expect(columns).toEqual([1, 3, 5, 11, 13, 15]);
-    expect(boulderSides(17)).toEqual([[1, 3, 5], [11, 13, 15]]);
+    expect(boulderSides(17)).toEqual([[2, 3, 4, 5], [11, 12, 13, 14]]);
   });
 
-  it('avisam, descem pelas duas colunas esmagando blocos, bombas e jogadores, e somem no fim', () => {
+  it('avisam, descem (3 colunas de largura) quebrando blocos e atordoando quem está no caminho, e somem no fim', () => {
     const state = make({ players: 2 });
     clear(state);
     state.round.phase = 'playing';
@@ -128,16 +128,18 @@ describe('Templo Perdido: pedras gigantes', () => {
       for (const e of drainEvents(state)) {
         if (e.type === 'boulderRoll') rolled += 1;
         if (e.type === 'boulderGone') gone += 1;
-        if (e.type === 'playerHit' && e.crushed) crushed += 1;
+        if (e.type === 'stunned') crushed += 1;
       }
       if (gone === 2) break;
     }
     expect(rolled).toBe(2);
     expect(gone).toBe(2);
     expect(crushed).toBe(2);
-    expect(a.alive).toBe(false);
-    expect(b.alive).toBe(false);
+    expect(a.alive).toBe(true);
+    expect(a.invertTicks).toBeGreaterThan(0); // atordoado: controles trocados
+    expect(b.invertTicks).toBeGreaterThan(0);
     expect(getCell(state.arena, left, 5)).toBe('empty');
+    expect(getCell(state.arena, left - 1, 5)).toBe('empty'); // as colunas ao lado também
     expect(boulder.phase).toBe('idle');
     expect([...boulder.last].sort()).toEqual([left, right].sort());
   });
@@ -153,11 +155,12 @@ describe('Templo Perdido: pedras gigantes', () => {
     const col = boulder.cols[0]!;
     p.x = col + 0.5;
     p.y = 6.5;
-    const sideways = col <= 3 ? 'right' : 'left';
-    for (let i = 0; i < 40; i++) step(state, { 1: { move: sideways } });
-    expect(Math.abs(p.x - (col + 0.5))).toBeGreaterThan(0.9);
+    const sideways = col <= 8 ? 'right' : 'left';
+    p.x = col + 0.5;
+    for (let i = 0; i < 60; i++) step(state, { 1: { move: sideways } });
+    expect(Math.abs(p.x - (col + 0.5))).toBeGreaterThan(1.9);
     for (let i = 0; i < BOULDER_WARN_TICKS + 200; i++) step(state);
-    expect(p.alive).toBe(true);
+    expect(p.invertTicks).toBe(0); // nem atordoado
   });
 
   it('a próxima queda é em outras colunas e vem depois do intervalo', () => {
@@ -190,8 +193,8 @@ describe('Templo Perdido: pedras gigantes', () => {
     step(state);
     const [left, right] = state.hazards!.boulder!.cols as [number, number];
     const map = buildHazards(state);
-    for (const col of [left, right]) expect(map.windows[cellIndex(state.arena, col, 6)]!.length).toBeGreaterThan(0);
-    const safe = [1, 3, 5, 11, 13, 15].find((c) => c !== left && c !== right)!;
+    for (const col of [left - 1, left, left + 1, right - 1, right, right + 1]) expect(map.windows[cellIndex(state.arena, col, 6)]!.length).toBeGreaterThan(0);
+    const safe = [1, 2, 3, 4, 5, 6, 10, 11, 12, 13, 14, 15].find((c) => Math.abs(c - left) > 1 && Math.abs(c - right) > 1)!;
     expect(map.windows[cellIndex(state.arena, safe, 6)]!.length).toBe(0);
   });
 });
@@ -201,5 +204,25 @@ describe('ilha dos piratas: convés', () => {
     const state = createGameState({ cols: 17, rows: 13, players: 2, seed: 3, sideline: false, hazards: { deck: true } });
     for (const c of deckCells(17, 13)) expect(getCell(state.arena, c.col, c.row)).toBe('empty');
     expect(deckCells(17, 13)).toHaveLength(25);
+  });
+});
+
+describe('bombas em cadeia com fogo aceso', () => {
+  it('uma bomba chutada para dentro de uma chama explode junto', () => {
+    const state = make({ players: 2 });
+    clear(state);
+    state.round.phase = 'playing';
+    state.flames.push({ col: 3, row: 11, ticksLeft: 30, owners: [2] });
+    state.bombs.push({ owner: 1, col: 2, row: 11, ticksLeft: 120, range: 1, walkThrough: [], slide: { direction: 'right', ticks: 0 } });
+    state.players[0]!.x = 1.5;
+    state.players[0]!.y = 9.5;
+    state.players[1]!.x = 9.5;
+    state.players[1]!.y = 9.5;
+    let exploded = false;
+    for (let i = 0; i < 30; i++) {
+      step(state);
+      if (drainEvents(state).some((e) => e.type === 'bombExploded')) exploded = true;
+    }
+    expect(exploded).toBe(true);
   });
 });

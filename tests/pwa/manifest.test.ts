@@ -11,7 +11,7 @@ const manifest = JSON.parse(readFileSync('public/manifest.webmanifest', 'utf8'))
 
 describe('PWA', () => {
   it('manifesto: nome, abre na raiz relativa e é instalável (standalone, ícones 192 e 512)', () => {
-    expect(manifest.name).toBe('Bomb Arena');
+    expect(manifest.name).toBe('Bomber Family: Aventura em Família');
     expect(manifest.start_url).toBe('./'); // relativo: funciona em qualquer subpasta
     expect(manifest.display).toBe('standalone');
     const sizes = manifest.icons.map((icon) => icon.sizes);

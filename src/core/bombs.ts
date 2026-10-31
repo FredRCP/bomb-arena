@@ -131,8 +131,9 @@ export function playerBlocksCell(state: GameState, col: number, row: number): bo
 export function slideProjection(state: GameState, bomb: BombState, ticks: number): { col: number; row: number } {
   if (!bomb.slide) return { col: bomb.col, row: bomb.row };
   const { dc, dr } = VECTORS[bomb.slide.direction];
-  const untilFirst = KICK_SLIDE_TICKS - bomb.slide.ticks;
-  const wanted = ticks < untilFirst ? 0 : 1 + Math.floor((ticks - untilFirst) / KICK_SLIDE_TICKS);
+  const interval = bomb.slide.interval ?? KICK_SLIDE_TICKS;
+  const untilFirst = interval - bomb.slide.ticks;
+  const wanted = ticks < untilFirst ? 0 : 1 + Math.floor((ticks - untilFirst) / interval);
   let col = bomb.col;
   let row = bomb.row;
   for (let k = 0; k < wanted; k++) {
@@ -151,12 +152,25 @@ export function kickDestination(state: GameState, bomb: BombState, direction: Di
   return slideProjection(state, { ...bomb, slide: { direction, ticks: 0 } }, 1_000_000);
 }
 
+/**
+ * Deslocamento (em células, de -1 a 1) para DESENHAR uma bomba que desliza: ela avança de forma contínua em direção à
+ * próxima célula (o estado só muda de célula a cada KICK_SLIDE_TICKS passos), mas só se a próxima ainda estiver livre.
+ * É só visual: não altera o estado.
+ */
+export function slideOffset(state: GameState, bomb: BombState): { x: number; y: number } {
+  if (!bomb.slide) return { x: 0, y: 0 };
+  const { dc, dr } = VECTORS[bomb.slide.direction];
+  if (!isFreeForBomb(state, bomb.col + dc, bomb.row + dr) || playerBlocksCell(state, bomb.col + dc, bomb.row + dr)) return { x: 0, y: 0 };
+  const t = Math.min(1, bomb.slide.ticks / (bomb.slide.interval ?? KICK_SLIDE_TICKS));
+  return { x: dc * t, y: dr * t };
+}
+
 /** Bombas chutadas andam uma célula a cada KICK_SLIDE_TICKS passos e param ao bater em parede, bloco, bomba ou jogador. */
 export function advanceSlidingBombs(state: GameState): void {
   for (const bomb of state.bombs) {
     if (!bomb.slide) continue;
     bomb.slide.ticks += 1;
-    if (bomb.slide.ticks < KICK_SLIDE_TICKS) continue;
+    if (bomb.slide.ticks < (bomb.slide.interval ?? KICK_SLIDE_TICKS)) continue;
     const { dc, dr } = VECTORS[bomb.slide.direction];
     const col = bomb.col + dc;
     const row = bomb.row + dr;
@@ -167,6 +181,7 @@ export function advanceSlidingBombs(state: GameState): void {
     bomb.col = col;
     bomb.row = row;
     bomb.slide.ticks = 0;
+    if (bomb.slide.interval) bomb.slide = null; // levada pela correnteza: a célula seguinte da faixa decide se continua
   }
 }
 

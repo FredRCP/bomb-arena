@@ -61,9 +61,9 @@ export class TitleScene extends Phaser.Scene {
     this.addDecorations();
 
     this.add
-      .text(WIDTH / 2, HEIGHT * 0.22, 'BOMB ARENA', { fontFamily: FONT, fontSize: '110px', fontStyle: 'bold', color: '#ffe66d', stroke: '#1b1f3b', strokeThickness: 12 })
+      .text(WIDTH / 2, HEIGHT * 0.22, 'BOMBER FAMILY', { fontFamily: FONT, fontSize: '110px', fontStyle: 'bold', color: '#ffe66d', stroke: '#1b1f3b', strokeThickness: 12 })
       .setOrigin(0.5);
-    this.add.text(WIDTH / 2, HEIGHT * 0.22 + 78, 'nome provisório', { fontFamily: FONT, fontSize: '24px', color: '#e3e7ff' }).setOrigin(0.5);
+    this.add.text(WIDTH / 2, HEIGHT * 0.22 + 78, 'aventura em família', { fontFamily: FONT, fontSize: '24px', color: '#e3e7ff' }).setOrigin(0.5);
 
     const prompt = this.add
       .text(WIDTH / 2, HEIGHT * 0.41, 'Pressione qualquer tecla', { fontFamily: FONT, fontSize: '36px', fontStyle: 'bold', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 5 })

@@ -16,9 +16,9 @@ interface Layer {
 }
 
 const LAYERS: readonly Layer[] = [
-  { count: 110, scale: [0.3, 0.5], speed: [26, 44], alpha: [0.55, 0.8], sway: 10 },
-  { count: 70, scale: [0.55, 0.85], speed: [56, 86], alpha: [0.7, 0.9], sway: 18 },
-  { count: 26, scale: [1.0, 1.7], speed: [110, 160], alpha: [0.6, 0.85], sway: 28 },
+  { count: 110, scale: [0.18, 0.3], speed: [26, 44], alpha: [0.55, 0.8], sway: 10 },
+  { count: 70, scale: [0.32, 0.5], speed: [56, 86], alpha: [0.7, 0.9], sway: 18 },
+  { count: 26, scale: [0.6, 1.0], speed: [110, 160], alpha: [0.6, 0.85], sway: 28 },
 ];
 
 interface Flake {

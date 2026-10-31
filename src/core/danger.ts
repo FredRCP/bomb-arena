@@ -1,7 +1,8 @@
 import { BOMB_FUSE_TICKS, FLAME_TICKS } from '../config/bombs';
-import { BOULDER_SPEED } from '../config/hazards';
+import { BOULDER_SPEED, BRIDGE_DOWN_TICKS } from '../config/hazards';
 import { cellIndex, getCell } from './arena';
 import { slideProjection } from './bombs';
+import { lavaFlowTicks } from './extraHazards';
 import { blastOf } from './explosions';
 import { STEP_DISTANCE, stepDistanceOf } from './movement';
 import { closingHazards } from './shrink';
@@ -83,7 +84,28 @@ export function buildHazards(state: GameState, extraBomb?: BombState, selfId?: P
     const rollTicks = Math.ceil((arena.rows - 0.5) / BOULDER_SPEED);
     const from = boulder.phase === 'warn' ? Math.max(0, boulder.timer - 30) : 0;
     const to = boulder.phase === 'warn' ? boulder.timer + rollTicks : Math.ceil((arena.rows - boulder.y) / BOULDER_SPEED);
-    for (const col of boulder.cols) for (let row = 1; row < arena.rows - 1; row++) windows[cellIndex(arena, col, row)]!.push([from, to]);
+    for (const center of boulder.cols) for (let col = center - 1; col <= center + 1; col++) for (let row = 1; row < arena.rows - 1; row++) if (getCell(arena, col, row) !== 'wall') windows[cellIndex(arena, col, row)]!.push([from, to]);
+  }
+
+  // Vulcão: a célula onde a bola vai cair é perigosa no instante da queda; a lava que vai escorrer logo também.
+  const volcano = state.hazards?.volcano;
+  if (volcano) for (const shot of volcano.shots) windows[cellIndex(arena, shot.col, shot.row)]!.push([Math.max(0, shot.ticks - 6), shot.ticks + 12]);
+  const cannon = state.hazards?.cannon;
+  if (cannon) for (const shot of cannon.shots) windows[cellIndex(arena, shot.col, shot.row)]!.push([Math.max(0, shot.ticks - 6), shot.ticks + 12]);
+  // Rio de lava: a coluna é perigosa do aviso até ele passar.
+  const lava = state.hazards?.lava;
+  if (lava && lava.phase !== 'idle') {
+    const flow = lavaFlowTicks(arena.rows);
+    const from = lava.phase === 'warn' ? Math.max(0, lava.timer - 30) : 0;
+    const to = lava.phase === 'warn' ? lava.timer + flow : Math.ceil(flow * (lava.dir === 1 ? (arena.rows + 4 - lava.y) : lava.y + 4) / (arena.rows + 4));
+    for (let row = 1; row < arena.rows - 1; row++) if (getCell(arena, lava.col, row) !== 'wall') windows[cellIndex(arena, lava.col, row)]!.push([from, to]);
+  }
+  // Ponte do templo que vai cair: perigosa do aviso até voltar.
+  const fall = state.hazards?.bridgeFall;
+  const bridges = state.hazards?.bridges;
+  if (fall && bridges && fall.phase !== 'idle') {
+    const to = fall.phase === 'warn' ? fall.timer + BRIDGE_DOWN_TICKS : fall.timer;
+    for (const index of bridges) if (Math.floor(index / arena.cols) === fall.row) windows[index]!.push([Math.max(0, (fall.phase === 'warn' ? fall.timer : 0) - 60), to]);
   }
 
   // Morte súbita: as células que vão virar parede são perigosas dali em diante, para sempre.

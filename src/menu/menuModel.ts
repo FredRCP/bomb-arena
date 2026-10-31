@@ -17,8 +17,8 @@ export const DEFAULT_MUSIC = 5;
 export interface MenuSettings {
   /** Pessoas: 1 (sozinho), 2 (mesmo teclado) ou 3 a 5 (com controles de videogame). */
   players: 1 | 2 | 3 | 4 | 5;
-  /** Inimigos do computador. Com 1 pessoa: 1 a 4; com 2 pessoas: 0 a 3 (no máximo 5 jogadores no total). */
-  enemies: 0 | 1 | 2 | 3 | 4;
+  /** Inimigos do computador. Com 1 pessoa: 1 a 6; com 2 pessoas: 0 a 5 (no máximo 7 jogadores no total, e a fase pode permitir menos). */
+  enemies: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   difficulty: AiDifficulty;
   /** Rodadas que é preciso vencer para ganhar a partida: 1 (partida única), 2 ou 3. */
   wins: 1 | 2 | 3;
@@ -93,9 +93,9 @@ export function stepNumber(screen: MenuScreen, settings: MenuSettings): number |
 }
 
 /** Máximo de jogadores na arena, somando pessoas e computador. */
-export const MAX_TOTAL_PLAYERS = 5;
+export const MAX_TOTAL_PLAYERS = 7;
 
-/** Quantos inimigos o modo permite: com 1 pessoa, de 1 a 4; com 2 pessoas, de 0 a 3. */
+/** Quantos inimigos o modo permite: com 1 pessoa, de 1 a 6; com 2 pessoas, de 0 a 5 (a fase escolhida pode limitar o total). */
 export function enemyRange(players: number): { min: number; max: number } {
   return { min: players === 1 ? 1 : 0, max: MAX_TOTAL_PLAYERS - players };
 }

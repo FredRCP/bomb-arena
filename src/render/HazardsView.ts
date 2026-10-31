@@ -14,6 +14,8 @@ export class HazardsView {
   private iceKey = '';
   /** Brilho de fogo por cima da pirâmide (para ninguém ser pego por uma chama escondida no túnel). */
   private readonly glow: Phaser.GameObjects.Graphics;
+  /** Redemoinhos da areia movediça (Egito). */
+  private readonly sand: Phaser.GameObjects.Graphics;
   /** Pedra gigante do Templo Perdido (desenhada por cima dos jogadores). */
   private readonly boulderG: Phaser.GameObjects.Graphics;
 
@@ -21,6 +23,7 @@ export class HazardsView {
     this.g = scene.add.graphics().setDepth(9);
     this.ice = scene.add.graphics().setDepth(0.8);
     this.glow = scene.add.graphics().setDepth(11);
+    this.sand = scene.add.graphics().setDepth(0.55);
     this.drawSlippery(state);
     this.drawChasm(state);
     this.boulderG = scene.add.graphics().setDepth(10.2);
@@ -118,33 +121,33 @@ export class HazardsView {
     if (boulder.phase === 'warn') {
       const left = boulder.timer / 60;
       const on = Math.floor(left * (left < 1 ? 8 : 4)) % 2 === 0;
-      g.fillStyle(0xff3b3b, on ? 0.2 : 0.07).fillRect(col * TILE_SIZE, TILE_SIZE, TILE_SIZE, height - 2 * TILE_SIZE);
+      g.fillStyle(0xff3b3b, on ? 0.2 : 0.07).fillRect((col - 1) * TILE_SIZE, TILE_SIZE, 3 * TILE_SIZE, height - 2 * TILE_SIZE);
       // A pedra aparece rachando o teto: poeira e pedrinhas caindo no topo da coluna.
       const progress = 1 - boulder.timer / BOULDER_WARN_TICKS;
-      for (let k = 0; k < 6; k++) {
+      for (let k = 0; k < 10; k++) {
         const fall = ((state.tick * 3 + k * 37) % 60) / 60;
-        g.fillStyle(0xb9a98a, 0.8).fillCircle(x + Math.sin(k * 2.3) * 22, TILE_SIZE * 0.4 + fall * TILE_SIZE * 1.3, 2 + (k % 3));
+        g.fillStyle(0xb9a98a, 0.8).fillCircle(x + Math.sin(k * 2.3) * 70, TILE_SIZE * 0.4 + fall * TILE_SIZE * 1.3, 2 + (k % 3));
       }
-      g.fillStyle(0x7d7364, 0.9).fillCircle(x, TILE_SIZE * 0.2, 14 + progress * 18); // a pedra espiando por cima
-      g.lineStyle(3, 0x2b261c, 1).strokeCircle(x, TILE_SIZE * 0.2, 14 + progress * 18);
+      g.fillStyle(0x7d7364, 0.9).fillCircle(x, TILE_SIZE * 0.1, 28 + progress * 40); // a pedra espiando por cima
+      g.lineStyle(3, 0x2b261c, 1).strokeCircle(x, TILE_SIZE * 0.1, 28 + progress * 40);
       return;
     }
+    // Pedra de 3 colunas de largura (raio 96).
+    const R = 94;
     const y = boulder.y * TILE_SIZE;
-    const spin = boulder.y * 2.4;
-    for (let k = 1; k <= 5; k++) g.fillStyle(0xcdbf9f, 0.35 - k * 0.05).fillCircle(x + Math.sin(k * 3.1 + y * 0.02) * 26, y - 40 - k * 14, 10 + k * 3); // poeira
-    g.fillStyle(0x1b1f3b, 0.3).fillEllipse(x + 6, y + 36, 96, 22); // sombra
-    g.fillStyle(0x7b7466, 1).fillCircle(x, y, 47);
-    g.fillStyle(0x938b7a, 1).fillCircle(x - 9, y - 11, 34);
-    g.fillStyle(0xc2baa7, 0.55).fillCircle(x - 17, y - 21, 14);
-    g.fillStyle(0x5f9a3f, 0.85).fillEllipse(x + Math.cos(spin) * 22, y + Math.sin(spin) * 22, 20, 12); // musgo girando
-    g.fillStyle(0x5f9a3f, 0.7).fillEllipse(x + Math.cos(spin + 2.4) * 30, y + Math.sin(spin + 2.4) * 30, 14, 9);
-    g.lineStyle(3, 0x403a2e, 0.9);
+    const spin = boulder.y * 1.3;
+    for (let k = 1; k <= 7; k++) g.fillStyle(0xcdbf9f, 0.35 - k * 0.04).fillCircle(x + Math.sin(k * 3.1 + y * 0.02) * 60, y - 90 - k * 22, 18 + k * 6); // poeira
+    g.fillStyle(0x1b1f3b, 0.3).fillEllipse(x + 10, y + 74, 200, 40); // sombra
+    g.fillStyle(0x7b7466, 1).fillCircle(x, y, R);
+    g.fillStyle(0x938b7a, 1).fillCircle(x - 18, y - 22, 68);
+    g.fillStyle(0xc2baa7, 0.55).fillCircle(x - 34, y - 42, 28);
+    g.fillStyle(0x5f9a3f, 0.85).fillEllipse(x + Math.cos(spin) * 44, y + Math.sin(spin) * 44, 40, 24); // musgo girando
+    g.fillStyle(0x5f9a3f, 0.7).fillEllipse(x + Math.cos(spin + 2.4) * 60, y + Math.sin(spin + 2.4) * 60, 28, 18);
+    g.lineStyle(5, 0x403a2e, 0.9);
     for (const a of [0.6, 2.4, 4.1]) {
-      const r1 = 8;
-      const r2 = 30;
-      g.lineBetween(x + Math.cos(spin + a) * r1, y + Math.sin(spin + a) * r1, x + Math.cos(spin + a + 0.3) * r2, y + Math.sin(spin + a + 0.3) * r2);
+      g.lineBetween(x + Math.cos(spin + a) * 16, y + Math.sin(spin + a) * 16, x + Math.cos(spin + a + 0.3) * 60, y + Math.sin(spin + a + 0.3) * 60);
     }
-    g.lineStyle(4, 0x2b261c, 1).strokeCircle(x, y, 47);
+    g.lineStyle(6, 0x2b261c, 1).strokeCircle(x, y, R);
   }
 
   /** Faixa fixa que marca a fileira da armadilha (pequenos buracos nas laterais, como a saída dos dardos). */
@@ -238,14 +241,20 @@ export class HazardsView {
     for (const roller of state.hazards?.rollers ?? []) {
       const x = roller.x * TILE_SIZE;
       const y = roller.y * TILE_SIZE;
-      g.fillStyle(0x1b1f3b, 0.25).fillEllipse(x, y + 22, 44, 12); // sombra
+      if (roller.kind === 'penguin') g.fillStyle(0x1b1f3b, 0.25).fillEllipse(x, y + 22, 44, 12); // sombra
       if (roller.kind === 'snowball') {
-        const spin = roller.y * 5;
-        g.fillStyle(0xdff3ff, 1).fillCircle(x, y, 27);
-        g.fillStyle(0xffffff, 1).fillCircle(x - 7, y - 8, 14);
-        g.lineStyle(3, 0x8cc7e8, 1).strokeCircle(x, y, 27);
-        g.lineStyle(3, 0x8cc7e8, 0.9).lineBetween(x + Math.cos(spin) * 8, y + Math.sin(spin) * 8, x + Math.cos(spin) * 20, y + Math.sin(spin) * 20);
-        g.lineBetween(x + Math.cos(spin + 2.1) * 8, y + Math.sin(spin + 2.1) * 8, x + Math.cos(spin + 2.1) * 20, y + Math.sin(spin + 2.1) * 20);
+        // Bola de neve gigante (o dobro do tamanho de antes).
+        const spin = roller.y * 2.5;
+        const R = 54;
+        g.fillStyle(0x1b1f3b, 0.25).fillEllipse(x, y + 44, 96, 24); // sombra
+        g.fillStyle(0xdff3ff, 1).fillCircle(x, y, R);
+        g.fillStyle(0xffffff, 1).fillCircle(x - 14, y - 16, 28);
+        g.lineStyle(5, 0x8cc7e8, 1).strokeCircle(x, y, R);
+        g.lineStyle(5, 0x8cc7e8, 0.9);
+        for (let k = 0; k < 3; k++) {
+          const a = spin + k * 2.1;
+          g.lineBetween(x + Math.cos(a) * 16, y + Math.sin(a) * 16, x + Math.cos(a) * 40, y + Math.sin(a) * 40);
+        }
       } else {
         // Pinguim de barriga para baixo, olhando para a frente (para baixo na tela).
         g.fillStyle(0x1f2540, 1).fillEllipse(x, y, 40, 54);
@@ -259,7 +268,39 @@ export class HazardsView {
     }
   }
 
+  /** Areia movediça: espirais girando como uma centrífuga (cada célula é um redemoinho). */
+  private drawQuicksand(state: GameState): void {
+    const g = this.sand;
+    g.clear();
+    const cells = state.hazards?.quicksand;
+    if (!cells || cells.length === 0) return;
+    const cols = state.arena.cols;
+    const t = state.tick;
+    for (const index of cells) {
+      const cx = ((index % cols) + 0.5) * TILE_SIZE;
+      const cy = (Math.floor(index / cols) + 0.5) * TILE_SIZE;
+      g.fillStyle(0x6b4a1c, 0.18).fillCircle(cx, cy, 30);
+      for (let arm = 0; arm < 3; arm++) {
+        const base = t * 0.09 + (arm * Math.PI * 2) / 3;
+        let px = cx;
+        let py = cy;
+        for (let k = 1; k <= 14; k++) {
+          const u = k / 14;
+          const angle = base - u * 4.2; // o braço se enrola para o centro
+          const r = 3 + u * 28;
+          const nx = cx + Math.cos(angle) * r;
+          const ny = cy + Math.sin(angle) * r;
+          g.lineStyle(4 - u * 2, arm === 0 ? 0xf2d08a : 0x8a6428, 0.55 - u * 0.2).lineBetween(px, py, nx, ny);
+          px = nx;
+          py = ny;
+        }
+      }
+      g.fillStyle(0x3a2608, 0.55).fillCircle(cx, cy, 5);
+    }
+  }
+
   update(state: GameState): void {
+    this.drawQuicksand(state);
     this.drawIce(state);
     this.drawBoulder(state);
     const tunnel = state.hazards?.tunnel;

@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { DART_FIRST_DELAY_TICKS, DART_PERIOD_TICKS, DART_WARN_TICKS, QUICKSAND_SPEED_FACTOR } from '../../src/config/hazards';
+import { DART_SLOW_TICKS, DART_FIRST_DELAY_TICKS, DART_PERIOD_TICKS, DART_WARN_TICKS, QUICKSAND_SPEED_FACTOR } from '../../src/config/hazards';
 import { STAGES, stageById } from '../../src/config/stages';
-import { cellIndex, createGameState, drainEvents, getCell, recordEvents, createScoreboard, speedFactorAt, step, STEP_DISTANCE } from '../../src/core';
+import { cellIndex, createGameState, drainEvents, getCell, speedFactorAt, step, STEP_DISTANCE } from '../../src/core';
 import type { GameState } from '../../src/core';
 
 const EGYPT = stageById('egypt');
@@ -17,27 +17,27 @@ function runUntil(state: GameState, phase: 'warn' | 'fly' | 'idle', max = 5000):
 }
 
 describe('arenas por fase: tamanho e jogadores', () => {
-  it('toda fase tem tamanho ímpar, até 5 jogadores e a arena 17 x 13 nasce válida com os 5 jogadores', () => {
+  it('toda fase tem tamanho ímpar, até 7 jogadores e a arena 17 x 13 nasce válida com 7 jogadores', () => {
     for (const stage of STAGES) {
       expect(stage.cols % 2).toBe(1);
       expect(stage.rows % 2).toBe(1);
       expect(stage.maxPlayers).toBeGreaterThanOrEqual(2);
-      expect(stage.maxPlayers).toBeLessThanOrEqual(5);
+      expect(stage.maxPlayers).toBeLessThanOrEqual(7);
     }
-    const state = createGameState({ cols: 17, rows: 13, players: 3, enemies: 2, seed: 5 });
+    const state = createGameState({ cols: 17, rows: 13, players: 3, enemies: 4, seed: 5 });
     expect(state.arena.cols).toBe(17);
     for (const player of state.players) {
       expect(getCell(state.arena, Math.floor(player.x), Math.floor(player.y))).toBe('empty'); // ninguém nasce dentro de pilar
     }
-    // O quinto jogador (centro) tem a coluna do meio par: o pilar do centro dá lugar a ele.
-    const fifth = state.players[4]!;
-    expect([Math.floor(fifth.x), Math.floor(fifth.y)]).toEqual([8, 6]);
+    // O sétimo jogador (centro) tem a coluna do meio par: o pilar do centro dá lugar a ele.
+    const seventh = state.players[6]!;
+    expect([Math.floor(seventh.x), Math.floor(seventh.y)]).toEqual([8, 6]);
   });
 
   it('arenas 15 e 19 continuam como antes (centro é a mesma célula livre)', () => {
     for (const cols of [15, 19]) {
-      const state = createGameState({ cols, rows: 13, players: 3, enemies: 2, seed: 1 });
-      expect(getCell(state.arena, Math.floor(state.players[4]!.x), Math.floor(state.players[4]!.y))).toBe('empty');
+      const state = createGameState({ cols, rows: 13, players: 3, enemies: 4, seed: 1 });
+      expect(getCell(state.arena, Math.floor(state.players[6]!.x), Math.floor(state.players[6]!.y))).toBe('empty');
     }
   });
 
@@ -102,6 +102,7 @@ describe('Egito: armadilha de dardos', () => {
   it('primeiro aviso ~18 s, disparo 2 s depois, e os disparos seguintes alternam o lado', () => {
     const state = egypt();
     const trap = state.hazards!.dartTrap!;
+    trap.dir = 1; // o primeiro lado é sorteado a cada rodada
     runUntil(state, 'warn');
     expect(state.tick).toBeCloseTo(DART_FIRST_DELAY_TICKS - DART_WARN_TICKS, -1);
     expect(drainEvents(state).some((e) => e.type === 'dartWarn')).toBe(true);
@@ -117,7 +118,7 @@ describe('Egito: armadilha de dardos', () => {
     expect(state.tick - idleAt).toBeCloseTo(DART_PERIOD_TICKS - DART_WARN_TICKS, -1);
   });
 
-  it('o dardo elimina quem está na fileira (sem pontos de "se matou") e poupa quem está em outra', () => {
+  it('o dardo NÃO mata: deixa quem está na fileira na velocidade mínima por 10 s e poupa quem está em outra', () => {
     const state = egypt();
     const row = state.hazards!.dartTrap!.row;
     const [inRow, elsewhere] = state.players;
@@ -129,16 +130,29 @@ describe('Egito: armadilha de dardos', () => {
     drainEvents(state);
     runUntil(state, 'idle');
     const events = drainEvents(state);
-    expect(inRow!.alive).toBe(false);
-    expect(elsewhere!.alive).toBe(true);
-    const hit = events.find((e) => e.type === 'playerHit');
-    expect(hit).toMatchObject({ playerId: inRow!.id, killers: [], dart: true });
-    const board = createScoreboard(state.players);
-    recordEvents(board, events, state.players);
-    expect(board[inRow!.id]).toMatchObject({ points: 0, deaths: 1 });
+    expect(inRow!.alive).toBe(true);
+    expect(inRow!.slowTicks).toBeGreaterThan(DART_SLOW_TICKS - 60);
+    expect(elsewhere!.slowTicks).toBe(0);
+    expect(events.find((e) => e.type === 'slowed')).toMatchObject({ playerId: inRow!.id });
+    expect(events.some((e) => e.type === 'playerHit')).toBe(false);
   });
 
-  it('o colete aguenta um dardo; o escudo e o super-herói protegem', () => {
+  it('lento: anda na velocidade mínima e volta ao normal depois de 10 s', () => {
+    const state = egypt();
+    const p = state.players[0]!;
+    for (let c = 1; c < 16; c++) state.arena.cells[cellIndex(state.arena, c, 1)] = 'empty';
+    p.x = 2.5;
+    p.y = 1.5;
+    const startX = p.x;
+    for (let i = 0; i < 30; i++) step(state, { 1: { move: 'right' } });
+    const normal = p.x - startX;
+    p.slowTicks = 600;
+    const slowStart = p.x;
+    for (let i = 0; i < 30; i++) step(state, { 1: { move: 'right' } });
+    expect(p.x - slowStart).toBeLessThan(normal * 0.9);
+  });
+
+  it('o escudo e o super-herói protegem da lentidão do dardo', () => {
     const state = egypt({ players: 3 });
     const row = state.hazards!.dartTrap!.row;
     const [vest, shield, hero] = state.players;
@@ -146,19 +160,18 @@ describe('Egito: armadilha de dardos', () => {
       p.x = 8.5 + (p === vest ? 0 : 0);
       p.y = row + 0.5;
     }
-    vest!.vest = true;
     shield!.shieldTicks = 5000;
     hero!.heroTicks = 5000;
     runUntil(state, 'fly');
     runUntil(state, 'idle');
-    expect(vest!.alive).toBe(true);
-    expect(vest!.vest).toBe(false);
-    expect(shield!.alive).toBe(true);
-    expect(hero!.alive).toBe(true);
+    expect(vest!.slowTicks).toBeGreaterThan(0);
+    expect(shield!.slowTicks).toBe(0);
+    expect(hero!.slowTicks).toBe(0);
   });
 
   it('o dardo sai do lado certo: dir -1 começa na direita', () => {
     const state = egypt();
+    state.hazards!.dartTrap!.dir = 1;
     runUntil(state, 'fly');
     runUntil(state, 'idle');
     runUntil(state, 'fly');

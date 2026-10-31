@@ -42,11 +42,14 @@ import { FlameSprites } from '../render/FlameSprites';
 import { ItemSprites, hasItemIcon } from '../render/ItemSprites';
 import { FLAME_TICKS } from '../config/bombs';
 import { createHud } from '../render/Hud';
-import { SCREEN_HEIGHT, SCREEN_WIDTH, TOP_HEIGHT, placeArena, sideWidthFor } from '../render/layout';
+import { TOP_HEIGHT, placeArena, sideWidthFor } from '../render/layout';
 import { HazardsView } from '../render/HazardsView';
 import { ElephantView } from '../render/ElephantView';
 import { PlaneView } from '../render/PlaneView';
 import { SnowView } from '../render/SnowView';
+import { BubblesView } from '../render/BubblesView';
+import { EmbersView } from '../render/EmbersView';
+import { ExtraHazardsView } from '../render/ExtraHazardsView';
 import { POWER_LABELS } from '../config/powers';
 import { addMenuBackground } from '../render/menuBackground';
 import { has, themeById, themeKey } from '../render/theme';
@@ -78,6 +81,9 @@ export interface GameSession {
 /** Quanto a semente avança quando começa uma partida nova (para a revanche não repetir as mesmas arenas). */
 const SEED_STEP_PER_MATCH = 10;
 
+/** Passos só com o fundo no começo da partida (2,5 s). */
+const PREROLL_TICKS = 150;
+
 export class GameScene extends Phaser.Scene {
   private gameState!: GameState;
   private session!: GameSession;
@@ -98,6 +104,9 @@ export class GameScene extends Phaser.Scene {
   private elephantView!: ElephantView;
   private planeView!: PlaneView;
   private snowView: SnowView | null = null;
+  private bubblesView: BubblesView | null = null;
+  private embersView: EmbersView | null = null;
+  private extraHazards!: ExtraHazardsView;
   /** A música da morte súbita já começou nesta rodada? */
   private suddenMusic = false;
   private hud!: Hud;
@@ -109,6 +118,9 @@ export class GameScene extends Phaser.Scene {
   private overlayShown = false;
   /** Passos que faltam da contagem regressiva do início (o jogo só começa em zero). */
   private countdownTicks = 0;
+  /** Passos de "só o fundo" antes da contagem (a arena aparece depois). */
+  private prerollTicks = 0;
+  private freshStart = true;
   private countdownText: Phaser.GameObjects.Text | null = null;
   private lastCountdownShown = '';
   private pauseObjects: Phaser.GameObjects.GameObject[] = [];
@@ -132,6 +144,7 @@ export class GameScene extends Phaser.Scene {
    * `?players=1&enemies=2` — monta uma a partir do endereço, com uma partida nova.
    */
   init(data?: Partial<GameSession>): void {
+    this.freshStart = !data?.scores;
     this.session = {
       config: data?.config ?? parseGameConfig(window.location.search),
       match: data?.match ?? createMatch(data?.config?.wins ?? parseGameConfig(window.location.search).wins),
@@ -186,10 +199,15 @@ export class GameScene extends Phaser.Scene {
     }
 
     placeArena(this, stage.cols);
+    let backdrop = false;
     const theme = themeById(themeIdOf(stage));
     if (theme.background && has(this, theme, 'background')) {
       // Fundo da fase: uma imagem do tamanho da tela (a câmera desliza, por isso começa no canto da tela, e não em 0,0).
-      this.add.image(this.cameras.main.scrollX, this.cameras.main.scrollY, themeKey(theme, 'background')).setOrigin(0, 0).setDisplaySize(SCREEN_WIDTH, SCREEN_HEIGHT).setDepth(-100);
+      // Fica numa cena por baixo da partida (BackdropScene): a câmera da partida é transparente e a arena pode sumir por uns segundos.
+      this.scene.launch('Backdrop', { key: themeKey(theme, 'background'), title: this.freshStart ? stage.name : '' });
+      this.scene.sendToBack('Backdrop');
+      this.cameras.main.setAlpha(1);
+      backdrop = true;
     } else {
       addMenuBackground(this, undefined, false); // fundo colorido da tela (sem bolhas, para não distrair)
     }
@@ -197,6 +215,9 @@ export class GameScene extends Phaser.Scene {
     this.lastFrameMs = performance.now();
     this.overlayShown = false;
     this.countdownTicks = (config.countdown ?? COUNTDOWN_SECONDS) * TICKS_PER_SECOND;
+    // Começo de partida: uns 2,5 s só com o fundo da fase (e o nome dela) antes de a arena aparecer.
+    this.prerollTicks = backdrop && this.freshStart && this.countdownTicks > 0 ? PREROLL_TICKS : 0;
+    if (this.prerollTicks > 0) this.cameras.main.setAlpha(0);
     this.countdownText = null;
     this.lastCountdownShown = '';
     this.pauseObjects = [];
@@ -214,6 +235,9 @@ export class GameScene extends Phaser.Scene {
     this.elephantView = new ElephantView(this);
     this.planeView = new PlaneView(this);
     this.snowView = theme.snow ? new SnowView(this) : null;
+    this.bubblesView = theme.bubbles ? new BubblesView(this) : null;
+    this.embersView = theme.embers ? new EmbersView(this) : null;
+    this.extraHazards = new ExtraHazardsView(this, this.gameState, theme.id);
     this.suddenMusic = false;
     for (const player of this.gameState.players) {
       this.playerViews.set(player.id, createPlayerView(this, player, characterById(this.characters[player.id])));
@@ -245,6 +269,7 @@ export class GameScene extends Phaser.Scene {
     this.events.once(Phaser.Scenes.Events.SHUTDOWN, () => {
       this.input.keyboard?.off('keydown', onPauseKey);
       this.keyboardInput.destroy();
+      this.scene.stop('Backdrop');
       music.release();
     });
 
@@ -300,7 +325,14 @@ export class GameScene extends Phaser.Scene {
       return;
     }
 
-    const ticks = this.stepper.advance(delta);
+    let ticks = this.stepper.advance(delta);
+    if (this.prerollTicks > 0) {
+      const used = Math.min(ticks, this.prerollTicks);
+      this.prerollTicks -= used;
+      ticks -= used;
+      this.cameras.main.setAlpha(this.prerollTicks > 30 ? 0 : 1 - this.prerollTicks / 30);
+      this.keyboardInput.getIntents();
+    }
     if (paused) this.pollPausePads(time);
     if (paused) {
       this.keyboardInput.getIntents(); // descarta apertos de bomba feitos durante a pausa
@@ -323,7 +355,7 @@ export class GameScene extends Phaser.Scene {
 
     // Contagem regressiva: os passos do relógio são gastos nela e o jogo fica parado (para a IA não sair na frente).
     let playTicks = ticks;
-    if (this.countdownTicks > 0) {
+    if (this.countdownTicks > 0 && this.prerollTicks === 0) {
       this.keyboardInput.getIntents(); // descarta apertos feitos durante a contagem
       const used = Math.min(ticks, this.countdownTicks);
       this.countdownTicks -= used;
@@ -528,6 +560,17 @@ export class GameScene extends Phaser.Scene {
         this.cameras.main.shake(1400, 0.0025);
       }
       if (event.type === 'dartFired') heard.add('place');
+      if (event.type === 'volcanoErupt') heard.add('explode');
+      if (event.type === 'lavaShot') heard.add('tick');
+      if (event.type === 'lavaImpact') heard.add('explode');
+      if (event.type === 'lavaRiver') heard.add('tick');
+      if (event.type === 'bridgeWarn') {
+        heard.add('tick');
+        this.cameras.main.shake(3000, 0.0012);
+      }
+      if (event.type === 'bridgeFall') heard.add('explode');
+      if (event.type === 'cannonShot') heard.add('place');
+      if (event.type === 'cannonImpact') heard.add('explode');
       if (event.type === 'powerUsed') {
         heard.add('pickup');
         this.showPowerLabel(event.playerId, POWER_LABELS[event.kind]);
@@ -544,9 +587,10 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.elephantView.onEvents(events);
+    this.extraHazards.onEvents(events);
     this.fx.onEvents(events, this.gameState);
     this.flameSprites.onEvents(events, this.gameState, FLAME_TICKS);
-    if (blocksChanged) redrawBlocks(this.blocksView, this.gameState.arena);
+    if (blocksChanged) redrawBlocks(this.blocksView, this.gameState.arena, this.gameState.chocolate);
     if (heard.has('tick')) sfx.play('tick');
     if (heard.has('place')) sfx.play('place');
     if (heard.has('explode')) sfx.play('explode');
@@ -619,6 +663,9 @@ export class GameScene extends Phaser.Scene {
     this.elephantView.update(this.gameState);
     this.planeView.update(this.gameState);
     this.snowView?.update();
+    this.bubblesView?.update();
+    this.embersView?.update();
+    this.extraHazards.update(this.gameState);
     drawItems(this.itemsView, this.gameState, (kind) => hasItemIcon(this, kind));
     this.itemSprites.update(this.gameState);
     const spriteFlames = this.flameSprites.ready;

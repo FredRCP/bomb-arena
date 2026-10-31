@@ -3,7 +3,7 @@ import { ICE_CRACK_LEVELS } from '../../src/config/hazards';
 import { ELEPHANT_SPEED, POWER_CHARGE_TICKS } from '../../src/config/powers';
 import { AIRPLANE_BOMBS, AIRPLANE_LAPS, AIRPLANE_LAP_TICKS, CONFUSE_POWER_TICKS, FREEZE_POWER_TICKS, GHOST_POWER_TICKS, SHIELD_POWER_TICKS } from '../../src/config/powers';
 import { stageById } from '../../src/config/stages';
-import { aiShouldUsePower, createGameState, drainEvents, getCell, givePower, powerFraction, powerReady, step, createAi, iglooCells, placeBomb, pyramidExitCells, pyramidOrigin, pyramidTunnelCells, pyramidWallCells } from '../../src/core';
+import { aiShouldUsePower, createGameState, drainEvents, getCell, givePower, powerFraction, powerReady, step, createAi, iglooCells, placeBomb, pyramidExitCells, pyramidOrigin, pyramidTunnelCells, pyramidWallCells, slipperyCells } from '../../src/core';
 import type { GameState } from '../../src/core';
 import { stateFromText } from '../helpers/stateFromText';
 
@@ -84,17 +84,21 @@ describe('Gelo: iglu, faixas e IA', () => {
     for (const d of state.hazards!.doors!) expect(getCell(state.arena, d.col, d.row)).toBe('empty');
   });
 
-  it('só 2 faixas escorregadias de 4 células, sem bloco e fora do gelo fino', () => {
+  it('só 1 pista escorregadia de 4 células, sem bloco e fora do gelo fino; muda de lugar a cada rodada', () => {
     const state = ice({ players: 2 });
     const strips = state.hazards!.slippery!;
-    expect(strips).toHaveLength(8);
+    expect(strips).toHaveLength(4);
+    const places = new Set<string>();
+    for (let seed = 1; seed <= 12; seed++) places.add(slipperyCells(15, 13, seed).map((c) => `${c.col},${c.row}`).join('|'));
+    expect(places.size).toBeGreaterThan(4);
+    for (let seed = 1; seed <= 40; seed++) for (const c of slipperyCells(15, 13, seed)) expect(c.col >= 1 && c.col <= 13 && c.row >= 3 && c.row <= 10 && !(c.col % 2 === 0 && c.row % 2 === 0)).toBe(true);
     for (const i of strips) {
       expect(state.arena.cells[i]).toBe('empty');
       expect(state.hazards!.thinIce!.includes(i)).toBe(false);
     }
   });
 
-  it('a cada 20 s sai uma bola de neve ou um pinguim de cada iglu (o segundo, 10 s depois); descem e param na parede', () => {
+  it('a cada 10 s sai uma bola de neve ou um pinguim de cada iglu (o segundo, 5 s antes); descem e param na parede', () => {
     const state = ice({ players: 1 });
     state.hazards!.thinIce = [];
     state.arena.cells.fill('empty');
@@ -103,13 +107,13 @@ describe('Gelo: iglu, faixas e IA', () => {
     state.players[0]!.x = 1.5;
     state.players[0]!.y = 1.5;
     const seen: Array<[number, string, number]> = [];
-    for (let i = 0; i < 41 * 60; i++) {
+    for (let i = 0; i < 21 * 60; i++) {
       step(state);
       for (const e of drainEvents(state)) if (e.type === 'rollerSpawned') seen.push([e.col, e.kind, Math.round(state.tick / 60)]);
     }
-    // segundo iglu (coluna 9) em 10 s e 30 s; primeiro (coluna 5) em 20 s e 40 s; alternando bola de neve e pinguim
-    expect(seen).toEqual([[9, 'penguin', 10], [5, 'snowball', 20], [9, 'snowball', 30], [5, 'penguin', 40]]);
-    for (let i = 0; i < 4 * 60; i++) step(state);
+    // segundo iglu (coluna 9) em 5 s e 15 s; primeiro (coluna 5) em 10 s e 20 s; alternando bola de neve e pinguim
+    expect(seen).toEqual([[9, 'penguin', 5], [5, 'snowball', 10], [9, 'snowball', 15], [5, 'penguin', 20]]);
+    for (let i = 0; i < 3 * 60; i++) step(state);
     expect(state.hazards!.rollers!.length).toBe(0); // já bateram na parede de baixo
   });
 

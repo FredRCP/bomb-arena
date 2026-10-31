@@ -1,0 +1,7 @@
+LOTE 36 — descompacte por cima do projeto e rode: npm run typecheck && npm test && npm run build
+
+1) Bomba que fica numa casa em chamas (chutada, arremessada, etc.) explode junto. 2) Chute com deslize contínuo (slideOffset em core/bombs.ts, usado por ArenaRenderer).
+3) Fase Fundo do Mar (sea): correntezas, blocos = bolhas, bombas = minas, bolhas de ar na tela, música mar.ogg. 4) Gelo: 1 pista que muda a cada rodada, flocos menores.
+5) Avião com o ursinho piloto (3 imagens: frente, lado, costas). 6) Fase Vulcão (volcano): lava pelas colunas (sem morte súbita), ilhas de pedra, bolas de lava com sombra 2 s antes, tela treme, vulcão 3x3.
+8) Egito: flecha não mata, deixa na velocidade mínima por 10 s. 9) Nome: Bomber Family: Aventura em Família. 10) Pedra do Templo: 3 colunas, atordoa (controles trocados 6 s).
+11) Piratas: músicas novas. Arte do mar/vulcão: provisória, gerada por código (scratchpad/art/seavolc.py).

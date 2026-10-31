@@ -4,10 +4,11 @@ import { advanceExplosions, applyFlameDamage } from './explosions';
 import { speedFactorAt, updateHazards } from './hazards';
 import { updatePowers, usePower } from './powers';
 import { collectItems } from './items';
-import { collidesAt, movePlayer } from './movement';
+import { collidesAt, movePlayer, stepDistanceOf } from './movement';
+import { MIN_SPEED_BONUS, SPEED_ITEMS_CAP } from '../config/items';
 import { updateRound } from './round';
 import { sidelineAct, updateSidelines } from './sideline';
-import type { GameState, Intents } from './types';
+import type { GameState, Intents, PlayerState } from './types';
 
 /**
  * Avança a partida em UM passo de simulação (altera o estado recebido).
@@ -56,7 +57,7 @@ export function step(state: GameState, intents: Intents = {}): void {
       player.facing = move;
       const beforeX = player.x;
       const beforeY = player.y;
-      movePlayer(state.arena, player, move, blockedCellsFor(state, player.id), walkThroughCellsFor(state, player.id), speedFactorAt(state, player));
+      movePlayer(state.arena, player, move, blockedCellsFor(state, player.id), walkThroughCellsFor(state, player.id), speedFactorAt(state, player) * slowFactor(player));
       tryKick(state, player, move);
       if (strips && player.x === beforeX && player.y === beforeY) player.slide = null;
     }
@@ -76,12 +77,24 @@ export function step(state: GameState, intents: Intents = {}): void {
   state.tick += 1;
 }
 
+/** Lentidão (flecha): enquanto durar, a velocidade cai para a mínima do jogo. */
+function slowFactor(player: PlayerState): number {
+  // Turbo do Bolt: velocidade máxima do jogo (vale mais que a lentidão).
+  if ((player.sprintTicks ?? 0) > 0) return Math.max(1, stepDistanceOf({ speedBonus: SPEED_ITEMS_CAP, speedScale: player.speedScale }) / stepDistanceOf(player));
+  if (player.slowTicks <= 0) return 1;
+  const slowest = stepDistanceOf({ speedBonus: MIN_SPEED_BONUS, speedScale: player.speedScale });
+  return Math.min(1, slowest / stepDistanceOf(player));
+}
+
 const OPPOSITE = { up: 'down', down: 'up', left: 'right', right: 'left' } as const;
 
 /** Efeitos temporários simples: controles invertidos e proteção de quem voltou à arena. */
 function tickEffects(state: GameState): void {
   for (const player of state.players) {
     if (player.invertTicks > 0) player.invertTicks -= 1;
+    if (player.slowTicks > 0) player.slowTicks -= 1;
+    if ((player.sprintTicks ?? 0) > 0) player.sprintTicks! -= 1;
+    if ((player.invisibleTicks ?? 0) > 0) player.invisibleTicks! -= 1;
     if (player.shieldTicks > 0) player.shieldTicks -= 1;
     if (player.heroTicks > 0) player.heroTicks -= 1;
   }

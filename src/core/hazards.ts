@@ -1,6 +1,6 @@
-import { BOULDER_FIRST_DELAY_TICKS, BOULDER_HIT_HALF, BOULDER_PERIOD_TICKS, BOULDER_SPEED, BOULDER_WARN_TICKS, CHASM_WIDTH, PYRAMID_SIZE, BLOCK_REGROW_TICKS, ROLLER_BREAKS_BLOCKS, ROLLER_PERIOD_TICKS, ROLLER_SPEED, ICE_CRACK_LEVELS, ICE_PATCHES, DART_FIRST_DELAY_TICKS, DART_HIT_HALF, DART_PERIOD_TICKS, DART_SPEED, DART_WARN_TICKS, QUICKSAND_PATCHES, QUICKSAND_SPEED_FACTOR } from '../config/hazards';
-import { VEST_BREAK_SHIELD_TICKS } from '../config/items';
+import { BOULDER_FIRST_DELAY_TICKS, BOULDER_HIT_HALF, BOULDER_STUN_TICKS, BOULDER_PERIOD_TICKS, BOULDER_SPEED, BOULDER_WARN_TICKS, CHASM_WIDTH, PYRAMID_SIZE, BLOCK_REGROW_TICKS, ROLLER_BREAKS_BLOCKS, ROLLER_PERIOD_TICKS, ROLLER_SPEED, ICE_CRACK_LEVELS, ICE_PATCHES, DART_FIRST_DELAY_TICKS, DART_HIT_HALF, DART_SLOW_TICKS, DART_PERIOD_TICKS, DART_SPEED, DART_WARN_TICKS, QUICKSAND_PATCHES, QUICKSAND_SPEED_FACTOR, BRIDGE_DOWN_TICKS, BRIDGE_FIRST_TICKS, BRIDGE_PERIOD_TICKS, BRIDGE_WARN_TICKS } from '../config/hazards';
 import { cellIndex, getCell, isTunnel } from './arena';
+import { applyExtraHazards, updateExtraHazards } from './extraHazards';
 import { dropPowerups, revealItem } from './items';
 import { bodyOverlapsCell, collidesAt } from './movement';
 import { createRng } from './random';
@@ -11,7 +11,7 @@ import type { Arena, Cell, GameState, HazardsState, PlayerState } from './types'
 // - Armadilha de dardos: uma fileira SEM blocos; de tempos em tempos pisca um aviso nas bordas e, 2 s depois, dardos
 //   varrem a fileira de um lado a outro (alternando o lado). Quem estiver na frente é atingido (colete e escudo valem).
 // - Pirâmide: quadrado 3 x 3 no centro com túnel em cruz. Iglus: dois, no alto da arena, com a porta para baixo.
-// - Gelo escorregadio: só em poucas faixas marcadas (veja slipperyCells).
+// - Gelo escorregadio: uma única pista, que muda de lugar a cada rodada (veja slipperyCells).
 
 export interface HazardOptions {
   /** Espalha manchas de areia movediça. */
@@ -36,6 +36,16 @@ export interface HazardOptions {
   chasm?: boolean;
   /** Pedras gigantes que descem por uma coluna de cada lado do abismo esmagando tudo (avisam 2,5 s antes). */
   boulder?: boolean;
+  /** Fundo do mar: duas faixas de correnteza (uma em cima, outra embaixo, em sentidos opostos). */
+  currents?: boolean;
+  /** Vulcão: a cada 60 s um rio de lava desce por uma coluna sorteada, de ponta a ponta da arena. */
+  lava?: boolean;
+  /** Ilha dos Piratas: canhões do navio disparam bolas com sombra no chão. */
+  cannons?: boolean;
+  /** Templo: de 60 em 60 s uma das pontes cai (com aviso) e volta 10 s depois. Precisa de `chasm`. */
+  bridgeFall?: boolean;
+  /** Vulcão de pedra 3 x 3 no meio da arena, que entra em erupção lançando bolas de lava. */
+  volcano?: boolean;
   /** Templo 3 x 3 no meio do abismo, com um túnel (a ponte do meio passa por dentro dele). Precisa de `chasm`. */
   island?: boolean;
 }
@@ -111,12 +121,22 @@ export function iglooDoors(cols: number, _rows: number): Cell[] {
   return [c - 2, c + 2].map((col) => ({ col, row: 2 }));
 }
 
-/** Faixas de gelo escorregadio: duas, de 4 células cada, em fileiras livres e opostas em relação ao centro. */
-export function slipperyCells(cols: number, rows: number): Cell[] {
-  const cx = Math.floor(cols / 2);
-  const cy = Math.floor(rows / 2);
+/**
+ * Pista de gelo escorregadio: UMA só, de 4 células, em fileira (ou coluna) sem pilar. O lugar sai da semente, então muda a
+ * cada rodada (a semente muda a cada rodada), assim como os buracos de gelo fino.
+ */
+export function slipperyCells(cols: number, rows: number, seed = 1): Cell[] {
+  const rng = createRng(seed * 31 + 5);
   const out: Cell[] = [];
-  for (let d = 2; d <= 5; d++) out.push({ col: cx - d, row: cy - 1 }, { col: cx + d, row: cy + 1 });
+  if (rng() < 0.5) {
+    const row = 3 + 2 * Math.floor(rng() * Math.floor((rows - 5) / 2)); // fileiras ímpares, abaixo dos iglus
+    const col0 = 1 + Math.floor(rng() * (cols - 5));
+    for (let d = 0; d < 4; d++) out.push({ col: col0 + d, row });
+  } else {
+    const col = 1 + 2 * Math.floor(rng() * Math.floor((cols - 1) / 2));
+    const row0 = 3 + Math.floor(rng() * (rows - 8));
+    for (let d = 0; d < 4; d++) out.push({ col, row: row0 + d });
+  }
   return out;
 }
 
@@ -141,11 +161,14 @@ export function boulderColumns(cols: number): number[] {
   return out;
 }
 
-/** As colunas da esquerda e da direita do abismo: a cada queda sai uma pedra de cada lado. */
+/** Colunas centrais possíveis da pedra (ela ocupa 3 colunas), de cada lado do abismo: a pedra nunca invade o abismo nem a borda. */
 export function boulderSides(cols: number): [number[], number[]] {
   const first = Math.floor(cols / 2) - Math.floor(CHASM_WIDTH / 2);
-  const all = boulderColumns(cols);
-  return [all.filter((col) => col < first), all.filter((col) => col >= first)];
+  const left: number[] = [];
+  const right: number[] = [];
+  for (let col = 2; col <= first - 2; col++) left.push(col);
+  for (let col = first + CHASM_WIDTH + 1; col <= cols - 3; col++) right.push(col);
+  return [left, right];
 }
 
 /** Células do templo no meio do abismo: um quadrado 3 x 3 com a fileira do meio livre (o túnel, que é a ponte do meio). */
@@ -181,12 +204,23 @@ export function createHazards(arena: Arena, options: HazardOptions | undefined, 
   }
 
   let dartTrap: HazardsState['dartTrap'] = null;
-  if (options.dartRow !== undefined) {
-    const row = options.dartRow;
+  let dartDir: 1 | -1 = 1;
+  // A fileira da armadilha de dardos é sorteada a cada rodada (ímpar, sem tocar a pirâmide) e o primeiro lado também.
+  let dartRow = options.dartRow;
+  if (dartRow !== undefined) {
+    const pick = createRng(seed * 5 + 19);
+    const mid = Math.floor(rows / 2);
+    const candidates: number[] = [];
+    for (let row = 3; row <= rows - 4; row += 2) if (!options.pyramid || Math.abs(row - mid) >= 3) candidates.push(row);
+    if (candidates.length > 0) dartRow = candidates[Math.floor(pick() * candidates.length)]!;
+    dartDir = pick() < 0.5 ? 1 : -1;
+  }
+  if (dartRow !== undefined) {
+    const row = dartRow;
     for (let col = 1; col < cols - 1; col++) {
       if (getCell(arena, col, row) === 'block') arena.cells[cellIndex(arena, col, row)] = 'empty';
     }
-    dartTrap = { row, phase: 'idle', timer: DART_FIRST_DELAY_TICKS - DART_WARN_TICKS, dir: 1, x: 0 };
+    dartTrap = { row, phase: 'idle', timer: DART_FIRST_DELAY_TICKS - DART_WARN_TICKS, dir: dartDir, x: 0 };
   }
 
   let tunnel: number[] | undefined;
@@ -243,11 +277,11 @@ export function createHazards(arena: Arena, options: HazardOptions | undefined, 
   const rng = createRng(seed * 7 + 13);
   // Células que não recebem areia movediça nem gelo fino: o túnel da pirâmide e as faixas escorregadias.
   const reserved = new Set<number>(tunnel ?? []);
-  if (options.slippery) for (const cell of slipperyCells(cols, rows)) reserved.add(cellIndex(arena, cell.col, cell.row));
+  if (options.slippery) for (const cell of slipperyCells(cols, rows, seed)) reserved.add(cellIndex(arena, cell.col, cell.row));
   for (const door of doors ?? []) reserved.add(cellIndex(arena, door.col, door.row));
   const taken = new Set<number>();
   const free = (cell: Cell): boolean =>
-    getCell(arena, cell.col, cell.row) !== 'wall' && !reserved.has(cellIndex(arena, cell.col, cell.row)) && cell.row !== options.dartRow && !nearSpawn(cell, cols, rows) && !taken.has(cellIndex(arena, cell.col, cell.row));
+    getCell(arena, cell.col, cell.row) !== 'wall' && !reserved.has(cellIndex(arena, cell.col, cell.row)) && cell.row !== dartRow && !nearSpawn(cell, cols, rows) && !taken.has(cellIndex(arena, cell.col, cell.row));
   /** Espalha `patches` manchas de 1 a 2 células (sem bloco por cima, à mostra desde o começo). */
   const scatter = (patches: number, pair: boolean): number[] => {
     const out: number[] = [];
@@ -276,6 +310,7 @@ export function createHazards(arena: Arena, options: HazardOptions | undefined, 
     hazards.bridges = bridges;
   }
   if (islandTunnel) hazards.tunnel = islandTunnel;
+  if (options.bridgeFall && bridges) hazards.bridgeFall = { phase: 'idle', timer: BRIDGE_FIRST_TICKS - BRIDGE_WARN_TICKS, row: 0 };
   if (options.boulder) hazards.boulder = { phase: 'idle', timer: BOULDER_FIRST_DELAY_TICKS - BOULDER_WARN_TICKS, cols: [], y: 0, last: [] };
   if (tunnel) hazards.tunnel = tunnel;
   if (doors) {
@@ -285,7 +320,7 @@ export function createHazards(arena: Arena, options: HazardOptions | undefined, 
   }
   if (options.slippery) {
     // As faixas ficam sem blocos (aparecem inteiras desde o começo).
-    hazards.slippery = slipperyCells(cols, rows).map((cell) => cellIndex(arena, cell.col, cell.row));
+    hazards.slippery = slipperyCells(cols, rows, seed).map((cell) => cellIndex(arena, cell.col, cell.row));
     for (const index of hazards.slippery) if (arena.cells[index] === 'block') arena.cells[index] = 'empty';
   }
   if (options.thinIce) {
@@ -300,6 +335,7 @@ export function createHazards(arena: Arena, options: HazardOptions | undefined, 
     });
     hazards.regrowTimer = BLOCK_REGROW_TICKS;
   }
+  applyExtraHazards(arena, options, seed, hazards);
   return hazards;
 }
 
@@ -318,6 +354,49 @@ export function updateHazards(state: GameState): void {
   updateRollers(state);
   updateRegrow(state);
   updateBoulder(state);
+  updateBridgeFall(state);
+  updateExtraHazards(state);
+}
+
+/** Ponte que cai: avisa (a ponte pisca e balança), vira abismo por BRIDGE_DOWN_TICKS (quem estiver nela morre) e se refaz. */
+function updateBridgeFall(state: GameState): void {
+  const fall = state.hazards?.bridgeFall;
+  const bridges = state.hazards?.bridges;
+  if (!fall || !bridges || state.round.phase !== 'playing') return;
+  const arena = state.arena;
+  const cellsOf = (row: number): number[] => bridges.filter((index) => Math.floor(index / arena.cols) === row);
+  fall.timer -= 1;
+  if (fall.timer > 0) return;
+  if (fall.phase === 'idle') {
+    const rows = [...new Set(bridges.map((index) => Math.floor(index / arena.cols)))];
+    if (rows.length === 0) return;
+    const rng = createRng(state.tick * 41 + 3);
+    fall.row = rows[Math.floor(rng() * rows.length)]!;
+    fall.phase = 'warn';
+    fall.timer = BRIDGE_WARN_TICKS;
+    state.events.push({ type: 'bridgeWarn', row: fall.row });
+  } else if (fall.phase === 'warn') {
+    fall.phase = 'down';
+    fall.timer = BRIDGE_DOWN_TICKS;
+    for (const index of cellsOf(fall.row)) {
+      const col = index % arena.cols;
+      arena.cells[index] = 'hole';
+      state.bombs = state.bombs.filter((bomb) => !(bomb.col === col && bomb.row === fall.row));
+      state.items = state.items.filter((item) => !(item.col === col && item.row === fall.row));
+      for (const player of state.players) {
+        if (!player.alive || Math.floor(player.x) !== col || Math.floor(player.y) !== fall.row) continue;
+        player.alive = false;
+        state.events.push({ type: 'playerHit', playerId: player.id, killers: [], crushed: true });
+        dropPowerups(state, player);
+      }
+    }
+    state.events.push({ type: 'bridgeFall', row: fall.row });
+  } else {
+    for (const index of cellsOf(fall.row)) arena.cells[index] = 'empty';
+    state.events.push({ type: 'bridgeRestored', row: fall.row });
+    fall.phase = 'idle';
+    fall.timer = Math.max(60, BRIDGE_PERIOD_TICKS - BRIDGE_WARN_TICKS - BRIDGE_DOWN_TICKS);
+  }
 }
 
 /** Gelo fino: cada entrada numa célula racha um nível; no último nível a célula vira buraco assim que ficar livre. */
@@ -412,8 +491,8 @@ function updateRollers(state: GameState): void {
 
 /**
  * Pedra gigante (Templo Perdido): a cada BOULDER_PERIOD_TICKS uma coluna sorteada treme (aviso de 2,5 s) e a pedra desce por ela de
- * cima a baixo, esmagando tudo: quebra os blocos (os itens aparecem e também são esmagados), some com bombas e itens e elimina quem
- * estiver no caminho (o colete aguenta uma vez; o escudo e o herói protegem).
+ * cima a baixo, esmagando tudo: ocupa 3 colunas, quebra os blocos (os itens aparecem e também são esmagados), some com bombas e itens e ATORDOA
+ * quem estiver no caminho (controles trocados por 6 s; o escudo e o herói protegem).
  */
 function updateBoulder(state: GameState): void {
   const boulder = state.hazards?.boulder;
@@ -456,32 +535,27 @@ function updateBoulder(state: GameState): void {
       continue;
     }
     if (front >= 1) {
-      const cell = getCell(arena, col, front);
-      if (cell === 'wall') {
-        done(col); // parede (morte súbita): a pedra se desfaz
+      if (getCell(arena, col, front) === 'wall') {
+        done(col); // parede (morte súbita) na coluna do meio: a pedra se desfaz
         continue;
       }
-      if (cell === 'block') {
-        arena.cells[cellIndex(arena, col, front)] = 'empty';
-        state.events.push({ type: 'blockDestroyed', col, row: front });
-        revealItem(state, col, front);
+      for (let c = col - 1; c <= col + 1; c++) {
+        if (getCell(arena, c, front) === 'block') {
+          arena.cells[cellIndex(arena, c, front)] = 'empty';
+          state.events.push({ type: 'blockDestroyed', col: c, row: front });
+          revealItem(state, c, front);
+        }
       }
     }
     const under = (row: number): boolean => Math.abs(row + 0.5 - boulder.y) < 0.75;
-    state.bombs = state.bombs.filter((bomb) => !(bomb.col === col && under(bomb.row)));
-    state.items = state.items.filter((item) => !(item.col === col && under(item.row)));
+    state.bombs = state.bombs.filter((bomb) => !(Math.abs(bomb.col - col) <= 1 && under(bomb.row)));
+    state.items = state.items.filter((item) => !(Math.abs(item.col - col) <= 1 && under(item.row)));
     for (const player of state.players) {
       if (!player.alive || player.shieldTicks > 0 || player.heroTicks > 0) continue;
-      if (Math.abs(player.x - (col + 0.5)) > BOULDER_HIT_HALF || Math.abs(player.y - boulder.y) > BOULDER_HIT_HALF + 0.1) continue;
-      if (player.vest) {
-        player.vest = false;
-        player.shieldTicks = VEST_BREAK_SHIELD_TICKS;
-        state.events.push({ type: 'vestBroken', playerId: player.id });
-      } else {
-        player.alive = false;
-        state.events.push({ type: 'playerHit', playerId: player.id, killers: [], crushed: true });
-        dropPowerups(state, player);
-      }
+      if (Math.abs(player.x - (col + 0.5)) > BOULDER_HIT_HALF || Math.abs(player.y - boulder.y) > 0.95) continue;
+      // A pedra não mata: atordoa (controles trocados). Só avisa na primeira pancada.
+      if (player.invertTicks < BOULDER_STUN_TICKS - 60) state.events.push({ type: 'stunned', playerId: player.id });
+      player.invertTicks = Math.max(player.invertTicks, BOULDER_STUN_TICKS);
     }
   }
   if (boulder.cols.length === 0) {
@@ -546,15 +620,9 @@ function updateDartTrap(state: GameState): void {
   for (const player of state.players) {
     if (!player.alive || player.shieldTicks > 0 || player.heroTicks > 0) continue;
     if (Math.floor(player.y) !== trap.row || Math.abs(player.x - trap.x) > DART_HIT_HALF + 0.3) continue;
-    if (player.vest) {
-      player.vest = false;
-      player.shieldTicks = VEST_BREAK_SHIELD_TICKS;
-      state.events.push({ type: 'vestBroken', playerId: player.id });
-    } else {
-      player.alive = false;
-      state.events.push({ type: 'playerHit', playerId: player.id, killers: [], dart: true });
-      dropPowerups(state, player);
-    }
+    // A flecha não mata: deixa o jogador na velocidade mínima do jogo por DART_SLOW_TICKS (10 s).
+    if (player.slowTicks <= 0) state.events.push({ type: 'slowed', playerId: player.id });
+    player.slowTicks = DART_SLOW_TICKS;
   }
   if (trap.x < -0.5 || trap.x > state.arena.cols + 0.5) {
     trap.phase = 'idle';

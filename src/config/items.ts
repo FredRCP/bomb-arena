@@ -24,7 +24,7 @@ export const SPEED_PER_ITEM = 0.35;
 export const INVERT_TICKS = 480;
 
 /** Item ruim "pedra": cada um tira 1 ponto de velocidade, até este mínimo (a velocidade base nunca zera). */
-export const MIN_SPEED_BONUS = -2;
+export const MIN_SPEED_BONUS = -5;
 
 /** Itens ruins: a IA os evita de propósito. */
 export const BAD_ITEMS = ['invert', 'slow'] as const;

@@ -44,9 +44,9 @@ describe('menu: linhas e seleção', () => {
     expect(visibleRows(base, 'options')).toEqual(['volume', 'music', 'controls', 'next']);
   });
 
-  it('faixa de inimigos: 1 pessoa 1 a 4; 2 pessoas 0 a 3 (máximo 5 no total)', () => {
-    expect(enemyRange(1)).toEqual({ min: 1, max: 4 });
-    expect(enemyRange(2)).toEqual({ min: 0, max: 3 });
+  it('faixa de inimigos: 1 pessoa 1 a 6; 2 pessoas 0 a 5 (máximo 7 no total)', () => {
+    expect(enemyRange(1)).toEqual({ min: 1, max: 6 });
+    expect(enemyRange(2)).toEqual({ min: 0, max: 5 });
   });
 
   it('cada tela começa no botão de baixo (Enter já avança com as escolhas guardadas)', () => {
@@ -62,18 +62,17 @@ describe('menu: linhas e seleção', () => {
     expect(selectedRow(menu)).toBe('next');
   });
 
-  it('esquerda/direita mudam o valor da linha: inimigos 1 a 4 e dando a volta', () => {
+  it('esquerda/direita mudam o valor da linha: inimigos 1 a 6 e dando a volta', () => {
     const menu = createMenu();
     goTo(menu, 'enemies');
     changeValue(menu, 1);
     expect(menu.settings.enemies).toBe(2);
-    changeValue(menu, 1);
-    changeValue(menu, 1);
-    expect(menu.settings.enemies).toBe(4);
+    for (let i = 0; i < 4; i++) changeValue(menu, 1);
+    expect(menu.settings.enemies).toBe(6);
     changeValue(menu, 1);
     expect(menu.settings.enemies).toBe(1);
     changeValue(menu, -1);
-    expect(menu.settings.enemies).toBe(4);
+    expect(menu.settings.enemies).toBe(6);
   });
 
   it('dificuldade percorre os 5 níveis e volta ao primeiro', () => {
@@ -195,22 +194,22 @@ describe('menu: partida, tempo e laterais', () => {
 });
 
 describe('menu: configuração da partida', () => {
-  it('os inimigos escolhidos valem nos dois modos, respeitando o máximo de 5 jogadores', () => {
+  it('os inimigos escolhidos valem nos dois modos, respeitando o máximo de 7 jogadores', () => {
     expect(toGameConfig({ ...DEFAULT_SETTINGS, players: 1, enemies: 3, difficulty: 'hard' })).toMatchObject({ players: 1, enemies: 3, difficulty: 'hard', items: true });
     expect(toGameConfig({ ...DEFAULT_SETTINGS, players: 1, enemies: 4 })).toMatchObject({ players: 1, enemies: 4 });
     expect(toGameConfig({ ...DEFAULT_SETTINGS, players: 2, enemies: 3 })).toMatchObject({ players: 2, enemies: 3 });
-    expect(toGameConfig({ ...DEFAULT_SETTINGS, players: 2, enemies: 4 })).toMatchObject({ players: 2, enemies: 3 });
+    expect(toGameConfig({ ...DEFAULT_SETTINGS, players: 2, enemies: 6 })).toMatchObject({ players: 2, enemies: 5 });
     expect(toGameConfig({ ...DEFAULT_SETTINGS, players: 2, enemies: 0 })).toMatchObject({ players: 2, enemies: 0 });
   });
 
-  it('trocar o modo ajusta os inimigos à faixa: 1 pessoa nunca fica com 0; 2 pessoas nunca passam de 3', () => {
+  it('trocar o modo ajusta os inimigos à faixa: 1 pessoa nunca fica com 0; 2 pessoas nunca passam de 5', () => {
     const menu = createMenu({ ...DEFAULT_SETTINGS, players: 2, enemies: 0 });
     moveSelection(menu, 1); // players
     changeValue(menu, 1);
     expect(menu.settings).toMatchObject({ players: 1, enemies: 1 });
-    menu.settings.enemies = 4;
+    menu.settings.enemies = 6;
     changeValue(menu, 1);
-    expect(menu.settings).toMatchObject({ players: 2, enemies: 3 });
+    expect(menu.settings).toMatchObject({ players: 2, enemies: 5 });
   });
 });
 
@@ -230,7 +229,7 @@ describe('endereço (?players=1&...)', () => {
     expect(parseGameConfig('?players=1&enemies=3&teams=mixed').teams).toBe('mixed');
     expect(parseGameConfig('?teams=banana').teams).toBe('free');
     expect(parseGameConfig('?power=kick,ghost,banana,kick')).toMatchObject({ power: ['kick', 'ghost'] });
-    expect(parseGameConfig('?players=2&enemies=4')).toMatchObject({ players: 2, enemies: 3 });
+    expect(parseGameConfig('?players=2&enemies=6')).toMatchObject({ players: 2, enemies: 5 });
     expect(parseGameConfig('?players=1&enemies=4')).toMatchObject({ players: 1, enemies: 4 });
     expect(hasGameParams('?power=kick')).toBe(true);
     expect(parseGameConfig('?time=20')).toMatchObject({ time: 20 });
@@ -247,7 +246,7 @@ describe('endereço (?players=1&...)', () => {
 
   it('valores inválidos ou fora da faixa viram o padrão ou são limitados', () => {
     expect(parseGameConfig('?players=7&enemies=99&ai=banana&bombs=0&range=500')).toMatchObject({
-      players: 5, enemies: 0, difficulty: 'normal', bombs: 1, range: 12,
+      players: 5, enemies: 2, difficulty: 'normal', bombs: 1, range: 12,
     });
     expect(parseGameConfig('?players=abc&seed=xyz')).toMatchObject({ players: 2, seed: 1 });
   });
@@ -322,23 +321,24 @@ describe('menu: níveis', () => {
 });
 
 describe('menu: fase e resumo', () => {
-  it('a fase percorre a lista (6 fases, todas jogáveis)', () => {
+  it('a fase percorre a lista (8 fases, todas jogáveis)', () => {
     const menu = createMenu(DEFAULT_SETTINGS, 'stage');
     goTo(menu, 'stage');
-    const expected: Array<[string, boolean]> = [['Arena Clássica', true], ['Arena Clássica Grande', true], ['Fase do Gelo', true], ['Fase do Egito', true], ['Templo Perdido', true], ['Ilha dos Piratas', true]];
+    const expected: Array<[string, boolean]> = [['Arena Clássica', true], ['Arena Clássica Grande', true], ['Fase do Gelo', true], ['Fase do Egito', true], ['Templo Perdido', true], ['Ilha dos Piratas', true], ['Fundo do Mar', true], ['Vulcão', true]];
     for (const [name, playable] of expected) {
       expect(describeRow(menu.settings, 'stage').value).toBe(name);
       expect(canStart(menu.settings)).toBe(playable);
       changeValue(menu, 1);
     }
-    expect(menu.settings.stage).toBe('classic'); // deu a volta nas 6 fases
+    expect(menu.settings.stage).toBe('classic'); // deu a volta nas 8 fases
   });
 
   it('stageIssue: celular não joga arena grande; fase pequena demais não comporta todos', () => {
     const big = stageById('egypt');
     expect(stageIssue(big, 2, false)).toBeNull();
     expect(stageIssue(big, 2, true)).toMatch(/grande demais para celular/);
-    expect(stageIssue(big, 5, false)).toMatch(/até 4 jogadores/);
+    expect(stageIssue(stageById('temple'), 5, false)).toMatch(/até 4 jogadores/);
+    expect(stageIssue(big, 7, false)).toMatch(/até 6 jogadores/);
     expect(stageIssue(stageById('classic'), 5, true)).toBeNull();
   });
 
@@ -389,12 +389,12 @@ describe('mais pessoas com controles de videogame', () => {
     changeValue(menu, -1);
     expect(menu.settings.players).toBe(4);
     expect(describeRow(menu.settings, 'players').value).toBe('4 jogadores (com controles)');
-    // As vagas dos inimigos respeitam o total de 5.
-    expect(enemyRange(4)).toEqual({ min: 0, max: 1 });
+    // As vagas dos inimigos respeitam o total de 7.
+    expect(enemyRange(4)).toEqual({ min: 0, max: 3 });
   });
 
   it('a configuração aceita 3 a 5 pessoas', () => {
-    expect(parseGameConfig('?players=4&enemies=3')).toMatchObject({ players: 4, enemies: 1 });
+    expect(parseGameConfig('?players=4&enemies=5')).toMatchObject({ players: 4, enemies: 3 });
     expect(parseSettings(JSON.stringify({ players: 3 }))).toEqual({ ...DEFAULT_SETTINGS, players: 3, enemies: 1 });
     expect(summaryLines({ ...DEFAULT_SETTINGS, players: 3, enemies: 0 })[0]).toBe('3 pessoas');
   });

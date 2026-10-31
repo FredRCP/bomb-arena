@@ -1,8 +1,12 @@
 100_victories.ogg - "100 Victories", de Zane Little (https://ko-fi.com/zanelittle). Música da arena clássica (as duas).
-menu.ogg e 8bit_bossa.mp3 - músicas dos menus (tocam alternando), enviadas pelo Fred. Autor e licença A CONFIRMAR.
+menu.ogg e 8bit_bossa.mp3 - músicas dos menus (tocam alternando), enviadas pelo Fred. Licença: CC0 (informado pelo Fred; autor não anotado).
 classic.ogg - não é mais usada (era a música dos menus); pode ser apagada.
 fechando_blocos.ogg - "Dizzy Racing", de Zane Little (https://ko-fi.com/zanelittle). Tocada quando o tempo acaba e os blocos começam a fechar a arena (todas as fases).
-egypt.ogg e suez.ogg - músicas da fase do Egito, enviadas pelo Fred. Origem e licença A CONFIRMAR (os arquivos não trazem autor): anote aqui o autor/licença antes de publicar.
-gelo_loop.ogg e gelo_intro.ogg - músicas da fase do Gelo, enviadas pelo Fred (arquivos icd_repeating e icd_seg1). Autor e licença A CONFIRMAR.
+egypt.ogg e suez.ogg - músicas da fase do Egito, enviadas pelo Fred. Licença: CC0 (informado pelo Fred; autor não anotado).
+gelo_loop.ogg e gelo_intro.ogg - músicas da fase do Gelo, enviadas pelo Fred (arquivos icd_repeating e icd_seg1). Licença: CC0 (informado pelo Fred; autor não anotado).
 
-temple_a.ogg (battleThemeA), temple_b.ogg (battleThemeB), sinister_abode.ogg — músicas do Templo Perdido enviadas pelo Fred. Autores/licença: a confirmar.
+temple_a.ogg (battleThemeA), temple_b.ogg (battleThemeB), sinister_abode.ogg — músicas do Templo Perdido enviadas pelo Fred. Licença: CC0 (informado pelo Fred).
+
+mar.ogg (the_world_is_ours) — Fundo do Mar; vulcao.ogg (vulc_o) — Vulcão; pirata_adventure.ogg (pirate_adventure) e piratas.ogg — Ilha dos Piratas. Enviadas pelo Fred. Licença: CC0 (informado pelo Fred).
+
+Observação (31/10/2026): o Fred confirmou que todas as músicas enviadas por ele são CC0, então não é obrigatório dar crédito.

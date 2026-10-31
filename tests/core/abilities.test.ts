@@ -280,13 +280,16 @@ describe('fantasma', () => {
 });
 
 describe('5 jogadores', () => {
-  it('o quinto nasce no centro, com zona livre; no máximo 5 no total', () => {
-    const state = createGameState({ seed: 3, players: 2, enemies: 3 });
-    expect(state.players).toHaveLength(5);
-    expect(state.players[4]).toMatchObject({ x: 7.5, y: 6.5, team: 5, cpu: true });
+  it('o 5º e o 6º nascem no meio das bordas de cima e de baixo, o 7º no centro (zonas livres); no máximo 7 no total', () => {
+    const state = createGameState({ seed: 3, players: 2, enemies: 5 });
+    expect(state.players).toHaveLength(7);
+    expect(state.players[4]).toMatchObject({ x: 7.5, y: 1.5, team: 5, cpu: true });
+    expect(state.players[5]).toMatchObject({ x: 7.5, y: 11.5 });
+    expect(state.players[6]).toMatchObject({ x: 7.5, y: 6.5 });
     for (const row of [5, 6, 7]) expect(state.arena.cells[row * state.arena.cols + 7]).toBe('empty');
-    expect(createGameState({ players: 2, enemies: 4 }).players).toHaveLength(5);
-    expect(createGameState({ players: 1, enemies: 4 }).players).toHaveLength(5);
+    for (const col of [6, 7, 8]) for (const row of [1, 11]) expect(state.arena.cells[row * state.arena.cols + col]).toBe('empty');
+    expect(createGameState({ players: 2, enemies: 6 }).players).toHaveLength(7);
+    expect(createGameState({ players: 1, enemies: 6 }).players).toHaveLength(7);
   });
 
   it('com 4 ou menos, a arena não ganha a zona do centro (mesmos blocos de antes)', () => {

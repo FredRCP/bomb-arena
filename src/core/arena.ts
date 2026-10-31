@@ -10,6 +10,8 @@ export interface ArenaOptions {
   blockDensity?: number;
   /** Deixa livre a zona de nascimento do centro (partida com 5 jogadores). */
   centerSpawn?: boolean;
+  /** Com 5 ou mais jogadores, o meio da borda de cima e o da de baixo também são casas de nascimento (zona livre de blocos). */
+  midSpawns?: boolean;
   /** Espelha a arena (girada 180°) para ser justa com dois jogadores. Padrão: ARENA_SYMMETRIC. */
   symmetric?: boolean;
 }
@@ -24,7 +26,13 @@ export function spawnCells(cols: number, rows: number): [Cell, Cell, Cell, Cell]
   ];
 }
 
-/** Nascimento do quinto jogador: o centro da arena (coluna e linha do meio). */
+/** Nascimento do 5º e do 6º jogadores: o meio da fileira de cima e o da de baixo (coluna do meio, primeira e última fileiras de dentro). */
+export function midSpawnCells(cols: number, rows: number): [Cell, Cell] {
+  const col = Math.floor(cols / 2);
+  return [{ col, row: 1 }, { col, row: rows - 2 }];
+}
+
+/** Nascimento do 7º jogador: o centro da arena (coluna e linha do meio). */
 export function centerSpawn(cols: number, rows: number): Cell {
   return { col: Math.floor(cols / 2), row: Math.floor(rows / 2) };
 }
@@ -88,6 +96,10 @@ export function createArena(options: ArenaOptions = {}): Arena {
     for (const cell of safeZone(spawn, cols, rows)) {
       safe.add(cell.row * cols + cell.col);
     }
+  }
+  if (options.midSpawns) {
+    // Fileira de dentro é ímpar (sem pilares): a zona livre é a própria casa e as duas vizinhas dos lados.
+    for (const spawn of midSpawnCells(cols, rows)) for (const dCol of [-1, 0, 1]) safe.add(spawn.row * cols + spawn.col + dCol);
   }
   if (options.centerSpawn) {
     // No centro, só as células de cima e de baixo são livres (as laterais são pilares): a zona é essa linha de 3.

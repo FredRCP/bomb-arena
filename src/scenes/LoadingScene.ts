@@ -66,7 +66,7 @@ export class LoadingScene extends Phaser.Scene {
     // Só o nome do jogo e uma bolinha pulando enquanto carrega (sem barra nem porcentagem).
     const cx = SCREEN_WIDTH / 2;
     this.add
-      .text(cx, SCREEN_HEIGHT / 2 - 20, 'BOMB ARENA', { fontFamily: FONT, fontSize: '110px', fontStyle: 'bold', color: '#ffe66d', stroke: '#1b1f3b', strokeThickness: 12 })
+      .text(cx, SCREEN_HEIGHT / 2 - 20, 'BOMBER FAMILY', { fontFamily: FONT, fontSize: '110px', fontStyle: 'bold', color: '#ffe66d', stroke: '#1b1f3b', strokeThickness: 12 })
       .setOrigin(0.5)
       .setName('loadingTitle');
     const dots = [0, 1, 2].map((i) => this.add.circle(cx - 40 + i * 40, SCREEN_HEIGHT / 2 + 100, 11, 0xffffff).setName('loadingDot'));

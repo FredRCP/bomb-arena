@@ -1,6 +1,6 @@
 {
-  "name": "Bomb Arena",
-  "short_name": "Bomb Arena",
+  "name": "Bomber Family: Aventura em Família",
+  "short_name": "Bomber Family",
   "description": "Jogo de arena com bombas para jogar no navegador, sozinho contra o computador ou com amigos no mesmo teclado.",
   "lang": "pt-BR",
   "start_url": "./",

@@ -127,9 +127,19 @@ export function advanceExplosions(state: GameState): void {
   for (const flame of state.flames) flame.ticksLeft -= 1;
   state.flames = state.flames.filter((flame) => flame.ticksLeft > 0);
 
+  // Bomba que fica numa casa em chamas (chutada para dentro do fogo, arremessada, etc.) explode junto, na hora.
+  if (state.flames.length > 0 && state.bombs.length > 0) {
+    const burning = new Set(state.flames.map((flame) => cellIndex(state.arena, flame.col, flame.row)));
+    for (const bomb of state.bombs) {
+      if (burning.has(cellIndex(state.arena, bomb.col, bomb.row))) {
+        bomb.ticksLeft = 0;
+        bomb.frozenTicks = 0;
+      }
+    }
+  }
   for (const bomb of state.bombs) {
     if (bomb.frozenTicks && bomb.frozenTicks > 0) bomb.frozenTicks -= 1; // congelada: o pavio fica parado
-    else bomb.ticksLeft -= 1;
+    else if (bomb.ticksLeft > 0) bomb.ticksLeft -= 1;
   }
   const due = state.bombs.filter((bomb) => bomb.ticksLeft <= 0);
   if (due.length === 0) return;

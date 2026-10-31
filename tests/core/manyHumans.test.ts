@@ -8,9 +8,9 @@ describe('várias pessoas na mesma partida', () => {
     expect(state.players.map((p) => p.id)).toEqual([1, 2, 3, 4, 5]);
   });
 
-  it('o total nunca passa de 5', () => {
-    const state = createGameState({ seed: 1, players: 5, enemies: 4 });
-    expect(state.players).toHaveLength(5);
-    expect(state.players.every((p) => !p.cpu)).toBe(true);
+  it('o total nunca passa de 7', () => {
+    const state = createGameState({ seed: 1, players: 5, enemies: 6 });
+    expect(state.players).toHaveLength(7);
+    expect(state.players.filter((p) => !p.cpu)).toHaveLength(5);
   });
 });

@@ -14,7 +14,7 @@ export interface GameConfig {
   /** Pessoas na partida (1 a 5; de 3 em diante com controles de videogame). */
   players: 1 | 2 | 3 | 4 | 5;
   /** Inimigos do computador. Em partida de 2 pessoas o padrão é 0. Pessoas + inimigos: no máximo 5. */
-  enemies: 0 | 1 | 2 | 3 | 4;
+  enemies: 0 | 1 | 2 | 3 | 4 | 5 | 6;
   difficulty: AiDifficulty;
   /** Times: cada um por si, pessoas × computador ou misturados (?teams=free|versus|mixed). */
   teams: TeamMode;
@@ -62,7 +62,7 @@ function readInt(query: URLSearchParams, name: string, min: number, max: number)
 export function parseGameConfig(search: string): GameConfig {
   const query = new URLSearchParams(search);
   const players = (readInt(query, 'players', 1, 5) ?? 2) as GameConfig['players'];
-  const enemies = Math.min(readInt(query, 'enemies', 0, 4) ?? (players === 1 ? 1 : 0), 5 - players) as 0 | 1 | 2 | 3 | 4;
+  const enemies = Math.min(readInt(query, 'enemies', 0, 6) ?? (players === 1 ? 1 : 0), 7 - players) as 0 | 1 | 2 | 3 | 4 | 5 | 6;
   const aiRaw = query.get('ai');
   const difficulty = (Object.keys(AI_SETTINGS) as AiDifficulty[]).find((name) => name === aiRaw) ?? DEFAULT_AI_DIFFICULTY;
   const config: GameConfig = {

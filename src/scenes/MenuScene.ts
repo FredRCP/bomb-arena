@@ -45,13 +45,13 @@ export class MenuScene extends Phaser.Scene {
     panel.strokeRoundedRect(ox + SCREEN_WIDTH / 2 - 330, oy + 345, 660, 440, 36);
 
     const title = this.add
-      .text(ox + SCREEN_WIDTH / 2, oy + 170, 'BOMB ARENA', { fontFamily: FONT, fontSize: '112px', fontStyle: 'bold', color: '#ffe66d', stroke: '#1b1f3b', strokeThickness: 14 })
+      .text(ox + SCREEN_WIDTH / 2, oy + 170, 'BOMBER FAMILY', { fontFamily: FONT, fontSize: '112px', fontStyle: 'bold', color: '#ffe66d', stroke: '#1b1f3b', strokeThickness: 14 })
       .setOrigin(0.5)
       .setShadow(0, 8, '#0b0d26', 0, true, true);
     title.setScale(0.6).setAlpha(0);
     this.tweens.add({ targets: title, scale: 1, alpha: 1, duration: 520, ease: 'Back.easeOut' });
     this.tweens.add({ targets: title, y: title.y - 8, duration: 1500, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: 600 });
-    this.add.text(ox + SCREEN_WIDTH / 2, oy + 262, 'a batalha de bombas da família', { fontFamily: FONT, fontSize: '28px', fontStyle: 'italic', color: '#e3e7ff', stroke: '#1b1f3b', strokeThickness: 5 }).setOrigin(0.5);
+    this.add.text(ox + SCREEN_WIDTH / 2, oy + 262, 'aventura em família', { fontFamily: FONT, fontSize: '28px', fontStyle: 'italic', color: '#e3e7ff', stroke: '#1b1f3b', strokeThickness: 5 }).setOrigin(0.5);
 
     this.buttons = ITEMS.map((item, index) => {
       const x = ox + SCREEN_WIDTH / 2;

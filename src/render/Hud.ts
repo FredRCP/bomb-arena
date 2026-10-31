@@ -52,6 +52,7 @@ const TIMED = [
   { kind: 'hero', left: (p: PlayerState) => p.heroTicks },
   { kind: 'ghost', left: (p: PlayerState) => p.ghostTicks },
   { kind: 'invert', left: (p: PlayerState) => p.invertTicks },
+  { kind: 'slow', left: (p: PlayerState) => p.slowTicks },
 ] as const;
 
 const CARD_W = 220;
@@ -91,14 +92,16 @@ export function createHud(scene: Phaser.Scene, state: GameState, choices: Charac
 
   // ---- Fichas dos jogadores: metade à esquerda do relógio, metade à direita
   const half = Math.ceil(players.length / 2);
+  const cardW = half > 3 ? 160 : CARD_W; // 7 jogadores: fichas mais estreitas para caber
+  const cardStep = cardW + (CARD_STEP - CARD_W);
   const cardY = barY + (TOP_HEIGHT - 4 - CARD_H) / 2;
   const cards = players.map((player, index) => {
     const onLeft = index < half;
     const order = onLeft ? index : index - half;
-    const x = onLeft ? clockCenter - 130 - (half - order) * CARD_STEP + (CARD_STEP - CARD_W) : clockCenter + 130 + order * CARD_STEP;
+    const x = onLeft ? clockCenter - 130 - (half - order) * cardStep + (cardStep - cardW) : clockCenter + 130 + order * cardStep;
     const accent = accentOf(player);
     back.fillStyle(CARD_COLOR);
-    back.fillRoundedRect(x, cardY, CARD_W, CARD_H, 12);
+    back.fillRoundedRect(x, cardY, cardW, CARD_H, 12);
     back.fillStyle(accent);
     back.fillRoundedRect(x, cardY, 7, CARD_H, 4);
     const face = addCharacter(scene, characterOf(player), x + 34, cardY + CARD_H / 2, 17).setDepth(4);
@@ -146,7 +149,7 @@ export function createHud(scene: Phaser.Scene, state: GameState, choices: Charac
 
       // Tudo que depende dos jogadores só é refeito se algo mudou (os efeitos com tempo, de 6 em 6 passos).
       const key = current.players
-        .map((p) => `${p.alive ? 1 : 0}${current.round.phase === 'playing' ? 'p' : 'e'}${+p.canKick}${+p.piercing}${+p.remote}${+p.canThrow}${+p.vest}.${Math.ceil(p.ghostTicks / 6)}.${Math.ceil(p.invertTicks / 6)}.${Math.ceil(p.heroTicks / 6)}${p.sideline ?? 'x'}:${scores?.[p.id]?.points ?? 0}:${match.wins[p.team] ?? 0}`)
+        .map((p) => `${p.alive ? 1 : 0}${current.round.phase === 'playing' ? 'p' : 'e'}${+p.canKick}${+p.piercing}${+p.remote}${+p.canThrow}${+p.vest}.${Math.ceil(p.ghostTicks / 6)}.${Math.ceil(p.invertTicks / 6)}.${Math.ceil(p.slowTicks / 6)}.${Math.ceil(p.heroTicks / 6)}${p.sideline ?? 'x'}:${scores?.[p.id]?.points ?? 0}:${match.wins[p.team] ?? 0}`)
         .join('|');
       if (key === lastKey) return;
       lastKey = key;
@@ -176,7 +179,7 @@ export function createHud(scene: Phaser.Scene, state: GameState, choices: Charac
           const scale = 0.38;
           // Cada ícone é desenhado em tamanho normal numa origem própria e reduzido; por isso o setScale na camada
           // não serve (reduziria tudo junto): desenhamos direto nas coordenadas já reduzidas.
-          const px = card.x + CARD_W - 50 + col * 17;
+          const px = card.x + cardW - 50 + col * 17;
           const py = cardY + 14 + row * 20;
           if (hasItemIcon(scene, kind)) {
             // Ícone em imagem (as imagens são criadas na primeira vez que aparecem e reaproveitadas depois).

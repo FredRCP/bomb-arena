@@ -1,6 +1,8 @@
-import { AIRPLANE_BOMBS, AIRPLANE_DROP_TICKS, AIRPLANE_END_SCALE, AIRPLANE_ENTRY_TICKS, AIRPLANE_FIRST_DROP, AIRPLANE_LAPS, AIRPLANE_LAP_TICKS, CONFUSE_POWER_TICKS, ELEPHANT_MAX_BLOCKS, ELEPHANT_SPEED, POWER_CHARGE_TICKS, SHIELD_POWER_TICKS, STORK_FAR_ITEMS, STORK_ITEMS, STORK_RADIUS, FREEZE_POWER_TICKS, GHOST_POWER_TICKS } from '../config/powers';
+import { AIRPLANE_BOMBS, AIRPLANE_DROP_TICKS, AIRPLANE_END_SCALE, AIRPLANE_ENTRY_TICKS, AIRPLANE_FIRST_DROP, AIRPLANE_LAPS, AIRPLANE_LAP_TICKS, CONFUSE_POWER_TICKS, CHOCOLATE_BLOCKS, FOG_POWER_TICKS, GHOST_PUSH_CELLS, GHOST_PUSH_RADIUS, INVISIBLE_POWER_TICKS, JUMP_CELLS, SLIME_CELLS, SLIME_TICKS, SPRINT_POWER_TICKS, TWIN_BOMB_RANGE, ELEPHANT_MAX_BLOCKS, ELEPHANT_SPEED, POWER_CHARGE_TICKS, SHIELD_POWER_TICKS, STORK_FAR_ITEMS, STORK_ITEMS, STORK_RADIUS, FREEZE_POWER_TICKS, GHOST_POWER_TICKS } from '../config/powers';
+import { BOMB_FUSE_TICKS } from '../config/bombs';
 import { cellIndex, getCell, isTunnel } from './arena';
 import { dropBomb } from './bombs';
+import { bodyOverlapsCell, collidesAt } from './movement';
 import { createRng } from './random';
 import { freeItemCells, revealItem } from './items';
 import type { Direction, GameState, PlayerState, PowerKind } from './types';
@@ -8,8 +10,10 @@ import type { Direction, GameState, PlayerState, PowerKind } from './types';
 // Superpoderes. Cada jogador pode ter um poder (veja `givePower`) que carrega sozinho em POWER_CHARGE_TICKS e é
 // disparado pela intenção `power`. Poder atual:
 // - airplane (Lucas): um avião sobrevoa a arena inteira em 4 voltas, largando 6 bombas em células aleatórias.
-// - shield (Fred): invencível 10 s. freeze (Van): congela as bombas dos outros por 10 s. stork (Wal): solta 4 itens bons (3 perto, 1 longe).
-//   confuse (Glauceste): todos os outros ficam com os controles invertidos por 10 s. ghost (Filippe): atravessa blocos por 10 s.
+// - shield (Fred): teletransporta para uma célula livre sorteada e fica invencível 10 s. freeze (Van): congela as bombas dos outros por 10 s. stork (Wal): solta 4 itens bons (3 perto, 1 longe).
+//   confuse (Glauceste): todos os outros ficam com os controles invertidos por 10 s. ghost (Filippe): atravessa blocos por 10 s e empurra os inimigos próximos 3 células para longe.
+// - pipoca: pula bomba ou bloco; bolt: velocidade máxima 10 s; musgo: gosma em 3 células em cada direção; violeta: invisível 10 s;
+//   fagulha: 2 bombas de alcance 8 (imune); nimbo: neblina 10 s; cacau: 3 blocos de chocolate à frente.
 // - elephant (Ana): um elefantinho sai correndo na direção para onde o jogador olha, em linha reta, e quebra todos os
 //   blocos do caminho (os itens escondidos aparecem). Ele não machuca ninguém e para ao bater numa parede.
 
@@ -37,6 +41,7 @@ export function powerFraction(player: Pick<PlayerState, 'power'>): number {
 /** Usa o poder se estiver pronto (aperto do botão de poder). */
 export function usePower(state: GameState, player: PlayerState): void {
   if (!powerReady(player) || !player.power) return;
+  if (player.power.kind === 'jump' && !jumpLanding(state, player)) return; // sem lugar para cair: não gasta a carga
   player.power.charge = 0;
   const col = Math.floor(player.x);
   const row = Math.floor(player.y);
@@ -83,6 +88,7 @@ export function updatePowers(state: GameState): void {
     }
   }
   updatePlanes(state);
+  updateSlimeAndFog(state);
   const elephants = state.elephants;
   if (!elephants || elephants.length === 0) return;
   const arena = state.arena;
@@ -115,9 +121,72 @@ function usePersonalPower(state: GameState, player: PlayerState, kind: Exclude<P
   const arena = state.arena;
   const rng = createRng(state.tick * 977 + player.id * 31 + 5);
   if (kind === 'shield') {
+    // Teletransporte: vai para uma célula livre sorteada (sem bomba, chama, jogador ou perigo) e fica invencível.
+    const spot = randomFreeCell(state, player, rng);
+    if (spot) {
+      player.x = spot.col + 0.5;
+      player.y = spot.row + 0.5;
+      if (player.slide !== undefined) player.slide = null;
+    }
     player.shieldTicks = Math.max(player.shieldTicks, SHIELD_POWER_TICKS);
   } else if (kind === 'ghost') {
     player.ghostTicks = Math.max(player.ghostTicks, GHOST_POWER_TICKS);
+    pushEnemiesAway(state, player);
+  } else if (kind === 'jump') {
+    const landing = jumpLanding(state, player);
+    if (landing) {
+      player.x = landing.col + 0.5;
+      player.y = landing.row + 0.5;
+    }
+  } else if (kind === 'sprint') {
+    player.sprintTicks = SPRINT_POWER_TICKS;
+  } else if (kind === 'invisible') {
+    player.invisibleTicks = INVISIBLE_POWER_TICKS;
+  } else if (kind === 'slime') {
+    const col0 = Math.floor(player.x);
+    const row0 = Math.floor(player.y);
+    const slime = (state.slime ??= []);
+    const add = (col: number, row: number): void => {
+      const kindHere = getCell(arena, col, row);
+      if (kindHere !== 'empty' && kindHere !== 'block') return;
+      slime.push({ col, row, owner: player.id, ticks: SLIME_TICKS });
+    };
+    add(col0, row0);
+    for (const { dx, dy } of Object.values(VECTORS)) {
+      for (let k = 1; k <= SLIME_CELLS; k++) {
+        if (getCell(arena, col0 + dx * k, row0 + dy * k) === 'wall') break;
+        add(col0 + dx * k, row0 + dy * k);
+      }
+    }
+  } else if (kind === 'twinbombs') {
+    const col0 = Math.floor(player.x);
+    const row0 = Math.floor(player.y);
+    const { dx, dy } = VECTORS[player.facing];
+    const spots = [{ col: col0, row: row0 }, { col: col0 - dx, row: row0 - dy }, { col: col0 + dx, row: row0 + dy }];
+    let placed = 0;
+    for (const spot of spots) {
+      if (placed >= 2 || !dropBomb(state, player, spot.col, spot.row)) continue;
+      const bomb = state.bombs[state.bombs.length - 1]!;
+      bomb.range = TWIN_BOMB_RANGE;
+      placed += 1;
+    }
+    player.heroTicks = Math.max(player.heroTicks, BOMB_FUSE_TICKS + 90); // ela é imune às chamas até as bombas passarem
+  } else if (kind === 'fog') {
+    state.fog = { ticks: FOG_POWER_TICKS, owner: player.id };
+  } else if (kind === 'chocolate') {
+    const { dx, dy } = VECTORS[player.facing];
+    const choc = (state.chocolate ??= []);
+    for (let k = 1; k <= CHOCOLATE_BLOCKS; k++) {
+      const col = Math.floor(player.x) + dx * k;
+      const row = Math.floor(player.y) + dy * k;
+      if (getCell(arena, col, row) !== 'empty') break;
+      if (isTunnel(state.hazards?.tunnel, arena, col, row) || state.bombs.some((b) => b.col === col && b.row === row)) break;
+      if (state.players.some((p) => p.alive && bodyOverlapsCell(p.x, p.y, col, row))) break;
+      arena.cells[cellIndex(arena, col, row)] = 'block';
+      state.items = state.items.filter((item) => !(item.col === col && item.row === row));
+      choc.push(cellIndex(arena, col, row));
+      state.events.push({ type: 'blockGrown', col, row });
+    }
   } else if (kind === 'confuse') {
     for (const other of state.players) if (other.alive && other.id !== player.id) other.invertTicks = Math.max(other.invertTicks, CONFUSE_POWER_TICKS);
   } else if (kind === 'freeze') {
@@ -147,6 +216,82 @@ function usePersonalPower(state: GameState, player: PlayerState, kind: Exclude<P
       state.items.push({ col, row, kind: itemKind });
       state.events.push({ type: 'itemSpawned', col, row, kind: itemKind });
     }
+  }
+}
+
+/** Para onde o pulo da Pipoca leva (2 células à frente), ou null se não houver lugar livre. */
+export function jumpLanding(state: GameState, player: PlayerState): { col: number; row: number } | null {
+  const arena = state.arena;
+  const { dx, dy } = VECTORS[player.facing];
+  const col0 = Math.floor(player.x);
+  const row0 = Math.floor(player.y);
+  const midKind = getCell(arena, col0 + dx, row0 + dy);
+  if (midKind === 'wall') return null;
+  const col = col0 + dx * JUMP_CELLS;
+  const row = row0 + dy * JUMP_CELLS;
+  if (getCell(arena, col, row) !== 'empty') return null;
+  if (state.bombs.some((b) => b.col === col && b.row === row)) return null;
+  if (isTunnel(state.hazards?.tunnel, arena, col, row)) return null;
+  if (state.players.some((p) => p.alive && p.id !== player.id && bodyOverlapsCell(p.x, p.y, col, row))) return null;
+  return { col, row };
+}
+
+/** Célula livre sorteada para o teletransporte: sem bomba, chama, jogador, item ruim ou perigo à vista. */
+function randomFreeCell(state: GameState, player: PlayerState, rng: () => number): { col: number; row: number } | null {
+  const arena = state.arena;
+  const spots: Array<{ col: number; row: number }> = [];
+  for (let row = 1; row < arena.rows - 1; row++) {
+    for (let col = 1; col < arena.cols - 1; col++) {
+      if (getCell(arena, col, row) !== 'empty') continue;
+      if (isTunnel(state.hazards?.tunnel, arena, col, row)) continue;
+      if (state.bombs.some((b) => b.col === col && b.row === row)) continue;
+      if (state.flames.some((f) => f.col === col && f.row === row)) continue;
+      if (state.players.some((p) => p.alive && p.id !== player.id && Math.abs(p.x - (col + 0.5)) < 2 && Math.abs(p.y - (row + 0.5)) < 2)) continue;
+      const slip = state.hazards?.slippery;
+      if (slip && slip.includes(cellIndex(arena, col, row))) continue;
+      spots.push({ col, row });
+    }
+  }
+  return spots.length > 0 ? spots[Math.floor(rng() * spots.length)]! : null;
+}
+
+/** Filippe: empurra para longe (GHOST_PUSH_CELLS células) todo inimigo a até GHOST_PUSH_RADIUS células, pelo eixo em que ele está mais longe. */
+function pushEnemiesAway(state: GameState, player: PlayerState): void {
+  for (const other of state.players) {
+    if (!other.alive || other.id === player.id || other.team === player.team) continue;
+    const ddx = other.x - player.x;
+    const ddy = other.y - player.y;
+    if (Math.abs(ddx) + Math.abs(ddy) > GHOST_PUSH_RADIUS + 0.5) continue;
+    const horizontal = Math.abs(ddx) >= Math.abs(ddy);
+    const sx = horizontal ? Math.sign(ddx) || 1 : 0;
+    const sy = horizontal ? 0 : Math.sign(ddy) || 1;
+    const blocked = new Set(state.bombs.map((b) => cellIndex(state.arena, b.col, b.row)));
+    for (let k = 0; k < GHOST_PUSH_CELLS; k++) {
+      if (collidesAt(state.arena, other.x + sx, other.y + sy, blocked)) break;
+      other.x += sx;
+      other.y += sy;
+    }
+    if (other.slide !== undefined) other.slide = null;
+  }
+}
+
+/** Gosma (quem pisa, menos o dono, fica lento) e neblina: contam o tempo. */
+function updateSlimeAndFog(state: GameState): void {
+  if (state.chocolate && state.chocolate.length > 0) state.chocolate = state.chocolate.filter((index) => state.arena.cells[index] === 'block');
+  if (state.round.phase !== 'playing') return;
+  const slime = state.slime;
+  if (slime && slime.length > 0) {
+    for (const cell of slime) {
+      cell.ticks -= 1;
+      for (const p of state.players) {
+        if (p.alive && p.id !== cell.owner && Math.floor(p.x) === cell.col && Math.floor(p.y) === cell.row) p.slowTicks = Math.max(p.slowTicks, 3);
+      }
+    }
+    state.slime = slime.filter((cell) => cell.ticks > 0);
+  }
+  if (state.fog) {
+    state.fog.ticks -= 1;
+    if (state.fog.ticks <= 0) delete state.fog;
   }
 }
 
@@ -216,10 +361,24 @@ export function aiShouldUsePower(state: GameState, player: PlayerState): boolean
     case 'stork':
       return !danger;
     case 'shield':
+      return danger; // teletransporta para fora do perigo
+    case 'jump':
+      return false;
+    case 'sprint':
+    case 'invisible':
+      return danger;
+    case 'ghost':
+      return danger || enemies.some((p) => Math.abs(p.x - player.x) + Math.abs(p.y - player.y) <= 2.5);
+    case 'slime':
+      return enemies.some((p) => Math.abs(p.x - player.x) + Math.abs(p.y - player.y) <= 4);
+    case 'twinbombs':
+      return enemies.some((p) => Math.abs(p.x - player.x) + Math.abs(p.y - player.y) <= 5);
+    case 'fog':
+      return enemies.some((p) => Math.abs(p.x - player.x) + Math.abs(p.y - player.y) <= 8);
+    case 'chocolate':
+      return danger;
     case 'freeze':
       return state.bombs.some((b) => b.owner !== player.id && !(b.frozenTicks && b.frozenTicks > 0));
-    case 'ghost':
-      return danger;
     default:
       break;
   }

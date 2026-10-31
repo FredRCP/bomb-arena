@@ -90,8 +90,9 @@ describe('itens ruins', () => {
     expect(applyItem(p, 'slow')).toBe(true);
     expect(p.speedBonus).toBe(-1);
     expect(stepDistanceOf(p)).toBeLessThan(base);
-    applyItem(p, 'slow');
+    for (let i = 0; i < 6; i++) applyItem(p, 'slow');
     expect(p.speedBonus).toBe(MIN_SPEED_BONUS);
+    expect(MIN_SPEED_BONUS).toBe(-5);
     expect(applyItem(p, 'slow')).toBe(false);
     expect(p.speedBonus).toBe(MIN_SPEED_BONUS);
     expect(stepDistanceOf(p)).toBeGreaterThan(0);
