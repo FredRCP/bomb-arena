@@ -532,7 +532,6 @@ export class GameScene extends Phaser.Scene {
         heard.add('pickup');
         this.showPowerLabel(event.playerId, POWER_LABELS[event.kind]);
       }
-      if (event.type === 'teleported') heard.add('confirm');
       if (event.type === 'iceCracked') heard.add('tick');
       if (event.type === 'iceBroken') heard.add('place');
       if (event.type === 'bombPlaced' || event.type === 'bombKicked' || event.type === 'bombThrown') heard.add('place');

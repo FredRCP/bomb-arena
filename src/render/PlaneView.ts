@@ -8,7 +8,7 @@ import { TILE_SIZE } from './ArenaRenderer';
 
 const key = (name: string): string => `plane-${name}`;
 /** Largura do avião na arena, em pixels lógicos (a célula tem 64). */
-const WIDTH = 150;
+const WIDTH = 100;
 /** Altura (em pixels) a que o avião voa acima do chão. */
 const HEIGHT_ABOVE = 26;
 

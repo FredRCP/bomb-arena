@@ -1,7 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { ICE_CRACK_LEVELS } from '../../src/config/hazards';
 import { ELEPHANT_SPEED, POWER_CHARGE_TICKS } from '../../src/config/powers';
-import { AIRPLANE_BOMBS, AIRPLANE_LAPS, AIRPLANE_LAP_TICKS, CONFUSE_POWER_TICKS, SHIELD_POWER_TICKS } from '../../src/config/powers';
+import { AIRPLANE_BOMBS, AIRPLANE_LAPS, AIRPLANE_LAP_TICKS, CONFUSE_POWER_TICKS, FREEZE_POWER_TICKS, GHOST_POWER_TICKS, SHIELD_POWER_TICKS } from '../../src/config/powers';
 import { stageById } from '../../src/config/stages';
 import { aiShouldUsePower, createGameState, drainEvents, getCell, givePower, powerFraction, powerReady, step, createAi, iglooCells, placeBomb, pyramidExitCells, pyramidOrigin, pyramidTunnelCells, pyramidWallCells } from '../../src/core';
 import type { GameState } from '../../src/core';
@@ -414,7 +414,7 @@ describe('superpoderes dos outros personagens', () => {
     return p;
   };
 
-  it('Fred: escudo de 5 s (e o poder zera a carga)', () => {
+  it('Fred: invencível por 10 s (e o poder zera a carga)', () => {
     const state = field();
     const p = use(state, 'shield');
     expect(p.shieldTicks).toBeGreaterThan(SHIELD_POWER_TICKS - 5);
@@ -424,39 +424,39 @@ describe('superpoderes dos outros personagens', () => {
   it('Filippe: fantasma (atravessa blocos) e Glauceste: inimigos ficam com os controles invertidos', () => {
     const state = field();
     const f = use(state, 'ghost');
-    expect(f.ghostTicks).toBeGreaterThan(400);
+    expect(f.ghostTicks).toBeGreaterThan(GHOST_POWER_TICKS - 5);
     const state2 = field();
     use(state2, 'confuse');
     expect(state2.players[1]!.invertTicks).toBeGreaterThan(CONFUSE_POWER_TICKS - 5);
-    expect(state2.players[0]!.invertTicks).toBe(0);
+    expect(state2.players[0]!.invertTicks).toBe(0); // todos os outros, menos ele
   });
 
-  it('Van: teletransporta para uma célula livre a pelo menos 4 células, e avisa', () => {
+  it('Van: congela por 10 s as bombas dos outros (as dela não), e a bomba congelada não explode', () => {
     const state = field();
-    state.arena.cells[3 * 13 + 5] = 'block';
-    const p = state.players[0]!;
-    const fromCol = Math.floor(p.x);
-    const fromRow = Math.floor(p.y);
-    givePower(p, 'teleport');
-    p.power!.charge = POWER_CHARGE_TICKS;
-    step(state, { 1: { move: null, power: true } });
-    const events = drainEvents(state);
-    expect(events.some((e) => e.type === 'teleported')).toBe(true);
-    expect(Math.abs(Math.floor(p.x) - fromCol) + Math.abs(Math.floor(p.y) - fromRow)).toBeGreaterThanOrEqual(4);
-    expect(getCell(state.arena, Math.floor(p.x), Math.floor(p.y))).toBe('empty');
+    state.bombs.push({ owner: 1, col: 6, row: 1, ticksLeft: 100, range: 1, walkThrough: [] });
+    state.bombs.push({ owner: 2, col: 9, row: 5, ticksLeft: 5, range: 1, walkThrough: [] });
+    use(state, 'freeze');
+    expect(state.bombs.find((b) => b.owner === 2)!.frozenTicks).toBeGreaterThan(FREEZE_POWER_TICKS - 5);
+    expect(state.bombs.find((b) => b.owner === 1)!.frozenTicks ?? 0).toBe(0);
+    for (let i = 0; i < 60; i++) step(state);
+    const frozen = state.bombs.find((b) => b.owner === 2);
+    expect(frozen).toBeDefined(); // passou do pavio e não explodiu
+    expect(frozen!.ticksLeft).toBeGreaterThan(0);
+    for (let i = 0; i < FREEZE_POWER_TICKS + 10; i++) step(state);
+    expect(state.bombs.find((b) => b.owner === 2)).toBeUndefined(); // descongelou e explodiu
   });
 
-  it('Wal: a cegonha solta 3 itens bons num raio de 3 células', () => {
+  it('Wal: a cegonha solta 4 itens bons: 3 perto e 1 em qualquer lugar', () => {
     const state = field();
     use(state, 'stork');
-    expect(state.items).toHaveLength(3);
+    expect(state.items).toHaveLength(4);
+    expect(state.items.filter((item) => Math.max(Math.abs(item.col - 2), Math.abs(item.row - 3)) <= 3).length).toBeGreaterThanOrEqual(3);
     for (const item of state.items) {
-      expect(Math.max(Math.abs(item.col - 2), Math.abs(item.row - 3))).toBeLessThanOrEqual(3);
       expect(['bomb', 'range', 'speed', 'vest', 'kick']).toContain(item.kind);
     }
   });
 
-  it('a IA usa escudo/teleporte/fantasma só com perigo por perto, e a confusão com inimigo perto', () => {
+  it('a IA usa escudo/fantasma só com perigo por perto, e a confusão com inimigo perto', () => {
     const state = field();
     const p = state.players[0]!;
     givePower(p, 'shield');

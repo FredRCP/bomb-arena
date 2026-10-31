@@ -98,7 +98,7 @@ export interface PlayerState {
 }
 
 /** Superpoderes que existem: o elefantinho da Ana. */
-export type PowerKind = 'elephant' | 'airplane' | 'shield' | 'teleport' | 'stork' | 'confuse' | 'ghost';
+export type PowerKind = 'elephant' | 'airplane' | 'shield' | 'freeze' | 'stork' | 'confuse' | 'ghost';
 
 /** Elefantinho em disparada: o centro dele (em células) e a direção. */
 /** Porta de um iglu: de onde saem as bolas de neve e os pinguins, com os passos até a próxima saída e quantas já saíram. */
@@ -187,6 +187,8 @@ export interface BombState {
   remote?: boolean;
   /** Bomba chutada deslizando: direção e passos desde o último deslize. null/ausente = parada. */
   slide?: { direction: Direction; ticks: number } | null;
+  /** Congelada (poder da Van): o pavio não anda enquanto isto for maior que zero. */
+  frozenTicks?: number;
 }
 
 /** Uma célula em chamas. Machuca quem estiver nela enquanto `ticksLeft` for maior que zero. */
@@ -229,7 +231,6 @@ export type GameEvent =
   /** A neve fez crescer um bloco destrutível. */
   | { type: 'blockGrown'; col: number; row: number }
   | { type: 'rollerGone'; id: number; col: number; row: number }
-  | { type: 'teleported'; playerId: PlayerId; fromCol: number; fromRow: number; col: number; row: number }
   | { type: 'boulderWarn'; col: number }
   | { type: 'boulderRoll'; col: number }
   | { type: 'boulderGone'; col: number }

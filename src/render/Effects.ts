@@ -17,7 +17,7 @@ const SMOKE_COLORS = [0x6c6f7a, 0x8a8d99, 0xa4a7b3] as const;
 const DUST_COLOR = 0xe8dcc0;
 
 /** Cor do brilho de cada superpoder. */
-const POWER_COLORS = { shield: 0x74c0fc, teleport: 0xf783ac, stork: 0xe599f7, confuse: 0xb2f2bb, ghost: 0xced4da } as const;
+const POWER_COLORS = { shield: 0x74c0fc, freeze: 0x9be7ff, stork: 0xe599f7, confuse: 0xb2f2bb, ghost: 0xced4da } as const;
 
 export class Effects {
   private readonly particles = new ParticleSystem();
@@ -51,10 +51,6 @@ export class Effects {
         const p = state.players.find((q) => q.id === event.playerId);
         if (p) this.powerBurst(p.x * TILE_SIZE, p.y * TILE_SIZE - 10, POWER_COLORS[event.kind]);
         if (event.kind === 'confuse') for (const q of state.players) if (q.alive && q.id !== event.playerId && q.invertTicks > 0) this.stars(q.x * TILE_SIZE, q.y * TILE_SIZE - 30);
-      }
-      if (event.type === 'teleported') {
-        this.powerBurst((event.fromCol + 0.5) * TILE_SIZE, (event.fromRow + 0.5) * TILE_SIZE, POWER_COLORS.teleport);
-        this.powerBurst((event.col + 0.5) * TILE_SIZE, (event.row + 0.5) * TILE_SIZE, POWER_COLORS.teleport);
       }
       if (event.type === 'itemPicked' || event.type === 'playerRevived') {
         const p = state.players.find((q) => q.id === (event.type === 'itemPicked' ? event.playerId : event.playerId));

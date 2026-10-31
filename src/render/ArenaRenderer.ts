@@ -409,8 +409,9 @@ function drawBomb(g: Graphics, bomb: BombState, tick: number): void {
   const cy = (bomb.row + 0.5) * TILE_SIZE;
 
   // A bomba "pulsa" e pulsa mais rápido quando falta pouco para explodir.
+  const frozen = (bomb.frozenTicks ?? 0) > 0;
   const urgency = bomb.ticksLeft < 60 ? 3 : 1;
-  const pulse = 1 + 0.07 * Math.sin((tick / 7) * urgency);
+  const pulse = frozen ? 1 : 1 + 0.07 * Math.sin((tick / 7) * urgency);
   const r = 22 * pulse;
 
   g.fillStyle(COLORS.shadow, 0.25);
@@ -430,7 +431,7 @@ function drawBomb(g: Graphics, bomb: BombState, tick: number): void {
       g.fillCircle(cx + ux * (tip - 1), cy + 3 + uy * (tip - 1), 2.4);
     }
   }
-  g.fillStyle(bomb.pierce ? 0x232a45 : COLORS.bombBody);
+  g.fillStyle(frozen ? 0x7fc8e8 : bomb.pierce ? 0x232a45 : COLORS.bombBody);
   g.fillCircle(cx, cy + 3, r);
   if (bomb.remote) {
     // bomba-relógio: luz roxa piscando no meio
@@ -439,6 +440,32 @@ function drawBomb(g: Graphics, bomb: BombState, tick: number): void {
   }
   g.fillStyle(COLORS.bombHighlight, 0.6);
   g.fillCircle(cx - 8, cy - 6, 6);
+
+  if (frozen) {
+    // Bomba congelada: casca de gelo azul-clara com brilho, cristais em volta e sem faísca (o pavio fica parado).
+    const blink = (bomb.frozenTicks ?? 0) < 90 && tick % 16 < 8; // perto de descongelar, pisca
+    g.fillStyle(blink ? 0xffd6a5 : 0xe6f9ff, 0.55);
+    g.fillCircle(cx - 3, cy + 1, r - 6);
+    g.lineStyle(2, 0xffffff, 0.85);
+    g.lineBetween(cx - 12, cy - 2, cx - 2, cy + 8);
+    g.lineBetween(cx + 2, cy - 10, cx + 12, cy + 2);
+    g.lineStyle(3, 0xbdeeff, 0.95);
+    g.strokeCircle(cx, cy + 3, r);
+    for (let k = 0; k < 6; k++) {
+      const angle = (k * Math.PI) / 3 + 0.3;
+      const ux = Math.cos(angle);
+      const uy = Math.sin(angle);
+      g.fillStyle(0xe6f9ff, 0.95);
+      g.fillTriangle(cx + ux * (r - 2) - uy * 4, cy + 3 + uy * (r - 2) + ux * 4, cx + ux * (r - 2) + uy * 4, cy + 3 + uy * (r - 2) - ux * 4, cx + ux * (r + 9), cy + 3 + uy * (r + 9));
+    }
+    g.fillStyle(0xffffff, 0.9);
+    g.fillCircle(cx - 8, cy - 6, 5);
+    g.lineStyle(4, 0x6b7fa0, 1);
+    g.lineBetween(cx + 6, cy - r + 6, cx + 14, cy - r - 4);
+    g.fillStyle(0xbdeeff);
+    g.fillCircle(cx + 15, cy - r - 6, 3);
+    return;
+  }
 
   // Pavio com uma faísca que pisca.
   g.lineStyle(4, COLORS.bombFuse, 1);

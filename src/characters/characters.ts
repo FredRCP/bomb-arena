@@ -30,7 +30,7 @@ export interface CharacterDef {
 /** Os personagens com arte própria (caricaturas) vêm primeiro: ficam na linha de cima da escolha. */
 export const CHARACTERS: readonly CharacterDef[] = [
   { id: 'fred', name: 'Fred', color: 0xffa94d, hat: 'cap', custom: true, sprites: true, power: 'shield' },
-  { id: 'vanessa', name: 'Van', color: 0xf06595, hat: 'flower', custom: true, sprites: true, spriteScale: 1.12, power: 'teleport' },
+  { id: 'vanessa', name: 'Van', color: 0xf06595, hat: 'flower', custom: true, sprites: true, spriteScale: 1.12, power: 'freeze' },
   { id: 'ana-julia', name: 'Ana', color: 0xffd43b, hat: 'bow', custom: true, sprites: true, spriteScale: 0.92, power: 'elephant' },
   { id: 'lucas', name: 'Lucas', color: 0x74c0fc, hat: 'none', custom: true, sprites: true, spriteScale: 0.82, power: 'airplane' },
   { id: 'filippe', name: 'Filippe', color: 0x38d9a9, hat: 'headband', custom: true, sprites: true, spriteScale: 0.92, power: 'ghost' },

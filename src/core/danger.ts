@@ -54,7 +54,7 @@ export function buildHazards(state: GameState, extraBomb?: BombState, selfId?: P
   for (const bomb of bombs) bombByCell.set(cellIndex(arena, bomb.col, bomb.row), bomb);
 
   const blasts = bombs.map((bomb) => blastOf(arena, bomb, bombByCell));
-  const explodeAt = bombs.map((bomb, i) => (unknownRemote[i] ? UNKNOWN_REMOTE_TICKS : bomb.ticksLeft));
+  const explodeAt = bombs.map((bomb, i) => (unknownRemote[i] ? UNKNOWN_REMOTE_TICKS : bomb.ticksLeft + (bomb.frozenTicks ?? 0)));
 
   // Relaxa até estabilizar: quem é atingido por uma bomba que explode antes explode junto com ela.
   let changed = true;

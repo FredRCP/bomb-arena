@@ -127,7 +127,10 @@ export function advanceExplosions(state: GameState): void {
   for (const flame of state.flames) flame.ticksLeft -= 1;
   state.flames = state.flames.filter((flame) => flame.ticksLeft > 0);
 
-  for (const bomb of state.bombs) bomb.ticksLeft -= 1;
+  for (const bomb of state.bombs) {
+    if (bomb.frozenTicks && bomb.frozenTicks > 0) bomb.frozenTicks -= 1; // congelada: o pavio fica parado
+    else bomb.ticksLeft -= 1;
+  }
   const due = state.bombs.filter((bomb) => bomb.ticksLeft <= 0);
   if (due.length === 0) return;
 

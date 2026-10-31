@@ -28,7 +28,7 @@ export interface StageDef {
 
 export const STAGES: readonly StageDef[] = [
   { id: 'classic', name: 'Arena Clássica', available: true, tagline: 'Caixotes de madeira e blocos de pedra: o jeito clássico de jogar.', cols: 15, rows: 13, maxPlayers: 5, mobileOk: true, music: ['audio/100_victories.ogg'] },
-  { id: 'classic17', name: 'Arena Clássica Grande', theme: 'classic', available: true, tagline: 'A clássica em tamanho família (17 x 13), com mais espaço para fugir.', cols: 17, rows: 13, maxPlayers: 5, mobileOk: false, music: ['audio/100_victories.ogg'] },
+  { id: 'classic17', name: 'Arena Clássica Grande', theme: 'classic', available: true, tagline: 'A clássica em tamanho família (19 x 13), com mais espaço para fugir.', cols: 19, rows: 13, maxPlayers: 5, mobileOk: false, music: ['audio/100_victories.ogg'] },
   { id: 'ice', name: 'Fase do Gelo', available: true, tagline: 'Neve caindo, faixas escorregadias, gelo fino que racha e dois iglus que soltam bola de neve e pinguim!', cols: 15, rows: 13, maxPlayers: 5, mobileOk: true, hazards: { slippery: true, thinIce: true, igloo: true, regrow: true }, music: ['audio/gelo_loop.ogg', 'audio/gelo_intro.ogg'] },
   {
     id: 'egypt',
