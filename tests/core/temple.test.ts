@@ -144,6 +144,24 @@ describe('Templo Perdido: pedras gigantes', () => {
     expect([...boulder.last].sort()).toEqual([left, right].sort());
   });
 
+  it('a pedra passa por cima de pilares e não some no meio da descida', () => {
+    const state = make({ players: 2 });
+    clear(state);
+    state.round.phase = 'playing';
+    const boulder = state.hazards!.boulder!;
+    boulder.timer = 1;
+    step(state);
+    const [left, right] = boulder.cols as [number, number];
+    for (const col of [left, right]) for (const row of [3, 6, 9]) state.arena.cells[cellIndex(state.arena, col, row)] = 'wall';
+    let gone = 0;
+    for (let i = 0; i < BOULDER_WARN_TICKS + 1200 && gone < 2; i++) {
+      step(state);
+      for (const e of drainEvents(state)) if (e.type === 'boulderGone') gone += 1;
+    }
+    expect(gone).toBe(2);
+    expect(getCell(state.arena, left, 6)).toBe('wall'); // o pilar continua lá
+  });
+
   it('o jogador que sai da coluna durante o aviso se salva', () => {
     const state = make({ players: 2 });
     clear(state);

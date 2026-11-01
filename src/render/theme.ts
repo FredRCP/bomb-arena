@@ -55,10 +55,10 @@ export interface ThemeDef {
 }
 
 export const THEMES: Record<string, ThemeDef> = {
-  classic: { id: 'classic', floors: false, wall: true, wallWidth: 62, blockVariants: 1, blockWidth: 62, rubble: false, background: false, chips: [0xd9822b, 0xa65a1c, 0x6e3a12] },
+  classic: { id: 'classic', floors: false, wall: true, wallWidth: 62, blockVariants: 1, blockWidth: 62, rubble: false, background: true, chips: [0xd9822b, 0xa65a1c, 0x6e3a12] },
   egypt: { id: 'egypt', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xf3d896, 0xe0b868, 0xb88f46], borderGlyphs: 22, pyramid: true, floorFull: true, columns: true, quicksand: true, sphinx: true, scrolls: true },
   temple: { id: 'temple', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xc9965c, 0x9b6b3a, 0x5f8f3f], island: true },
-  pirates: { id: 'pirates', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xb07a3c, 0x8a5a2a, 0xd9b36a], deck: true },
+  pirates: { id: 'pirates', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xb07a3c, 0x8a5a2a, 0xd9b36a] },
   sea: { id: 'sea', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xbdeeff, 0x7fd0f0, 0xe8fbff], bubbles: true },
   volcano: { id: 'volcano', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xff7a1a, 0x9a5a38, 0x2a2228], volcano: true, embers: true },
   ice: { id: 'ice', floors: true, wall: true, wallWidth: 56, blockVariants: 3, blockWidth: 62, rubble: true, background: true, chips: [0xe3f6ff, 0xb9e3f7, 0x7fc4e8], igloo: true, snow: true },

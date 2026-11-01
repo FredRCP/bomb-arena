@@ -23,7 +23,7 @@
         height: 100%;
         overflow: hidden;
         overscroll-behavior: none;
-        background: #3a4fd0;
+        background: linear-gradient(#6a4cf0, #1ab5e6);
         -webkit-user-select: none;
         user-select: none;
         -webkit-touch-callout: none;
@@ -31,6 +31,7 @@
       }
       /* Ocupa só a parte realmente visível (no Safari do iPhone, 100vh passa por baixo da barra do navegador) e respeita o entalhe. */
       #game {
+        z-index: 1;
         position: fixed;
         top: env(safe-area-inset-top, 0px);
         right: env(safe-area-inset-right, 0px);

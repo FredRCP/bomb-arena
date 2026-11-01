@@ -179,9 +179,71 @@ export class ExtraHazardsView {
     }
   }
 
-  /** Canhões do navio: sombra no chão avisando e a bala caindo de cima (cinza escura, com pavio aceso). */
+  /** Posição (base) e sentido de cada um dos 3 canhões, nas margens laterais da arena. */
+  private cannonSpots(state: GameState): { x: number; y: number; dir: 1 | -1 }[] {
+    const w = state.arena.cols * TILE_SIZE;
+    const h = state.arena.rows * TILE_SIZE;
+    return [
+      { x: -110, y: h * 0.27, dir: 1 },
+      { x: -110, y: h * 0.73, dir: 1 },
+      { x: w + 110, y: h * 0.5, dir: -1 },
+    ];
+  }
+
+  /** Desenha um canhão pirata (carreta de madeira, rodas, cano de ferro com anéis dourados) apontado para a arena. */
+  private drawCannonBody(g: Phaser.GameObjects.Graphics, x: number, y: number, dir: 1 | -1, recoil: number): void {
+    const bx = x - dir * recoil;
+    // Carreta e rodas
+    g.fillStyle(0x000000, 0.28).fillEllipse(x, y + 44, 120, 22);
+    g.fillStyle(0x6b4423, 1).fillRoundedRect(bx - 44, y + 4, 88, 22, 6);
+    g.fillStyle(0x8a5a2a, 1).fillRoundedRect(bx - 40, y + 6, 80, 8, 4);
+    for (const wx of [-26, 26]) {
+      g.fillStyle(0x3d2412, 1).fillCircle(bx + wx, y + 30, 19);
+      g.fillStyle(0x7a4e28, 1).fillCircle(bx + wx, y + 30, 15);
+      g.fillStyle(0x3d2412, 1).fillCircle(bx + wx, y + 30, 5);
+      g.lineStyle(3, 0x3d2412, 1).lineBetween(bx + wx - 15, y + 30, bx + wx + 15, y + 30).lineBetween(bx + wx, y + 15, bx + wx, y + 45);
+      g.fillStyle(0xe8c04a, 1).fillCircle(bx + wx, y + 30, 3);
+    }
+    // Cano inclinado para cima, na direção da arena
+    const ang = -0.3;
+    const ca = Math.cos(ang);
+    const sa = Math.sin(ang);
+    const pt = (u: number, v: number): { x: number; y: number } => ({ x: bx + dir * (u * ca - v * sa), y: y + 2 + (u * sa + v * ca) });
+    const poly = (pts: { x: number; y: number }[]): Phaser.Geom.Point[] => pts.map((q) => new Phaser.Geom.Point(q.x, q.y));
+    g.fillStyle(0x22232b, 1).fillPoints(poly([pt(-34, -15), pt(52, -12), pt(52, 12), pt(-34, 15)]), true);
+    g.fillStyle(0x3a3c48, 1).fillPoints(poly([pt(-30, -11), pt(50, -9), pt(50, -2), pt(-30, -3)]), true);
+    g.fillStyle(0x22232b, 1).fillCircle(pt(-36, 0).x, pt(-36, 0).y, 10);
+    for (const u of [-14, 20, 46]) {
+      const a = pt(u, -15);
+      const b = pt(u, 15);
+      g.lineStyle(5, 0xe8c04a, 1).lineBetween(a.x, a.y, b.x, b.y);
+    }
+    const m = pt(56, 0);
+    g.fillStyle(0x0a0a10, 1).fillCircle(m.x, m.y, 9);
+  }
+
+  /** Canhões do navio: 3 canhões nas margens atiram em arco; a sombra no chão avisa onde a bala vai cair. */
   private drawCannon(g: Phaser.GameObjects.Graphics, top: Phaser.GameObjects.Graphics, state: GameState, cannon: NonNullable<GameState['hazards']>['cannon'] & object): void {
     const t = state.tick;
+    const spots = this.cannonSpots(state);
+    const recoil = [0, 0, 0];
+    const flash = [0, 0, 0];
+    for (const shot of cannon.shots) {
+      const idx = (shot.col + shot.row) % 3;
+      const age = CANNON_FALL_TICKS - shot.ticks;
+      recoil[idx] = Math.max(recoil[idx], 16 * Math.max(0, 1 - age / 16));
+      flash[idx] = Math.max(flash[idx], Math.max(0, 1 - age / 10));
+    }
+    spots.forEach((s, i) => {
+      this.drawCannonBody(g, s.x, s.y, s.dir, recoil[i]);
+      if (flash[i] > 0) {
+        const mx = s.x + s.dir * 62;
+        const my = s.y - 16;
+        top.fillStyle(0xfff0a0, 0.9 * flash[i]).fillCircle(mx, my, 14 + 22 * (1 - flash[i]));
+        top.fillStyle(0xff7a1a, 0.7 * flash[i]).fillCircle(mx + s.dir * 14, my - 4, 10 + 18 * (1 - flash[i]));
+        top.fillStyle(0x8a8a96, 0.5 * flash[i]).fillCircle(mx + s.dir * 36, my - 18, 18 + 26 * (1 - flash[i]));
+      }
+    });
     for (const shot of cannon.shots) {
       const progress = 1 - shot.ticks / CANNON_FALL_TICKS;
       const tx = (shot.col + 0.5) * TILE_SIZE;
@@ -189,13 +251,15 @@ export class ExtraHazardsView {
       const blink = shot.ticks < 40 && Math.floor(t / 4) % 2 === 0;
       g.fillStyle(0x1b0a05, 0.15 + 0.4 * progress).fillCircle(tx, ty + 4, 10 + 26 * progress);
       g.lineStyle(3, blink ? 0xffe066 : 0xff7a1a, 0.5 + 0.4 * progress).strokeCircle(tx, ty + 4, 12 + 26 * progress);
-      if (shot.ticks > 36) continue;
-      const u = 1 - shot.ticks / 36;
-      const by = -140 + (ty + 140) * u * u;
-      top.fillStyle(0x15151c, 1).fillCircle(tx, by, 17);
-      top.fillStyle(0x4a4a58, 1).fillCircle(tx - 5, by - 5, 6);
-      top.fillStyle(0xffc23a, 1).fillCircle(tx + 9, by - 17, 4);
-      top.fillStyle(0xff6a14, 0.4).fillCircle(tx, by - 30, 12);
+      const s = spots[(shot.col + shot.row) % 3];
+      const sx = s.x + s.dir * 62;
+      const sy = s.y - 16;
+      const bx = sx + (tx - sx) * progress;
+      const by = sy + (ty - sy) * progress - Math.sin(Math.PI * progress) * 230;
+      top.fillStyle(0x000000, 0.18).fillCircle(bx, sy + (ty - sy) * progress + 10, 10);
+      top.fillStyle(0x15151c, 1).fillCircle(bx, by, 16);
+      top.fillStyle(0x4a4a58, 1).fillCircle(bx - 5, by - 5, 6);
+      top.fillStyle(0x8a8a96, 0.35).fillCircle(bx - s.dir * 18, by + 6, 8).fillCircle(bx - s.dir * 34, by + 12, 5);
     }
   }
 

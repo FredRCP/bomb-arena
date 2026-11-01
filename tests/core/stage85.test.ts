@@ -37,7 +37,7 @@ describe('níveis de dificuldade e velocidade', () => {
   it('o teto de velocidade vale para todos: nem o nível mais alto com 5 itens passa do passo de uma pessoa com 5 itens', () => {
     const ultra = stepDistanceOf({ speedBonus: SPEED_ITEMS_CAP, speedScale: 1.2 });
     expect(ultra).toBeCloseTo(MAX_STEP_DISTANCE, 12);
-    expect(MAX_STEP_DISTANCE).toBeLessThan(0.1);
+    expect(MAX_STEP_DISTANCE).toBeLessThan(0.12);
     expect(stepDistanceOf({ speedBonus: SPEED_ITEMS_CAP, speedScale: 1 })).toBeCloseTo(MAX_STEP_DISTANCE, 12);
   });
 

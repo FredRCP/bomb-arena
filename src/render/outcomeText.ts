@@ -41,7 +41,7 @@ export function setCpuNames(names: Readonly<Record<number, string>>): void {
 
 /** Nome de um jogador nos painéis e no placar: "Você" (uma pessoa só), "Jogador N", o nome do personagem do computador ou "CPU k". */
 export function playerLabel(player: Pick<PlayerState, 'id' | 'cpu'>, players: Roster): string {
-  if (player.cpu && cpuNames[player.id]) return cpuNames[player.id]!;
+  if (cpuNames[player.id]) return cpuNames[player.id]!;
   if (player.cpu) return `CPU ${players.filter((p) => p.cpu).findIndex((p) => p.id === player.id) + 1}`;
   return humansOf(players).length === 1 ? 'Você' : `Jogador ${player.id}`;
 }

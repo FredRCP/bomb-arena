@@ -535,10 +535,7 @@ function updateBoulder(state: GameState): void {
       continue;
     }
     if (front >= 1) {
-      if (getCell(arena, col, front) === 'wall') {
-        done(col); // parede (morte súbita) na coluna do meio: a pedra se desfaz
-        continue;
-      }
+      // A pedra passa por cima dos pilares (a coluna do meio pode ser par e ter pilar): ela nunca some no meio da descida.
       for (let c = col - 1; c <= col + 1; c++) {
         if (getCell(arena, c, front) === 'block') {
           arena.cells[cellIndex(arena, c, front)] = 'empty';

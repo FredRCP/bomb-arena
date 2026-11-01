@@ -35,18 +35,18 @@ describe('velocidade e limites', () => {
     const p = stateFromText(HALL).players[0]!;
     expect(stepDistanceOf(p)).toBeCloseTo(PLAYER_SPEED / 60, 12);
     p.speedBonus = SPEED_ITEMS_CAP;
-    expect(stepDistanceOf(p)).toBeLessThan(2 * PLAYER_SLACK);
+    expect(stepDistanceOf(p)).toBeLessThan(2.5 * PLAYER_SLACK); // com +8 (pedido do Fred) o passo passa de 0,1; a IA usa tolerância proporcional ao passo
   });
 
-  it('limites: no máximo 8 bombas e 5 de velocidade; depois o item é gasto sem efeito', () => {
+  it('limites: no máximo 8 bombas e 8 de velocidade; depois o item é gasto sem efeito', () => {
     expect(MAX_BOMBS_CAP).toBe(8);
-    expect(SPEED_ITEMS_CAP).toBe(5);
+    expect(SPEED_ITEMS_CAP).toBe(8);
     const p = stateFromText(HALL).players[0]!;
     for (let i = 1; i < 8; i++) expect(applyItem(p, 'bomb')).toBe(true);
     expect(p.maxBombs).toBe(8);
     expect(applyItem(p, 'bomb')).toBe(false);
-    for (let i = 0; i < 5; i++) expect(applyItem(p, 'speed')).toBe(true);
-    expect(p.speedBonus).toBe(5);
+    for (let i = 0; i < 8; i++) expect(applyItem(p, 'speed')).toBe(true);
+    expect(p.speedBonus).toBe(8);
     expect(applyItem(p, 'speed')).toBe(false);
   });
 });
@@ -211,5 +211,15 @@ describe('IA eliminada joga das laterais', () => {
     step(off);
     const ai = createAi(3, 'expert', 1);
     expect(ai.decide(off)).toEqual({ move: null, placeBomb: false });
+  });
+});
+
+describe('Bolt (lote 39)', () => {
+  it('é amarelo, com emblema de raio, e o poder é a corrida', async () => {
+    const { CHARACTERS } = await import('../../src/characters/characters');
+    const bolt = CHARACTERS.find((c) => c.id === 'bolt')!;
+    expect(bolt.color).toBe(0xffd43b);
+    expect(bolt.emblem).toBe('bolt');
+    expect(bolt.power).toBe('sprint');
   });
 });

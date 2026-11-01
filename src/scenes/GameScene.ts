@@ -48,6 +48,7 @@ import { ElephantView } from '../render/ElephantView';
 import { PlaneView } from '../render/PlaneView';
 import { SnowView } from '../render/SnowView';
 import { BubblesView } from '../render/BubblesView';
+import { setPageBackdrop } from '../render/pageBackdrop';
 import { EmbersView } from '../render/EmbersView';
 import { ExtraHazardsView } from '../render/ExtraHazardsView';
 import { POWER_LABELS } from '../config/powers';
@@ -77,9 +78,6 @@ export interface GameSession {
   /** Música sorteada para esta partida (vale para todas as rodadas dela). Ausente: sorteia ao começar. */
   track?: string;
 }
-
-/** Quanto a semente avança quando começa uma partida nova (para a revanche não repetir as mesmas arenas). */
-const SEED_STEP_PER_MATCH = 10;
 
 /** Passos só com o fundo no começo da partida (2,5 s). */
 const PREROLL_TICKS = 150;
@@ -174,7 +172,9 @@ export class GameScene extends Phaser.Scene {
     this.characters = this.session.characters ?? defaultChoices(this.gameState.players.length);
     // O computador aparece com o nome do personagem que está jogando (e não "CPU 1", "CPU 2"...).
     const cpuNames: Record<number, string> = {};
-    for (const player of this.gameState.players) if (player.cpu) cpuNames[player.id] = characterById(this.characters[player.id]).name;
+    // Com mais de uma pessoa jogando, cada uma também aparece com o nome do seu personagem (em vez de "Jogador 1", "Jogador 2"...).
+    const manyHumans = this.gameState.players.filter((p) => !p.cpu).length > 1;
+    for (const player of this.gameState.players) if (player.cpu || manyHumans) cpuNames[player.id] = characterById(this.characters[player.id]).name;
     setCpuNames(cpuNames);
     // Superpoder de cada personagem (a carga começa vazia a cada rodada).
     for (const player of this.gameState.players) {
@@ -208,7 +208,9 @@ export class GameScene extends Phaser.Scene {
       this.scene.sendToBack('Backdrop');
       this.cameras.main.setAlpha(1);
       backdrop = true;
+      setPageBackdrop(`${import.meta.env.BASE_URL}themes/${theme.id}/background.jpg`);
     } else {
+      setPageBackdrop(null);
       addMenuBackground(this, undefined, false); // fundo colorido da tela (sem bolhas, para não distrair)
     }
     this.stepper.reset();
@@ -270,6 +272,7 @@ export class GameScene extends Phaser.Scene {
       this.input.keyboard?.off('keydown', onPauseKey);
       this.keyboardInput.destroy();
       this.scene.stop('Backdrop');
+      setPageBackdrop(null);
       music.release();
     });
 
@@ -412,7 +415,9 @@ export class GameScene extends Phaser.Scene {
     if (!roundOver) {
       this.scene.restart({ config, match, characters: this.characters, scores: this.session.scores, ...(this.session.track && { track: this.session.track }) });
     } else if (match.finished) {
-      this.scene.restart({ config: { ...config, seed: config.seed + SEED_STEP_PER_MATCH }, match: createMatch(config.wins), characters: this.characters });
+      // Fim da partida: pódio com os vencedores (de lá dá para jogar de novo ou voltar ao menu).
+      const ranked = rankPlayers(this.session.scores!, this.gameState.players);
+      this.scene.start('Podium', { ranked, characters: this.characters, config });
     } else {
       nextRound(match);
       this.scene.restart({ config, match, characters: this.characters, scores: this.session.scores, ...(this.session.track && { track: this.session.track }) });
@@ -569,10 +574,10 @@ export class GameScene extends Phaser.Scene {
         this.cameras.main.shake(3000, 0.0012);
       }
       if (event.type === 'bridgeFall') heard.add('explode');
-      if (event.type === 'cannonShot') heard.add('place');
+      if (event.type === 'cannonShot') sfx.play('cannon');
       if (event.type === 'cannonImpact') heard.add('explode');
       if (event.type === 'powerUsed') {
-        heard.add('pickup');
+        sfx.play(`power-${event.kind}`);
         this.showPowerLabel(event.playerId, POWER_LABELS[event.kind]);
       }
       if (event.type === 'iceCracked') heard.add('tick');
@@ -629,7 +634,7 @@ export class GameScene extends Phaser.Scene {
       const note = this.saveRecords(ranked);
       if (note) text.lines.push(note);
     }
-    sfx.play(text.tone === 'good' ? 'win' : 'lose');
+    sfx.play(text.tone === 'good' ? 'fanfare' : text.tone === 'bad' ? 'sad' : 'lose');
     this.hud.update(this.gameState, match, this.session.scores);
     showOutcomeOverlay(this, this.gameState.arena.cols * TILE_SIZE, this.gameState.arena.rows * TILE_SIZE, text);
   }

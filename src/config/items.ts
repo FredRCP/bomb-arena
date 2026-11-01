@@ -9,7 +9,7 @@ export const ITEM_WEIGHTS = { bomb: 4, range: 4, speed: 3, kick: 2, pierce: 1, r
 /** Limites, para ninguém ficar forte demais. Pegar um item no limite o gasta sem efeito. */
 export const MAX_BOMBS_CAP = 8;
 export const BOMB_RANGE_CAP = 8;
-export const SPEED_ITEMS_CAP = 5;
+export const SPEED_ITEMS_CAP = 8;
 
 /**
  * Velocidade que cada ponto de velocidade soma, em células por segundo.

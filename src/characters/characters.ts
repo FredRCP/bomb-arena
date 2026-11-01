@@ -23,6 +23,8 @@ export interface CharacterDef {
   sprites?: boolean;
   /** Ajuste fino do tamanho do corpo na arena (1 = padrão), para igualar o tamanho da cabeça entre artes diferentes. */
   spriteScale?: number;
+  /** Desenho no meio do corpo (só nos personagens genéricos): o raio do Bolt. */
+  emblem?: 'bolt';
   /** Superpoder do personagem (carrega sozinho e é solto com o botão de poder). */
   power?: PowerKind;
 }
@@ -37,7 +39,7 @@ export const CHARACTERS: readonly CharacterDef[] = [
   { id: 'waleska', name: 'Wal', color: 0xe599f7, hat: 'crown', custom: true, sprites: true, power: 'stork' },
   { id: 'glaucio', name: 'Glauceste', color: 0xadb5bd, hat: 'cap', custom: true, sprites: true, power: 'confuse' },
   { id: 'pipoca', name: 'Pipoca', color: 0xff5c8a, hat: 'antenna', custom: false, power: 'jump' },
-  { id: 'bolt', name: 'Bolt', color: 0x2dc7ff, hat: 'horns', custom: false, power: 'sprint' },
+  { id: 'bolt', name: 'Bolt', color: 0xffd43b, hat: 'horns', custom: false, emblem: 'bolt', power: 'sprint' },
   { id: 'musgo', name: 'Musgo', color: 0x7ed957, hat: 'leaf', custom: false, power: 'slime' },
   { id: 'violeta', name: 'Violeta', color: 0xb388ff, hat: 'crown', custom: false, power: 'invisible' },
   { id: 'fagulha', name: 'Fagulha', color: 0xff6b35, hat: 'star', custom: false, power: 'twinbombs' },

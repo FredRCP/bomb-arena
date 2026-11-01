@@ -106,6 +106,25 @@ function darker(color: number): number {
   return (Math.floor(r * 0.6) << 16) | (Math.floor(g * 0.6) << 8) | Math.floor(b * 0.6);
 }
 
+/** Raio (relâmpago) desenhado no meio do corpo do Bolt: laranja com contorno escuro, atrás dos olhos. */
+function drawBolt(g: Phaser.GameObjects.Graphics, radius: number): void {
+  const r = radius;
+  const pts = [
+    { x: 0.12, y: -0.95 },
+    { x: -0.48, y: 0.08 },
+    { x: -0.06, y: 0.08 },
+    { x: -0.2, y: 0.95 },
+    { x: 0.5, y: -0.16 },
+    { x: 0.08, y: -0.16 },
+  ].map((p) => ({ x: p.x * r, y: p.y * r }));
+  g.fillStyle(0x7a3b00, 1);
+  g.fillPoints(pts.map((p) => ({ x: p.x * 1.18, y: p.y * 1.1 })), true);
+  g.fillStyle(0xff8a00, 1);
+  g.fillPoints(pts, true);
+  g.fillStyle(0xfff3a0, 0.9);
+  g.fillPoints(pts.map((p) => ({ x: p.x * 0.55, y: p.y * 0.55 })), true);
+}
+
 /**
  * Cria o desenho de um personagem centrado em (x, y), com `radius` de raio. Usa a imagem do personagem se ela
  * foi carregada; senão, o desenho provisório (cabeça redonda com olhos, acessório e, nos da família, a inicial).
@@ -139,6 +158,7 @@ export function addCharacter(scene: Phaser.Scene, character: CharacterDef, x: nu
           .setOrigin(0.5),
       );
     } else {
+      if (character.emblem === 'bolt') drawBolt(g, radius);
       g.fillStyle(COLORS.playerEye);
       g.fillCircle(-radius * 0.31, -radius * 0.08, radius * 0.23);
       g.fillCircle(radius * 0.31, -radius * 0.08, radius * 0.23);

@@ -79,9 +79,12 @@ export class MenuScene extends Phaser.Scene {
     this.arrowRight = this.add.text(0, 0, '◀', { fontFamily: FONT, fontSize: '44px', color: '#ffe66d', stroke: '#1b1f3b', strokeThickness: 5 }).setOrigin(0.5);
     this.tweens.add({ targets: [this.arrow], x: '+=10', duration: 450, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     this.add
-      .text(ox + SCREEN_WIDTH / 2, oy + SCREEN_HEIGHT - 50, '↑ ↓ escolher     Enter confirmar     Esc voltar     (ou use o controle)', { fontFamily: FONT, fontSize: '24px', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 4 })
+      .text(ox + SCREEN_WIDTH / 2, oy + SCREEN_HEIGHT - 50, '↑ ↓ escolher     Enter confirmar     (ou use o controle)', { fontFamily: FONT, fontSize: '24px', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 4 })
       .setOrigin(0.5);
 
+    // O primeiro toque ou tecla libera o áudio do navegador: a música do menu começa agora se ele a tinha segurado.
+    this.input.once('pointerdown', () => music.sync());
+    this.input.keyboard?.once('keydown', () => music.sync());
     this.bindKeys();
     this.padNav = new PadNav(this);
     this.render();
@@ -166,7 +169,8 @@ export class MenuScene extends Phaser.Scene {
   }
 
   private back(): void {
-    this.scene.start('Title');
+    // Já é a tela inicial: não há para onde voltar.
+    sfx.play('tick');
   }
 
   private render(): void {
