@@ -36,7 +36,6 @@ export class SetupScene extends Phaser.Scene {
   private menu!: MenuState;
   private session: GameSession | undefined;
   private texts: Phaser.GameObjects.GameObject[] = [];
-  private arrow!: Phaser.GameObjects.Text;
   private padNav!: PadNav;
   /** Tela de toque (celular/tablet)? As arenas grandes ficam desligadas nela. */
   private touch = false;
@@ -79,7 +78,6 @@ export class SetupScene extends Phaser.Scene {
     const step = stepNumber(this.menu.screen, this.menu.settings);
     const total = this.session ? totalSteps({ ...this.menu.settings, players: this.session.config.players, enemies: this.session.config.enemies }) : totalSteps(this.menu.settings);
     if (step) this.add.text(WIDTH / 2, 160, `Passo ${step} de ${total}`, { fontFamily: FONT, fontSize: '24px', color: '#e3e7ff' }).setOrigin(0.5);
-    this.arrow = this.add.text(0, 0, '▶', { fontFamily: FONT, fontSize: '34px', color: '#ffe66d' }).setOrigin(0.5);
     this.add
       .text(WIDTH / 2, HEIGHT - 50, this.menu.screen === 'stage' ? '← → trocar de fase     Enter jogar     Esc voltar     (ou use o controle)' : '↑ ↓ escolher     ← → mudar     Enter continuar     Esc voltar     (ou use o controle)', { fontFamily: FONT, fontSize: '24px', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 4 })
       .setOrigin(0.5);
@@ -194,7 +192,6 @@ export class SetupScene extends Phaser.Scene {
 
   /** Carrossel de fases: a escolhida grande no meio, as vizinhas menores e apagadas dos lados. */
   private renderStage(): void {
-    this.arrow.setVisible(false);
     const ids = STAGES.map((stage) => stage.id);
     const at = ids.indexOf(stageById(this.menu.settings.stage).id);
     const stage = STAGES[at]!;
@@ -295,17 +292,15 @@ export class SetupScene extends Phaser.Scene {
         const label = NEXT_LABELS[this.menu.screen];
         const color = blocked ? '#6c7293' : selected ? '#ffe66d' : '#c9a93a';
         this.texts.push(this.add.text(WIDTH / 2, y + 24, label, { fontFamily: FONT, fontSize: '50px', fontStyle: 'bold', color, stroke: '#1b1f3b', strokeThickness: 6 }).setOrigin(0.5));
-        if (selected) this.arrow.setPosition(WIDTH / 2 - 130, y + 24);
         return;
       }
       const { label, value } = describeRow(this.menu.settings, row);
-      const color = selected ? '#ffffff' : '#e3e7ff';
+      const color = selected ? '#ffe66d' : '#e3e7ff';
       const style = { fontFamily: FONT, fontSize: '32px', fontStyle: selected ? 'bold' : 'normal', color };
       this.texts.push(
         this.add.text(150, y, label, style).setOrigin(0, 0.5),
         this.add.text(WIDTH - 150, y, selected ? `◀  ${value}  ▶` : value, style).setOrigin(1, 0.5),
       );
-      if (selected) this.arrow.setPosition(110, y);
     });
 
     if (this.menu.screen === 'participants' && this.menu.maxHumans < 3) {

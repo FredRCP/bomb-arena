@@ -20,8 +20,6 @@ const ITEMS = [
 export class MenuScene extends Phaser.Scene {
   private selected = 0;
   private buttons: Array<{ box: Phaser.GameObjects.Container; bg: Phaser.GameObjects.Graphics; label: Phaser.GameObjects.Text; icon: Phaser.GameObjects.Image }> = [];
-  private arrow!: Phaser.GameObjects.Text;
-  private arrowRight!: Phaser.GameObjects.Text;
   private padNav!: PadNav;
 
   constructor() {
@@ -75,9 +73,6 @@ export class MenuScene extends Phaser.Scene {
       });
       return { box, bg, label, icon };
     });
-    this.arrow = this.add.text(0, 0, '▶', { fontFamily: FONT, fontSize: '44px', color: '#ffe66d', stroke: '#1b1f3b', strokeThickness: 5 }).setOrigin(0.5);
-    this.arrowRight = this.add.text(0, 0, '◀', { fontFamily: FONT, fontSize: '44px', color: '#ffe66d', stroke: '#1b1f3b', strokeThickness: 5 }).setOrigin(0.5);
-    this.tweens.add({ targets: [this.arrow], x: '+=10', duration: 450, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
     this.add
       .text(ox + SCREEN_WIDTH / 2, oy + SCREEN_HEIGHT - 50, '↑ ↓ escolher     Enter confirmar     (ou use o controle)', { fontFamily: FONT, fontSize: '24px', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 4 })
       .setOrigin(0.5);
@@ -191,8 +186,6 @@ export class MenuScene extends Phaser.Scene {
       box.setScale(selected ? 1.07 : 1);
       if (selected) {
         this.tweens.add({ targets: box, scale: 1.12, duration: 520, yoyo: true, repeat: -1, ease: 'Sine.easeInOut' });
-        this.arrow.setPosition(box.x - 290, box.y);
-        this.arrowRight.setPosition(box.x + 290, box.y);
       }
     });
   }

@@ -82,6 +82,9 @@ export interface GameSession {
 /** Passos só com o fundo no começo da partida (2,5 s). */
 const PREROLL_TICKS = 150;
 
+/** Tempo que o resultado da última rodada fica na tela antes de o pódio aparecer sozinho. */
+const MATCH_END_PODIUM_DELAY_MS = 3000;
+
 export class GameScene extends Phaser.Scene {
   private gameState!: GameState;
   private session!: GameSession;
@@ -425,7 +428,7 @@ export class GameScene extends Phaser.Scene {
   }
 
   /** Itens do menu da pausa (a ordem é a da tela). */
-  private static readonly PAUSE_ITEMS = ['resume', 'sfx', 'music', 'controls', 'restart', 'quit'] as const;
+  private static readonly PAUSE_ITEMS = ['resume', 'sfx', 'music', 'controls', 'restart', 'arenas', 'quit'] as const;
 
   private setPaused(paused: boolean): void {
     if (!paused) {
@@ -470,6 +473,7 @@ export class GameScene extends Phaser.Scene {
       music: `◀  Volume da música: ${pct(settings.music)}  ▶`,
       controls: 'Controles',
       restart: 'Reiniciar a rodada',
+      arenas: 'Sair para a escolha de arenas',
       quit: 'Sair para o menu',
     };
     this.pauseTexts.forEach((text, index) => {
@@ -507,6 +511,14 @@ export class GameScene extends Phaser.Scene {
       }
       if (item === 'restart') {
         this.restart(false);
+        return;
+      }
+      if (item === 'arenas') {
+        // Volta para a escolha da arena com os mesmos jogadores e personagens, numa partida nova (placar zerado).
+        const { config } = this.session;
+        const settings = loadSettings();
+        const seed = Math.floor(Math.random() * 1_000_000);
+        this.scene.start('Setup', { screen: 'stage', session: { config: { ...config, seed }, match: createMatch(config.wins ?? settings.wins), characters: this.characters } });
         return;
       }
       if (item === 'quit') {
@@ -637,6 +649,8 @@ export class GameScene extends Phaser.Scene {
     sfx.play(text.tone === 'good' ? 'fanfare' : text.tone === 'bad' ? 'sad' : 'lose');
     this.hud.update(this.gameState, match, this.session.scores);
     showOutcomeOverlay(this, this.gameState.arena.cols * TILE_SIZE, this.gameState.arena.rows * TILE_SIZE, text);
+    // Fim da partida: depois de um instante com o resultado da rodada na tela, vai sozinho para o pódio (sem apertar nada).
+    if (match.finished) this.time.delayedCall(MATCH_END_PODIUM_DELAY_MS, () => { if (this.scene.isActive() && this.gameState.round.phase === 'over' && this.pauseObjects.length === 0) this.restart(true); });
   }
 
   /** Fim da partida: guarda a pontuação de cada pessoa no Top 10. Devolve um aviso se alguém entrou no ranking. */
