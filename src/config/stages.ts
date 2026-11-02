@@ -82,7 +82,7 @@ export const STAGES: readonly StageDef[] = [
     id: 'volcano',
     name: 'Vulcão',
     available: true,
-    tagline: 'Um rio de lava cruza a arena a cada minuto, o vulcão lança bolas de fogo (a sombra avisa 2 s antes) e a tela treme. Fumaça e fagulhas por toda parte!',
+    tagline: 'Dois rios de lava cruzam a arena (e acionam as bombas que tocam), o vulcão entra em erupção e lança bolas de fogo (a sombra avisa 2 s antes) e a tela treme. Nuvens de fumaça e fagulhas por toda parte!',
     cols: 17,
     rows: 13,
     maxPlayers: 6,

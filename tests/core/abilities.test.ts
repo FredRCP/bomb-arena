@@ -220,13 +220,28 @@ describe('arremesso', () => {
     near.players[0]!.facing = 'right';
     step(near, { 1: { move: null, placeBomb: true } });
     step(near, { 1: { move: null, special: true } });
-    expect(near.bombs[0]!.col).toBe(3);
+    expect(near.bombs[0]!.col).toBe(2); // o miolo só tem 3 casas: a bomba dá a volta e cai na casa do meio
 
     const none = stateFromText(['###', '#.#', '###'], [{ id: 1, col: 1, row: 1 }]);
     none.players[0]!.canThrow = true;
     step(none, { 1: { move: null, placeBomb: true } });
     step(none, { 1: { move: null, special: true } });
     expect(none.bombs[0]).toMatchObject({ col: 1, row: 1 });
+  });
+
+  it('a bomba arremessada para fora da arena reaparece do lado oposto (como no Bomberman)', () => {
+    const state = stateFromText(['#######', '#.....#', '#######'], [{ id: 1, col: 4, row: 1 }]);
+    state.players[0]!.canThrow = true;
+    state.players[0]!.facing = 'right';
+    step(state, { 1: { move: null, placeBomb: true } });
+    step(state, { 1: { move: null, special: true } });
+    expect(state.bombs[0]).toMatchObject({ col: 2, row: 1 }); // 4 + 3 = 7 passa da borda: volta pela esquerda
+    const tall = stateFromText(['#####', '#...#', '#...#', '#...#', '#...#', '#...#', '#####'], [{ id: 1, col: 2, row: 4 }]);
+    tall.players[0]!.canThrow = true;
+    tall.players[0]!.facing = 'down';
+    step(tall, { 1: { move: null, placeBomb: true } });
+    step(tall, { 1: { move: null, special: true } });
+    expect(tall.bombs[0]).toMatchObject({ col: 2, row: 2 }); // 4 + 3 = 7 -> volta pelo alto
   });
 
   it('sem o item, nada acontece; o pavio continua', () => {

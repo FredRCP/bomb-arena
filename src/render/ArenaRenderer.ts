@@ -3,7 +3,7 @@ import type { CharacterDef } from '../characters/characters';
 import Phaser from 'phaser';
 import { getCell, inwardDirection, ringCells, slideOffset } from '../core';
 import type { Arena, BombState, FlameState, GameState, HazardsState, ItemState, PlayerState } from '../core';
-import { iglooCells, iglooDoors, pyramidOrigin, pyramidWallCells } from '../core';
+import { iglooCells, iglooDoors, pyramidOrigin, pyramidWallCells, volcanoCells } from '../core';
 import { PYRAMID_SIZE } from '../config/hazards';
 import { COLORS } from './palette';
 import { has, loadedBlockVariants, themeById, themeKey } from './theme';
@@ -69,10 +69,12 @@ export function drawArena(scene: Phaser.Scene, arena: Arena, themeId = 'classic'
   const glyphImages = glyphs > 0 && has(scene, theme, 'glyph1');
   const pyramidOn = !!theme.pyramid && has(scene, theme, 'pyramid') && !!hazards?.tunnel;
   const iglooOn = !!theme.igloo && has(scene, theme, 'igloo') && !!hazards;
+  const volcanoOn = !!theme.volcano && has(scene, theme, 'volcano') && !!hazards?.volcano;
   // Células que ficam sob uma imagem grande (pirâmide, iglu): a parede delas não é desenhada uma a uma.
   const pyramidAt = new Set([
     ...(pyramidOn ? pyramidWallCells(arena.cols, arena.rows) : []),
     ...(iglooOn ? iglooCells(arena.cols, arena.rows) : []),
+    ...(volcanoOn ? volcanoCells(arena.cols, arena.rows) : []),
   ].map((c) => c.row * arena.cols + c.col));
 
   for (let row = 0; row < arena.rows; row++) {

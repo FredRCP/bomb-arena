@@ -342,6 +342,8 @@ export interface HazardsState {
   currents?: CurrentLane[];
   /** Vulcão: lava que escorre pelas colunas e substitui a morte súbita. */
   lava?: LavaState;
+  /** Vulcão: o segundo rio de lava (coluna diferente da do primeiro). */
+  lava2?: LavaState;
   /** Vulcão: erupções que lançam bolas de lava, que caem em células sorteadas (com sombra 2 s antes). */
   volcano?: VolcanoState;
   /** Ilha dos Piratas: canhões do navio (mesma mecânica das bolas do vulcão, com sombra no chão). */

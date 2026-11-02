@@ -58,16 +58,18 @@ export const CURRENT_PUSH = 0.03;
  * Vulcão: a cada 60 s um rio de lava (4 células de comprimento) desce por uma coluna sorteada, de uma ponta à outra da arena,
  * e sai pelo outro lado. A coluna pisca 2,5 s antes. Quem estiver no rio morre; blocos, bombas e itens no caminho são destruídos.
  */
-export const LAVA_FIRST_TICKS = 35 * 60;
-export const LAVA_PERIOD_TICKS = 60 * 60;
+export const LAVA_FIRST_TICKS = 22 * 60;
+export const LAVA_PERIOD_TICKS = 32 * 60;
 export const LAVA_WARN_TICKS = 150;
 /** Células por passo (0,06 = 3,6 células/s: atravessa a arena em uns 4 s). */
 export const LAVA_SPEED = 0.06;
 export const LAVA_LENGTH = 4;
+/** O segundo rio de lava sai este tanto de passos depois do primeiro (os dois rios descem por colunas diferentes). */
+export const LAVA2_DELAY_TICKS = 150;
 /** Erupção: a primeira com 20 s, depois a cada 45 s (a cada 9 s depois que o tempo acaba, no lugar da morte súbita). 8 bolas por erupção, uma a cada 14 passos. */
-export const VOLCANO_FIRST_TICKS = 20 * 60;
-export const VOLCANO_PERIOD_TICKS = 45 * 60;
-export const VOLCANO_PERIOD_LATE_TICKS = 9 * 60;
+export const VOLCANO_FIRST_TICKS = 12 * 60;
+export const VOLCANO_PERIOD_TICKS = 24 * 60;
+export const VOLCANO_PERIOD_LATE_TICKS = 7 * 60;
 export const VOLCANO_SHOTS = 8;
 export const VOLCANO_SHOT_GAP = 14;
 /** A sombra aparece 2 s antes da bola cair. */

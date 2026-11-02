@@ -118,7 +118,7 @@ describe('Vulcão', () => {
     expect(lava.timer).toBeGreaterThan(60 * 20);
   });
 
-  it('o rio destrói blocos e bombas do caminho e o escudo protege', () => {
+  it('o rio destrói blocos, aciona as bombas do caminho (que explodem) e o escudo protege', () => {
     const state = volcano();
     const lava = state.hazards!.lava!;
     lava.phase = 'flow';
@@ -135,6 +135,58 @@ describe('Vulcão', () => {
     expect(getCell(state.arena, 3, 4)).toBe('empty');
     expect(state.bombs.some((b) => b.col === 3 && b.row === 6)).toBe(false);
     expect(p.alive).toBe(true);
+  });
+
+  it('a lava aciona a bomba que toca: o pavio acaba e ela explode', () => {
+    const state = volcano();
+    const lava = state.hazards!.lava!;
+    lava.phase = 'flow';
+    lava.col = 3;
+    lava.dir = 1;
+    lava.y = 5;
+    state.players[0]!.x = 13.5;
+    state.players[0]!.y = 11.5;
+    state.players[1]!.x = 15.5;
+    state.players[1]!.y = 11.5;
+    state.bombs.push({ owner: 2, col: 3, row: 6, ticksLeft: 5000, range: 1, walkThrough: [] });
+    let exploded = false;
+    for (let i = 0; i < 40 && !exploded; i++) {
+      step(state);
+      if (drainEvents(state).some((e) => e.type === 'bombExploded' && e.col === 3 && e.row === 6)) exploded = true;
+    }
+    expect(exploded).toBe(true);
+  });
+
+  it('a bola de lava do vulcão também aciona a bomba da célula onde cai', () => {
+    const state = volcano();
+    state.players[0]!.x = 13.5;
+    state.players[0]!.y = 11.5;
+    state.players[1]!.x = 15.5;
+    state.players[1]!.y = 11.5;
+    state.bombs.push({ owner: 2, col: 4, row: 3, ticksLeft: 5000, range: 1, walkThrough: [] });
+    state.hazards!.volcano!.shots.push({ col: 4, row: 3, ticks: 1 });
+    let exploded = false;
+    for (let i = 0; i < 10 && !exploded; i++) {
+      step(state);
+      if (drainEvents(state).some((e) => e.type === 'bombExploded' && e.col === 4 && e.row === 3)) exploded = true;
+    }
+    expect(exploded).toBe(true);
+  });
+
+  it('são dois rios de lava, que descem por colunas diferentes', () => {
+    const state = volcano();
+    const { lava, lava2 } = state.hazards!;
+    expect(lava2).toBeDefined();
+    state.players[0]!.x = 13.5;
+    state.players[0]!.y = 11.5;
+    state.players[1]!.x = 15.5;
+    state.players[1]!.y = 11.5;
+    lava!.timer = 1;
+    lava2!.timer = 1;
+    step(state);
+    expect(lava!.phase).toBe('warn');
+    expect(lava2!.phase).toBe('warn');
+    expect(lava!.col).not.toBe(lava2!.col);
   });
 
   it('a erupção treme, avisa a célula 2 s antes e a bola mata quem está embaixo', () => {
@@ -159,8 +211,8 @@ describe('Vulcão', () => {
       if (drainEvents(state).some((e) => e.type === 'playerHit' && e.playerId === p.id)) hit = true;
     }
     expect(hit).toBe(true);
-    expect(VOLCANO_FIRST_TICKS).toBe(1200);
-    expect(VOLCANO_PERIOD_TICKS).toBe(45 * 60); // erupção a cada 45 s
+    expect(VOLCANO_FIRST_TICKS).toBe(720);
+    expect(VOLCANO_PERIOD_TICKS).toBe(24 * 60); // erupção a cada 24 s
   });
 
   it('a IA enxerga a célula da bola como perigosa', async () => {

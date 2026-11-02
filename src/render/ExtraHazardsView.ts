@@ -15,6 +15,8 @@ export class ExtraHazardsView {
   private readonly g: Phaser.GameObjects.Graphics;
   private readonly top: Phaser.GameObjects.Graphics;
   private readonly bridgeG: Phaser.GameObjects.Graphics;
+  /** Solta uma baforada de fumaça pela cratera do vulcão (nada acontece nas outras fases). */
+  private spawnSmoke: (count?: number) => void = () => undefined;
 
   constructor(private readonly scene: Phaser.Scene, state: GameState, themeId: string) {
     this.g = scene.add.graphics().setDepth(0.85);
@@ -24,8 +26,75 @@ export class ExtraHazardsView {
     if (has(scene, theme, 'volcano') && state.hazards?.volcano) {
       const c = Math.floor(state.arena.cols / 2);
       const m = Math.floor(state.arena.rows / 2);
-      scene.add.image((c + 0.5) * TILE_SIZE, (m + 0.5) * TILE_SIZE, themeKey(theme, 'volcano')).setDisplaySize(3.1 * TILE_SIZE, 3.1 * TILE_SIZE).setDepth(6.5);
+      // O vulcão ocupa exatamente o 3 x 3 do centro (192 x 192): a fumaça sobe dentro da faixa de cima do quadrado.
+      const cx = (c + 0.5) * TILE_SIZE;
+      const cy = (m + 0.5) * TILE_SIZE;
+      // Chão queimado em volta (cinza escuro que vai esmaecendo) e rachaduras de lava saindo do vulcão: a base se funde ao piso.
+      const ground = scene.add.graphics().setDepth(0.6);
+      for (let i = 0; i < 7; i++) {
+        const k = 1 - i / 7;
+        ground.fillStyle(0x140805, 0.09 + 0.05 * (1 - k)).fillEllipse(cx, cy + 0.35 * TILE_SIZE, (2.9 + 2.3 * k) * TILE_SIZE, (2.3 + 1.6 * k) * TILE_SIZE);
+      }
+      const cracks: Array<[number, number, number]> = [[-0.9, 0.2, 2.5], [0.3, 0.55, 2.7], [1.9, 0.35, 2.4], [2.6, 0.5, 2.6], [3.6, 0.3, 2.5], [4.6, 0.55, 2.8], [5.4, 0.3, 2.4]];
+      for (const [ang, wob, len] of cracks) {
+        let px = cx + Math.cos(ang) * 1.2 * TILE_SIZE;
+        let py = cy + 0.35 * TILE_SIZE + Math.sin(ang) * 0.9 * TILE_SIZE;
+        const pts: Array<[number, number]> = [[px, py]];
+        for (let j = 1; j <= 4; j++) {
+          const a2 = ang + Math.sin(j * 1.7 + wob * 5) * wob;
+          px += Math.cos(a2) * (len / 4) * 0.5 * TILE_SIZE;
+          py += Math.sin(a2) * (len / 4) * 0.4 * TILE_SIZE;
+          pts.push([px, py]);
+        }
+        ground.lineStyle(7, 0x2a0d05, 0.5).beginPath().moveTo(pts[0]![0], pts[0]![1]);
+        for (const q of pts.slice(1)) ground.lineTo(q[0], q[1]);
+        ground.strokePath();
+        ground.lineStyle(3, 0xff7a1a, 0.55).beginPath().moveTo(pts[0]![0], pts[0]![1]);
+        for (const q of pts.slice(1)) ground.lineTo(q[0], q[1]);
+        ground.strokePath();
+      }
+      scene.add.image(cx, cy, themeKey(theme, 'volcano')).setDisplaySize(3 * TILE_SIZE, 3 * TILE_SIZE).setDepth(6.5);
+      this.startSmoke(cx - 6, cy - 30);
     }
+  }
+
+  /** Fumaça animada saindo da cratera: baforadas cinza que sobem, crescem, derivam para a esquerda e somem. */
+  private startSmoke(x: number, y: number): void {
+    const scene = this.scene;
+    const key = 'smoke-puff';
+    if (!scene.textures.exists(key)) {
+      const g = scene.make.graphics({ x: 0, y: 0 }, false);
+      const blobs: Array<[number, number, number]> = [[34, 44, 22], [58, 40, 24], [80, 46, 20], [46, 28, 20], [70, 26, 18]];
+      for (const [bx, by, r] of blobs) g.fillStyle(0x1c1a20, 1).fillCircle(bx, by, r + 4);
+      for (const [bx, by, r] of blobs) g.fillStyle(0x4d4953, 1).fillCircle(bx, by, r);
+      g.fillStyle(0x7a7581, 1).fillCircle(44, 32, 9).fillCircle(66, 30, 7).fillCircle(58, 46, 6);
+      g.generateTexture(key, 108, 80);
+      g.destroy();
+    }
+    this.spawnSmoke = (count = 1): void => {
+      for (let i = 0; i < count; i++) {
+        const x0 = x + (Math.random() - 0.5) * 16;
+        const rise = 70 + Math.random() * 45;
+        const drift = -10 - Math.random() * 40;
+        const grow = 0.65 + Math.random() * 0.4;
+        const spin = (Math.random() - 0.5) * 40;
+        const puff = scene.add.image(x0, y, key).setDepth(6.7).setAlpha(0).setScale(0.18);
+        scene.tweens.addCounter({
+          from: 0,
+          to: 1,
+          duration: 2300 + Math.random() * 900,
+          delay: i * 140,
+          onUpdate: (tween) => {
+            const v = tween.getValue() ?? 0;
+            puff.setPosition(x0 + drift * v, y - rise * v).setScale(0.18 + grow * v).setAngle(spin * v);
+            puff.setAlpha((v < 0.15 ? v / 0.15 : (1 - v) / 0.85) * 0.92);
+          },
+          onComplete: () => puff.destroy(),
+        });
+      }
+    };
+    scene.time.addEvent({ delay: 330, loop: true, callback: () => this.spawnSmoke(1) });
+    this.spawnSmoke(3);
   }
 
   /** Redesenha o que se mexe (correnteza, lava e bolas), uma vez por quadro. */
@@ -59,7 +128,8 @@ export class ExtraHazardsView {
       void set;
     }
 
-    this.drawRiver(g, state);
+    this.drawRiver(g, state, state.hazards?.lava);
+    this.drawRiver(g, state, state.hazards?.lava2);
     this.drawBridges(state);
     this.drawSlime(g, state);
 
@@ -99,8 +169,7 @@ export class ExtraHazardsView {
   }
 
   /** Rio de lava: a coluna pisca no aviso e depois a lava desce por ela. */
-  private drawRiver(g: Phaser.GameObjects.Graphics, state: GameState): void {
-    const lava = state.hazards?.lava;
+  private drawRiver(g: Phaser.GameObjects.Graphics, state: GameState, lava: NonNullable<GameState['hazards']>['lava']): void {
     if (!lava || lava.phase === 'idle') return;
     const arena = state.arena;
     const t = state.tick;
@@ -290,7 +359,10 @@ export class ExtraHazardsView {
   /** Efeitos de cena: a bola que cai faz um clarão e a erupção treme a tela toda. */
   onEvents(events: readonly GameEvent[]): void {
     for (const event of events) {
-      if (event.type === 'volcanoErupt') this.scene.cameras.main.shake(2600, 0.006);
+      if (event.type === 'volcanoErupt') {
+        this.scene.cameras.main.shake(2600, 0.006);
+        this.spawnSmoke(8); // a erupção solta uma nuvem grande
+      }
       if (event.type === 'lavaRiver') this.scene.cameras.main.shake(1200, 0.003);
       if (event.type === 'cannonImpact') {
         const x = (event.col + 0.5) * TILE_SIZE;

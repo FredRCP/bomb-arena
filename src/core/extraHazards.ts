@@ -1,4 +1,4 @@
-import { CANNON_FALL_TICKS, CANNON_FIRST_TICKS, CANNON_PERIOD_TICKS, CANNON_SHOT_GAP, CANNON_SHOTS, CURRENT_PUSH, LAVA_FIRST_TICKS, LAVA_LENGTH, LAVA_PERIOD_TICKS, LAVA_SPEED, LAVA_WARN_TICKS, VOLCANO_FALL_TICKS, VOLCANO_FIRST_TICKS, VOLCANO_HIT_HALF, VOLCANO_PERIOD_LATE_TICKS, VOLCANO_PERIOD_TICKS, VOLCANO_SHOT_GAP, VOLCANO_SHOTS } from '../config/hazards';
+import { CANNON_FALL_TICKS, CANNON_FIRST_TICKS, CANNON_PERIOD_TICKS, CANNON_SHOT_GAP, CANNON_SHOTS, CURRENT_PUSH, LAVA_FIRST_TICKS, LAVA_LENGTH, LAVA2_DELAY_TICKS, LAVA_PERIOD_TICKS, LAVA_SPEED, LAVA_WARN_TICKS, VOLCANO_FALL_TICKS, VOLCANO_FIRST_TICKS, VOLCANO_HIT_HALF, VOLCANO_PERIOD_LATE_TICKS, VOLCANO_PERIOD_TICKS, VOLCANO_SHOT_GAP, VOLCANO_SHOTS } from '../config/hazards';
 import { VEST_BREAK_SHIELD_TICKS } from '../config/items';
 import { cellIndex, getCell } from './arena';
 import { blockedCellsFor, walkThroughCellsFor } from './bombs';
@@ -58,7 +58,10 @@ export function applyExtraHazards(arena: Arena, options: ExtraHazardOptions, see
     });
   }
   if (options.volcano) for (const cell of volcanoCells(cols, rows)) arena.cells[cellIndex(arena, cell.col, cell.row)] = 'wall';
-  if (options.lava) hazards.lava = { phase: 'idle', timer: LAVA_FIRST_TICKS - LAVA_WARN_TICKS, col: 0, dir: 1, y: 0 };
+  if (options.lava) {
+    hazards.lava = { phase: 'idle', timer: LAVA_FIRST_TICKS - LAVA_WARN_TICKS, col: 0, dir: 1, y: 0 };
+    hazards.lava2 = { phase: 'idle', timer: LAVA_FIRST_TICKS - LAVA_WARN_TICKS + LAVA2_DELAY_TICKS, col: 0, dir: 1, y: 0 };
+  }
   if (options.cannons) hazards.cannon = { phase: 'idle', timer: CANNON_FIRST_TICKS, remaining: 0, gap: 0, shots: [] };
   if (options.volcano || options.lava) hazards.volcano = { phase: 'idle', timer: VOLCANO_FIRST_TICKS, remaining: 0, gap: 0, shots: [] };
 }
@@ -68,7 +71,8 @@ export function updateExtraHazards(state: GameState): void {
   const hz = state.hazards;
   if (!hz) return;
   if (hz.currents) updateCurrents(state, hz.currents);
-  if (hz.lava) updateLava(state, hz.lava);
+  if (hz.lava) updateLava(state, hz.lava, hz.lava2, 1);
+  if (hz.lava2) updateLava(state, hz.lava2, hz.lava, 2);
   if (hz.volcano) updateShots(state, hz.volcano, VOLCANO_SHOTS_CFG);
   if (hz.cannon) updateShots(state, hz.cannon, CANNON_CFG);
 }
@@ -122,14 +126,15 @@ export function lavaRows(lava: NonNullable<HazardsState['lava']>): [number, numb
  * Rio de lava: de tempos em tempos uma coluna sorteada pisca (aviso) e a lava desce por ela de ponta a ponta, saindo da arena.
  * Elimina quem estiver nela (escudo e herói protegem) e destrói blocos, bombas e itens do caminho.
  */
-function updateLava(state: GameState, lava: NonNullable<HazardsState['lava']>): void {
+function updateLava(state: GameState, lava: NonNullable<HazardsState['lava']>, other: HazardsState['lava'], salt: number): void {
   if (state.round.phase !== 'playing') return;
   const arena = state.arena;
   if (lava.phase === 'idle') {
     lava.timer -= 1;
     if (lava.timer > 0) return;
-    const rng = createRng(state.tick * 29 + 7);
-    const options = lavaColumns(arena.cols);
+    const rng = createRng(state.tick * 29 + 7 + salt * 131);
+    // O outro rio (se estiver descendo ou avisando) ocupa a coluna dele: este sorteia entre as demais.
+    const options = lavaColumns(arena.cols).filter((col) => !(other && other.phase !== 'idle' && other.col === col));
     lava.col = options[Math.floor(rng() * options.length)]!;
     lava.dir = rng() < 0.5 ? 1 : -1;
     lava.phase = 'warn';
@@ -156,7 +161,7 @@ function updateLava(state: GameState, lava: NonNullable<HazardsState['lava']>): 
       state.events.push({ type: 'blockDestroyed', col, row });
       revealItem(state, col, row);
     }
-    state.bombs = state.bombs.filter((bomb) => !(bomb.col === col && bomb.row === row));
+    igniteBombs(state, col, row);
     state.items = state.items.filter((item) => !(item.col === col && item.row === row));
     for (const player of state.players) {
       if (!player.alive || player.shieldTicks > 0 || player.heroTicks > 0) continue;
@@ -221,6 +226,11 @@ function updateShots(state: GameState, volcano: NonNullable<HazardsState['volcan
   }
 }
 
+/** A lava aciona as bombas que toca: o pavio acaba no próximo passo e elas explodem (e podem detonar outras em cadeia). */
+function igniteBombs(state: GameState, col: number, row: number): void {
+  for (const bomb of state.bombs) if (bomb.col === col && bomb.row === row && bomb.ticksLeft > 1) bomb.ticksLeft = 1;
+}
+
 /** Sorteia o alvo: metade cai perto de um jogador vivo, metade em qualquer célula comum. */
 function pickTarget(state: GameState, salt: number): Cell | null {
   const arena = state.arena;
@@ -254,7 +264,8 @@ function impact(state: GameState, col: number, row: number, kind: 'volcano' | 'c
     state.events.push({ type: 'blockDestroyed', col, row });
     revealItem(state, col, row);
   }
-  state.bombs = state.bombs.filter((bomb) => !(bomb.col === col && bomb.row === row));
+  if (kind === 'volcano') igniteBombs(state, col, row);
+  else state.bombs = state.bombs.filter((bomb) => !(bomb.col === col && bomb.row === row));
   state.items = state.items.filter((item) => !(item.col === col && item.row === row));
   state.events.push({ type: kind === 'volcano' ? 'lavaImpact' : 'cannonImpact', col, row });
   for (const player of state.players) {

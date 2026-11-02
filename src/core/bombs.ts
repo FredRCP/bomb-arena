@@ -221,13 +221,18 @@ export function findLanding(
   distance: number = THROW_DISTANCE,
 ): { col: number; row: number } | null {
   const { dc, dr } = VECTORS[direction];
-  const reach = Math.max(state.arena.cols, state.arena.rows);
+  const { cols, rows } = state.arena;
+  const reach = Math.max(cols, rows);
   const distances: number[] = [];
   for (let d = distance; d <= reach; d++) distances.push(d);
   for (let d = distance - 1; d >= 1; d--) distances.push(d);
+  // Como no Bomberman: a bomba que passaria da borda da arena reaparece do lado oposto, seguindo na mesma direção
+  // (o miolo jogável vai da coluna 1 à cols - 2 e da linha 1 à rows - 2; a borda é parede).
+  const wrap = (value: number, size: number): number => ((((value - 1) % (size - 2)) + (size - 2)) % (size - 2)) + 1;
   for (const d of distances) {
-    const toCol = col + dc * d;
-    const toRow = row + dr * d;
+    const toCol = wrap(col + dc * d, cols);
+    const toRow = wrap(row + dr * d, rows);
+    if (toCol === col && toRow === row) continue;
     if (inBounds(state.arena, toCol, toRow) && isFreeForBomb(state, toCol, toRow)) return { col: toCol, row: toRow };
   }
   return null;

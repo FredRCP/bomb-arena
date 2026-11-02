@@ -60,7 +60,7 @@ export const THEMES: Record<string, ThemeDef> = {
   temple: { id: 'temple', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xc9965c, 0x9b6b3a, 0x5f8f3f], island: true },
   pirates: { id: 'pirates', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xb07a3c, 0x8a5a2a, 0xd9b36a] },
   sea: { id: 'sea', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xbdeeff, 0x7fd0f0, 0xe8fbff], bubbles: true },
-  volcano: { id: 'volcano', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xff7a1a, 0x9a5a38, 0x2a2228], volcano: true, embers: true },
+  volcano: { id: 'volcano', floors: true, wall: true, wallWidth: 72, blockVariants: 3, blockWidth: 68, rubble: false, background: true, chips: [0xff7a1a, 0x9a5a38, 0x2a2228], volcano: true, embers: true },
   ice: { id: 'ice', floors: true, wall: true, wallWidth: 56, blockVariants: 3, blockWidth: 62, rubble: true, background: true, chips: [0xe3f6ff, 0xb9e3f7, 0x7fc4e8], igloo: true, snow: true },
 };
 

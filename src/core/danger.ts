@@ -93,8 +93,8 @@ export function buildHazards(state: GameState, extraBomb?: BombState, selfId?: P
   const cannon = state.hazards?.cannon;
   if (cannon) for (const shot of cannon.shots) windows[cellIndex(arena, shot.col, shot.row)]!.push([Math.max(0, shot.ticks - 6), shot.ticks + 12]);
   // Rio de lava: a coluna é perigosa do aviso até ele passar.
-  const lava = state.hazards?.lava;
-  if (lava && lava.phase !== 'idle') {
+  for (const lava of [state.hazards?.lava, state.hazards?.lava2]) {
+    if (!lava || lava.phase === 'idle') continue;
     const flow = lavaFlowTicks(arena.rows);
     const from = lava.phase === 'warn' ? Math.max(0, lava.timer - 30) : 0;
     const to = lava.phase === 'warn' ? lava.timer + flow : Math.ceil(flow * (lava.dir === 1 ? (arena.rows + 4 - lava.y) : lava.y + 4) / (arena.rows + 4));
