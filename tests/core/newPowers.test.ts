@@ -42,27 +42,41 @@ describe('Poderes: carga e personagens', () => {
     expect(me.x !== from.x || me.y !== from.y).toBe(true);
   });
 
-  it('Filippe: vira fantasma e empurra inimigos a até 3 células para 3 células de distância', () => {
+  it('Filippe: vira fantasma e cria um halo de 3 células de raio: o inimigo é empurrado para fora e não consegue entrar', () => {
     const { state, me, other } = setup('ghost');
     other.x = 5.5;
     other.y = 1.5;
     use(state, me);
     expect(me.ghostTicks).toBeGreaterThan(9 * 60);
-    expect(other.x).toBeCloseTo(8.5, 0); // 3 células à direita
-    expect(other.y).toBeCloseTo(1.5, 1);
+    expect(state.halos).toHaveLength(1);
+    expect(Math.hypot(other.x - me.x, other.y - me.y)).toBeGreaterThanOrEqual(2.99);
+    // tenta voltar andando para cima dele durante o halo: continua fora do círculo
+    for (let i = 0; i < 120; i++) {
+      step(state, { [other.id]: { move: 'left', placeBomb: false } } as never);
+      expect(Math.hypot(other.x - me.x, other.y - me.y)).toBeGreaterThanOrEqual(2.9);
+    }
   });
 
-  it('Pipoca: pula uma bomba ou um bloco (2 células à frente); sem lugar para cair não gasta a carga', () => {
-    const { state, me } = setup('jump');
-    state.bombs.push({ owner: 2, col: 4, row: 1, ticksLeft: 5000, range: 1, walkThrough: [] });
+  it('Filippe: o halo some depois de 10 s', () => {
+    const { state, me } = setup('ghost');
     use(state, me);
-    expect(Math.floor(me.x)).toBe(5);
+    for (let i = 0; i < 10 * 60 + 5; i++) step(state);
+    expect(state.halos ?? []).toHaveLength(0);
+  });
+
+  it('Pipoca: atira bombas a 4 células nas direções livres (onde não dá, cai mais perto); sem lugar nenhum não gasta a carga', () => {
+    const { state, me } = setup('jump');
+    use(state, me);
+    const at = (c: number, r: number) => state.bombs.some((b) => b.col === c && b.row === r);
+    expect(at(7, 1)).toBe(true); // direita, 4 células
+    expect(at(3, 5)).toBe(true); // baixo, 4 células
+    expect(state.bombs.length).toBeGreaterThanOrEqual(3);
     expect(me.power!.charge).toBeLessThan(10);
-    // agora com um bloco no pouso: não pula e mantém a carga
+    // cercada por paredes/blocos: nada a fazer, mantém a carga
     const t = setup('jump');
-    t.state.arena.cells[cellIndex(t.state.arena, 5, 1)] = 'block';
+    for (let k = 1; k <= 4; k++) for (const [c, r] of [[3 + k, 1], [3 - k, 1], [3, 1 + k], [3, 1 - k]] as const) if (getCell(t.state.arena, c, r) === 'empty') t.state.arena.cells[cellIndex(t.state.arena, c, r)] = 'block';
     use(t.state, t.me);
-    expect(Math.floor(t.me.x)).toBe(3);
+    expect(t.state.bombs).toHaveLength(0);
     expect(t.me.power!.charge).toBeGreaterThanOrEqual(POWER_CHARGE_TICKS);
   });
 
@@ -101,11 +115,11 @@ describe('Poderes: carga e personagens', () => {
     expect(me.invisibleTicks).toBeGreaterThan(9 * 60);
   });
 
-  it('Fagulha: põe 2 bombas de alcance 8 e fica imune às chamas', () => {
+  it('Fagulha: põe 2 bombas que varrem a linha e a coluna inteiras e fica imune às chamas', () => {
     const { state, me } = setup('twinbombs');
     use(state, me);
     expect(state.bombs).toHaveLength(2);
-    expect(state.bombs.every((b) => b.range === 8)).toBe(true);
+    expect(state.bombs.every((b) => b.range >= 20 && b.pierce)).toBe(true);
     for (let i = 0; i < 300; i++) step(state);
     expect(me.alive).toBe(true);
   });
@@ -177,5 +191,62 @@ describe('Egito: dardos', () => {
       for (let col = 1; col < 16; col++) expect(getCell(state.arena, col, row)).not.toBe('block');
     }
     expect(rows.size).toBeGreaterThan(1);
+  });
+});
+
+describe('Poderes reformulados (lote 54)', () => {
+  it('Fagulha: o fogo atravessa blocos e vai até a parede em toda a linha', () => {
+    const { state, me } = setup('twinbombs');
+    state.arena.cells[cellIndex(state.arena, 8, 1)] = 'block';
+    state.arena.cells[cellIndex(state.arena, 11, 1)] = 'block';
+    use(state, me);
+    for (let i = 0; i < 200 && state.bombs.length > 0; i++) step(state);
+    expect(getCell(state.arena, 8, 1)).toBe('empty');
+    expect(getCell(state.arena, 11, 1)).toBe('empty');
+  });
+
+  it('Van: congela os outros jogadores por 5 s (não andam nem soltam bomba) e depois voltam', () => {
+    const { state, me, other } = setup('freeze');
+    use(state, me);
+    expect(other.frozenTicks).toBeGreaterThan(5 * 60 - 5);
+    expect(me.frozenTicks ?? 0).toBe(0);
+    const x0 = other.x;
+    for (let i = 0; i < 60; i++) step(state, { [other.id]: { move: 'left', placeBomb: true } } as never);
+    expect(other.x).toBe(x0);
+    expect(state.bombs.filter((b) => b.owner === other.id)).toHaveLength(0);
+    for (let i = 0; i < 5 * 60; i++) step(state);
+    step(state, { [other.id]: { move: 'left', placeBomb: false } } as never);
+    expect(other.x).toBeLessThan(x0);
+  });
+
+  it('Wal: 4 itens (3 perto, 1 em qualquer lugar) e escudo de 5 s', () => {
+    const { state, me } = setup('stork');
+    use(state, me);
+    expect(state.items.length).toBe(4);
+    expect(me.shieldTicks).toBeGreaterThan(5 * 60 - 5);
+    expect(me.shieldTicks).toBeLessThanOrEqual(5 * 60);
+  });
+
+  it('Cacau: ganha +2 bombas e ainda constrói os blocos', () => {
+    const { state, me } = setup('chocolate');
+    const before = me.maxBombs;
+    use(state, me);
+    expect(me.maxBombs).toBe(before + 2);
+    expect(state.chocolate).toHaveLength(3);
+  });
+
+  it('Ana: o elefante quebra a fileira inteira e empurra quem está no caminho', () => {
+    const { state, me, other } = setup('elephant');
+    for (const c of [5, 9, 13]) state.arena.cells[cellIndex(state.arena, c, 1)] = 'block';
+    other.x = 8.5;
+    other.y = 1.5;
+    use(state, me);
+    let minGap = 99;
+    for (let i = 0; i < 400 && (state.elephants?.length ?? 0) > 0; i++) {
+      step(state);
+      minGap = Math.min(minGap, other.x - (state.elephants?.[0]?.x ?? 99));
+    }
+    for (const c of [5, 9, 13]) expect(getCell(state.arena, c, 1)).toBe('empty');
+    expect(other.x).toBeGreaterThan(8.5); // foi empurrado
   });
 });

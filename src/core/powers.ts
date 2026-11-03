@@ -1,5 +1,6 @@
-import { AIRPLANE_BOMBS, AIRPLANE_DROP_TICKS, AIRPLANE_END_SCALE, AIRPLANE_ENTRY_TICKS, AIRPLANE_FIRST_DROP, AIRPLANE_LAPS, AIRPLANE_LAP_TICKS, CONFUSE_POWER_TICKS, CHOCOLATE_BLOCKS, FOG_POWER_TICKS, GHOST_PUSH_CELLS, GHOST_PUSH_RADIUS, INVISIBLE_POWER_TICKS, JUMP_CELLS, SLIME_CELLS, SLIME_TICKS, SPRINT_POWER_TICKS, TWIN_BOMB_RANGE, ELEPHANT_MAX_BLOCKS, ELEPHANT_SPEED, POWER_CHARGE_TICKS, SHIELD_POWER_TICKS, STORK_FAR_ITEMS, STORK_ITEMS, STORK_RADIUS, FREEZE_POWER_TICKS, GHOST_POWER_TICKS } from '../config/powers';
+import { AIRPLANE_BOMBS, AIRPLANE_DROP_TICKS, AIRPLANE_END_SCALE, AIRPLANE_ENTRY_TICKS, AIRPLANE_FIRST_DROP, AIRPLANE_LAPS, AIRPLANE_LAP_TICKS, CONFUSE_POWER_TICKS, CHOCOLATE_BLOCKS, FOG_POWER_TICKS, GHOST_HALO_RADIUS, GHOST_HALO_TICKS, FREEZE_PLAYER_TICKS, STORK_SHIELD_TICKS, CHOCOLATE_EXTRA_BOMBS, INVISIBLE_POWER_TICKS, JUMP_CELLS, SLIME_CELLS, SLIME_TICKS, SPRINT_POWER_TICKS, TWIN_BOMB_RANGE, ELEPHANT_MAX_BLOCKS, ELEPHANT_SPEED, POWER_CHARGE_TICKS, SHIELD_POWER_TICKS, STORK_FAR_ITEMS, STORK_ITEMS, STORK_RADIUS, FREEZE_POWER_TICKS, GHOST_POWER_TICKS } from '../config/powers';
 import { BOMB_FUSE_TICKS } from '../config/bombs';
+import { MAX_BOMBS_CAP } from '../config/items';
 import { cellIndex, getCell, isTunnel } from './arena';
 import { dropBomb } from './bombs';
 import { bodyOverlapsCell, collidesAt } from './movement';
@@ -9,13 +10,13 @@ import type { Direction, GameState, PlayerState, PowerKind } from './types';
 
 // Superpoderes. Cada jogador pode ter um poder (veja `givePower`) que carrega sozinho em POWER_CHARGE_TICKS e é
 // disparado pela intenção `power`. Poder atual:
-// - airplane (Lucas): um avião sobrevoa a arena inteira em 4 voltas, largando 6 bombas em células aleatórias.
-// - shield (Fred): teletransporta para uma célula livre sorteada e fica invencível 10 s. freeze (Van): congela as bombas dos outros por 10 s. stork (Wal): solta 4 itens bons (3 perto, 1 longe).
-//   confuse (Glauceste): todos os outros ficam com os controles invertidos por 10 s. ghost (Filippe): atravessa blocos por 10 s e empurra os inimigos próximos 3 células para longe.
-// - pipoca: pula bomba ou bloco; bolt: velocidade máxima 10 s; musgo: gosma em 3 células em cada direção; violeta: invisível 10 s;
-//   fagulha: 2 bombas de alcance 8 (imune); nimbo: neblina 10 s; cacau: 3 blocos de chocolate à frente.
+// - airplane (Lucas): um avião sobrevoa a arena inteira em 4 voltas, largando 7 bombas em células aleatórias.
+// - shield (Fred): teletransporta para uma célula livre sorteada e fica invencível 10 s. freeze (Van): congela os outros jogadores por 5 s e as bombas deles por 10 s. stork (Wal): solta 4 itens bons (3 perto, 1 longe) e dá escudo de 5 s.
+//   confuse (Glauceste): todos os outros ficam com os controles invertidos por 10 s. ghost (Filippe): atravessa blocos por 10 s e cria um halo de 3 células de raio onde ninguém entra.
+// - pipoca: atira 4 bombas, uma em cada direção, a 4 células; bolt: velocidade máxima 10 s; musgo: gosma em 3 células em cada direção; violeta: invisível 10 s;
+//   fagulha: 2 bombas que varrem a linha e a coluna inteiras (imune); nimbo: neblina 10 s; cacau: 3 blocos de chocolate à frente e +2 bombas.
 // - elephant (Ana): um elefantinho sai correndo na direção para onde o jogador olha, em linha reta, e quebra todos os
-//   blocos do caminho (os itens escondidos aparecem). Ele não machuca ninguém e para ao bater numa parede.
+//   blocos da fileira inteira (os itens escondidos aparecem) e empurra quem estiver no caminho. Ele não machuca ninguém e para ao bater numa parede.
 
 const VECTORS: Record<Direction, { dx: number; dy: number }> = {
   up: { dx: 0, dy: -1 },
@@ -41,7 +42,7 @@ export function powerFraction(player: Pick<PlayerState, 'power'>): number {
 /** Usa o poder se estiver pronto (aperto do botão de poder). */
 export function usePower(state: GameState, player: PlayerState): void {
   if (!powerReady(player) || !player.power) return;
-  if (player.power.kind === 'jump' && !jumpLanding(state, player)) return; // sem lugar para cair: não gasta a carga
+  if (player.power.kind === 'jump' && jumpLandings(state, player).length === 0) return; // sem lugar para cair: não gasta a carga
   player.power.charge = 0;
   const col = Math.floor(player.x);
   const row = Math.floor(player.y);
@@ -88,6 +89,7 @@ export function updatePowers(state: GameState): void {
     }
   }
   updatePlanes(state);
+  updateHalos(state);
   updateSlimeAndFog(state);
   const elephants = state.elephants;
   if (!elephants || elephants.length === 0) return;
@@ -96,6 +98,7 @@ export function updatePowers(state: GameState): void {
     const { dx, dy } = VECTORS[elephant.dir];
     elephant.x += dx * ELEPHANT_SPEED;
     elephant.y += dy * ELEPHANT_SPEED;
+    pushPlayersAhead(state, elephant);
     // A célula à frente do corpo: quando a frente entra num bloco, ele quebra; numa parede, o elefante para.
     const frontCol = Math.floor(elephant.x + dx * 0.45);
     const frontRow = Math.floor(elephant.y + dy * 0.45);
@@ -131,13 +134,14 @@ function usePersonalPower(state: GameState, player: PlayerState, kind: Exclude<P
     player.shieldTicks = Math.max(player.shieldTicks, SHIELD_POWER_TICKS);
   } else if (kind === 'ghost') {
     player.ghostTicks = Math.max(player.ghostTicks, GHOST_POWER_TICKS);
-    pushEnemiesAway(state, player);
+    const halos = (state.halos ??= []);
+    const old = halos.find((h) => h.owner === player.id);
+    if (old) old.ticks = GHOST_HALO_TICKS;
+    else halos.push({ owner: player.id, ticks: GHOST_HALO_TICKS, radius: GHOST_HALO_RADIUS });
+    updateHalos(state, false);
   } else if (kind === 'jump') {
-    const landing = jumpLanding(state, player);
-    if (landing) {
-      player.x = landing.col + 0.5;
-      player.y = landing.row + 0.5;
-    }
+    // Atira uma bomba para cada direção, caindo a JUMP_CELLS células (ou na célula livre mais longe antes disso).
+    for (const spot of jumpLandings(state, player)) dropBomb(state, player, spot.col, spot.row);
   } else if (kind === 'sprint') {
     player.sprintTicks = SPRINT_POWER_TICKS;
   } else if (kind === 'invisible') {
@@ -168,6 +172,7 @@ function usePersonalPower(state: GameState, player: PlayerState, kind: Exclude<P
       if (placed >= 2 || !dropBomb(state, player, spot.col, spot.row)) continue;
       const bomb = state.bombs[state.bombs.length - 1]!;
       bomb.range = TWIN_BOMB_RANGE;
+      bomb.pierce = true; // o fogo varre a linha e a coluna inteiras, blocos incluídos
       placed += 1;
     }
     player.heroTicks = Math.max(player.heroTicks, BOMB_FUSE_TICKS + 90); // ela é imune às chamas até as bombas passarem
@@ -175,6 +180,7 @@ function usePersonalPower(state: GameState, player: PlayerState, kind: Exclude<P
     state.fog = { ticks: FOG_POWER_TICKS, owner: player.id };
   } else if (kind === 'chocolate') {
     const { dx, dy } = VECTORS[player.facing];
+    player.maxBombs = Math.min(MAX_BOMBS_CAP, player.maxBombs + CHOCOLATE_EXTRA_BOMBS);
     const choc = (state.chocolate ??= []);
     for (let k = 1; k <= CHOCOLATE_BLOCKS; k++) {
       const col = Math.floor(player.x) + dx * k;
@@ -190,9 +196,15 @@ function usePersonalPower(state: GameState, player: PlayerState, kind: Exclude<P
   } else if (kind === 'confuse') {
     for (const other of state.players) if (other.alive && other.id !== player.id) other.invertTicks = Math.max(other.invertTicks, CONFUSE_POWER_TICKS);
   } else if (kind === 'freeze') {
-    // Congela as bombas de todo mundo, menos as dela.
+    // Congela as bombas de todo mundo (por 10 s) e os outros jogadores (por 5 s), menos ela.
     for (const bomb of state.bombs) if (bomb.owner !== player.id) bomb.frozenTicks = FREEZE_POWER_TICKS;
+    for (const other of state.players) {
+      if (!other.alive || other.id === player.id) continue;
+      other.frozenTicks = Math.max(other.frozenTicks ?? 0, FREEZE_PLAYER_TICKS);
+      other.slide = null;
+    }
   } else if (kind === 'stork') {
+    player.shieldTicks = Math.max(player.shieldTicks, STORK_SHIELD_TICKS);
     const col0 = Math.floor(player.x);
     const row0 = Math.floor(player.y);
     const free = freeItemCells(state).filter((index) => {
@@ -219,21 +231,25 @@ function usePersonalPower(state: GameState, player: PlayerState, kind: Exclude<P
   }
 }
 
-/** Para onde o pulo da Pipoca leva (2 células à frente), ou null se não houver lugar livre. */
-export function jumpLanding(state: GameState, player: PlayerState): { col: number; row: number } | null {
+/** Onde caem as bombas da Pipoca: uma por direção, a JUMP_CELLS células (se não der, na célula livre mais perto antes disso). */
+export function jumpLandings(state: GameState, player: PlayerState): Array<{ col: number; row: number }> {
   const arena = state.arena;
-  const { dx, dy } = VECTORS[player.facing];
   const col0 = Math.floor(player.x);
   const row0 = Math.floor(player.y);
-  const midKind = getCell(arena, col0 + dx, row0 + dy);
-  if (midKind === 'wall') return null;
-  const col = col0 + dx * JUMP_CELLS;
-  const row = row0 + dy * JUMP_CELLS;
-  if (getCell(arena, col, row) !== 'empty') return null;
-  if (state.bombs.some((b) => b.col === col && b.row === row)) return null;
-  if (isTunnel(state.hazards?.tunnel, arena, col, row)) return null;
-  if (state.players.some((p) => p.alive && p.id !== player.id && bodyOverlapsCell(p.x, p.y, col, row))) return null;
-  return { col, row };
+  const spots: Array<{ col: number; row: number }> = [];
+  for (const { dx, dy } of Object.values(VECTORS)) {
+    for (let k = JUMP_CELLS; k >= 1; k--) {
+      const col = col0 + dx * k;
+      const row = row0 + dy * k;
+      if (getCell(arena, col, row) !== 'empty') continue;
+      if (state.bombs.some((b) => b.col === col && b.row === row)) continue;
+      if (state.flames.some((f) => f.col === col && f.row === row)) continue;
+      if (isTunnel(state.hazards?.tunnel, arena, col, row)) continue;
+      spots.push({ col, row });
+      break;
+    }
+  }
+  return spots;
 }
 
 /** Célula livre sorteada para o teletransporte: sem bomba, chama, jogador, item ruim ou perigo à vista. */
@@ -255,23 +271,62 @@ function randomFreeCell(state: GameState, player: PlayerState, rng: () => number
   return spots.length > 0 ? spots[Math.floor(rng() * spots.length)]! : null;
 }
 
-/** Filippe: empurra para longe (GHOST_PUSH_CELLS células) todo inimigo a até GHOST_PUSH_RADIUS células, pelo eixo em que ele está mais longe. */
-function pushEnemiesAway(state: GameState, player: PlayerState): void {
-  for (const other of state.players) {
-    if (!other.alive || other.id === player.id || other.team === player.team) continue;
-    const ddx = other.x - player.x;
-    const ddy = other.y - player.y;
-    if (Math.abs(ddx) + Math.abs(ddy) > GHOST_PUSH_RADIUS + 0.5) continue;
-    const horizontal = Math.abs(ddx) >= Math.abs(ddy);
-    const sx = horizontal ? Math.sign(ddx) || 1 : 0;
-    const sy = horizontal ? 0 : Math.sign(ddy) || 1;
-    const blocked = new Set(state.bombs.map((b) => cellIndex(state.arena, b.col, b.row)));
-    for (let k = 0; k < GHOST_PUSH_CELLS; k++) {
-      if (collidesAt(state.arena, other.x + sx, other.y + sy, blocked)) break;
-      other.x += sx;
-      other.y += sy;
+/**
+ * Halo do Filippe: um círculo de GHOST_HALO_RADIUS células em volta dele. Quem estiver dentro (ou tentar entrar) é
+ * empurrado de volta para a borda, então ninguém chega perto. O halo acompanha o dono e some quando o tempo acaba.
+ */
+function updateHalos(state: GameState, countDown = true): void {
+  const halos = state.halos;
+  if (!halos || halos.length === 0) return;
+  const blocked = new Set(state.bombs.map((b) => cellIndex(state.arena, b.col, b.row)));
+  for (const halo of halos) {
+    const owner = state.players.find((p) => p.id === halo.owner);
+    if (!owner || !owner.alive) {
+      halo.ticks = 0;
+      continue;
     }
-    if (other.slide !== undefined) other.slide = null;
+    if (countDown && state.round.phase === 'playing') halo.ticks -= 1;
+    for (const other of state.players) {
+      if (!other.alive || other.id === owner.id) continue;
+      const ddx = other.x - owner.x;
+      const ddy = other.y - owner.y;
+      const dist = Math.hypot(ddx, ddy);
+      if (dist >= halo.radius) continue;
+      const ux = dist > 0.001 ? ddx / dist : VECTORS[owner.facing].dx || 1;
+      const uy = dist > 0.001 ? ddy / dist : VECTORS[owner.facing].dy;
+      const candidates = [
+        { x: owner.x + ux * halo.radius, y: owner.y + uy * halo.radius },
+        { x: owner.x + Math.sign(ux || 1) * halo.radius * (Math.abs(ux) >= Math.abs(uy) ? 1 : 0) + (Math.abs(ux) >= Math.abs(uy) ? 0 : ddx), y: owner.y + (Math.abs(ux) >= Math.abs(uy) ? ddy : Math.sign(uy || 1) * halo.radius) },
+      ];
+      for (const spot of candidates) {
+        if (!collidesAt(state.arena, spot.x, spot.y, blocked)) {
+          other.x = spot.x;
+          other.y = spot.y;
+          if (other.slide !== undefined) other.slide = null;
+          break;
+        }
+      }
+    }
+  }
+  state.halos = halos.filter((h) => h.ticks > 0);
+}
+
+/** Elefante da Ana: empurra para a frente quem estiver no caminho dele (se houver lugar). */
+function pushPlayersAhead(state: GameState, elephant: { x: number; y: number; dir: Direction; owner: number }): void {
+  const { dx, dy } = VECTORS[elephant.dir];
+  const blocked = new Set(state.bombs.map((b) => cellIndex(state.arena, b.col, b.row)));
+  for (const other of state.players) {
+    if (!other.alive || other.id === elephant.owner) continue;
+    const along = (other.x - elephant.x) * dx + (other.y - elephant.y) * dy;
+    const side = Math.abs((other.x - elephant.x) * dy) + Math.abs((other.y - elephant.y) * dx);
+    if (side > 0.75 || along < -0.2 || along > 0.9) continue;
+    const nx = other.x + dx * ELEPHANT_SPEED * 1.4 + (0.9 - along > 0 ? dx * Math.max(0, 0.7 - along) * 0.5 : 0);
+    const ny = other.y + dy * ELEPHANT_SPEED * 1.4 + (0.9 - along > 0 ? dy * Math.max(0, 0.7 - along) * 0.5 : 0);
+    if (!collidesAt(state.arena, nx, ny, blocked)) {
+      other.x = nx;
+      other.y = ny;
+      if (other.slide !== undefined) other.slide = null;
+    }
   }
 }
 
@@ -363,7 +418,7 @@ export function aiShouldUsePower(state: GameState, player: PlayerState): boolean
     case 'shield':
       return danger; // teletransporta para fora do perigo
     case 'jump':
-      return false;
+      return enemies.some((p) => Math.abs(p.x - player.x) + Math.abs(p.y - player.y) <= 6);
     case 'sprint':
     case 'invisible':
       return danger;
@@ -378,7 +433,7 @@ export function aiShouldUsePower(state: GameState, player: PlayerState): boolean
     case 'chocolate':
       return danger;
     case 'freeze':
-      return state.bombs.some((b) => b.owner !== player.id && !(b.frozenTicks && b.frozenTicks > 0));
+      return state.bombs.some((b) => b.owner !== player.id && !(b.frozenTicks && b.frozenTicks > 0)) || enemies.some((p) => Math.abs(p.x - player.x) + Math.abs(p.y - player.y) <= 4);
     default:
       break;
   }

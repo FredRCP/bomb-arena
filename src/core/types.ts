@@ -1,4 +1,5 @@
 // Tipos do core. Aqui não há Phaser, nem janela, nem documento: só dados.
+import type { TrafficKind } from '../config/hazards';
 
 /** O que existe em cada célula da arena. */
 /** `hole`: buraco no gelo (impede a passagem, mas o fogo atravessa). */
@@ -99,6 +100,8 @@ export interface PlayerState {
   sprintTicks?: number;
   /** Violeta: passos que faltam invisível. */
   invisibleTicks?: number;
+  /** Congelado (poder da Van): não anda, não solta bomba nem usa poder enquanto for maior que zero. */
+  frozenTicks?: number;
   /** Superpoder do personagem e a carga dele (0 a POWER_CHARGE_TICKS). Ausente = sem poder. */
   power?: { kind: PowerKind; charge: number };
 }
@@ -248,6 +251,9 @@ export type GameEvent =
   /** A neve fez crescer um bloco destrutível. */
   | { type: 'blockGrown'; col: number; row: number }
   | { type: 'rollerGone'; id: number; col: number; row: number }
+  /** Tráfego: a faixa vai ser percorrida em instantes (aviso) e o veículo entrou nela. */
+  | { type: 'trafficWarn'; kind: TrafficKind; axis: 'row' | 'col'; index: number }
+  | { type: 'trafficGo'; kind: TrafficKind; axis: 'row' | 'col'; index: number }
   | { type: 'boulderWarn'; col: number }
   | { type: 'boulderRoll'; col: number }
   | { type: 'boulderGone'; col: number }
@@ -350,8 +356,31 @@ export interface HazardsState {
   cannon?: VolcanoState;
   /** Templo: uma das pontes cai de tempos em tempos. */
   bridgeFall?: BridgeFallState;
+  /** Selva, Pista, Obras, Parquinho e Trem: veículos que cruzam faixas (veja core/traffic.ts). */
+  traffic?: TrafficState;
   /** Última célula em que cada jogador esteve (para contar uma passagem só quando ele ENTRA na célula). */
   lastCell?: Partial<Record<PlayerId, number>>;
+}
+
+/** Uma faixa de tráfego: uma fileira ou coluna inteira, livre de blocos. */
+export interface TrafficLane {
+  axis: 'row' | 'col';
+  /** Número da fileira (axis row) ou da coluna (axis col). */
+  index: number;
+  phase: 'idle' | 'warn' | 'run';
+  /** Passos até a próxima fase (idle e warn). */
+  timer: number;
+  /** 1 = da esquerda/cima para a direita/baixo. */
+  dir: 1 | -1;
+  /** Posição da frente do veículo ao longo da faixa, em células (só em run). */
+  pos: number;
+  /** Cor/variação do veículo desta passagem. */
+  look: number;
+}
+
+export interface TrafficState {
+  kind: TrafficKind;
+  lanes: TrafficLane[];
 }
 
 export interface CurrentLane {
@@ -362,6 +391,8 @@ export interface CurrentLane {
 }
 
 /** Rio de lava: de 60 em 60 s desce por uma coluna (de uma ponta à outra) e sai da arena. */
+export type { TrafficKind } from '../config/hazards';
+
 export interface LavaState {
   phase: 'idle' | 'warn' | 'flow';
   /** Passos até a próxima fase (idle e warn). */
@@ -422,6 +453,8 @@ export interface GameState {
   hazards?: HazardsState;
   /** Elefantinhos em disparada (poder da Ana). */
   elephants?: ElephantState[];
+  /** Halos do Filippe: círculo em volta do dono onde ninguém mais entra. */
+  halos?: Array<{ owner: PlayerId; ticks: number; radius: number }>;
   planes?: PlaneState[];
   /** Gosma do Musgo no chão. */
   slime?: SlimeCell[];

@@ -252,3 +252,18 @@ describe('Ilha dos Piratas: canhões', () => {
     expect(hit).toBe(true);
   });
 });
+
+describe('Vulcão: último minuto', () => {
+  it('no último minuto da partida o intervalo entre erupções cai para 8 s', () => {
+    const state = make({ volcano: true });
+    state.round.phase = 'playing';
+    state.round.ticksLeft = 60 * 60;
+    state.hazards!.volcano!.timer = 20 * 60;
+    let erupted = 0;
+    for (let i = 0; i < 9 * 60; i++) {
+      step(state);
+      for (const e of drainEvents(state)) if (e.type === 'volcanoErupt') erupted += 1;
+    }
+    expect(erupted).toBeGreaterThanOrEqual(1);
+  });
+});

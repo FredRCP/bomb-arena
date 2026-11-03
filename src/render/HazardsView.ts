@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { GameState } from '../core';
 import { TILE_SIZE } from './ArenaRenderer';
 import { BOULDER_WARN_TICKS } from '../config/hazards';
+import { themeKey, themeById } from './theme';
 
 // Desenho da armadilha de dardos: uma faixa discreta na fileira (sempre visível), setas vermelhas piscando nas duas bordas
 // durante o aviso e os dardos voando quando disparam. Só desenho; as regras estão em core/hazards.ts.
@@ -18,6 +19,8 @@ export class HazardsView {
   private readonly sand: Phaser.GameObjects.Graphics;
   /** Pedra gigante do Templo Perdido (desenhada por cima dos jogadores). */
   private readonly boulderG: Phaser.GameObjects.Graphics;
+  /** Imagens da pedra (uma por coluna em queda), se o tema tiver boulder.png. */
+  private readonly boulderImages: Phaser.GameObjects.Image[] = [];
 
   constructor(private readonly scene: Phaser.Scene, state: GameState) {
     this.g = scene.add.graphics().setDepth(9);
@@ -109,13 +112,14 @@ export class HazardsView {
   private drawBoulder(state: GameState): void {
     const g = this.boulderG;
     g.clear();
+    for (const image of this.boulderImages) image.setVisible(false);
     const boulder = state.hazards?.boulder;
     if (!boulder || boulder.phase === 'idle') return;
     const height = state.arena.rows * TILE_SIZE;
-    for (const col of boulder.cols) this.drawOneBoulder(state, boulder, col, height);
+    boulder.cols.forEach((col, i) => this.drawOneBoulder(state, boulder, col, height, i));
   }
 
-  private drawOneBoulder(state: GameState, boulder: NonNullable<NonNullable<GameState['hazards']>['boulder']>, col: number, height: number): void {
+  private drawOneBoulder(state: GameState, boulder: NonNullable<NonNullable<GameState['hazards']>['boulder']>, col: number, height: number, index = 0): void {
     const g = this.boulderG;
     const x = (col + 0.5) * TILE_SIZE;
     if (boulder.phase === 'warn') {
@@ -136,6 +140,19 @@ export class HazardsView {
     const R = 94;
     const y = boulder.y * TILE_SIZE;
     const spin = boulder.y * 1.3;
+    const imageKey = themeKey(themeById('temple'), 'boulder');
+    if (this.scene.textures.exists(imageKey)) {
+      // Pedra desenhada (boulder.png): rola girando, com sombra e poeira.
+      for (let k = 1; k <= 7; k++) g.fillStyle(0xcdbf9f, 0.35 - k * 0.04).fillCircle(x + Math.sin(k * 3.1 + y * 0.02) * 60, y - 90 - k * 22, 18 + k * 6);
+      g.fillStyle(0x1b1f3b, 0.3).fillEllipse(x + 10, y + 74, 200, 40);
+      let image = this.boulderImages[index];
+      if (!image) {
+        image = this.scene.add.image(0, 0, imageKey).setDepth(10.25);
+        this.boulderImages[index] = image;
+      }
+      image.setVisible(true).setPosition(x, y).setDisplaySize(R * 2.1, R * 2.1).setRotation(spin);
+      return;
+    }
     for (let k = 1; k <= 7; k++) g.fillStyle(0xcdbf9f, 0.35 - k * 0.04).fillCircle(x + Math.sin(k * 3.1 + y * 0.02) * 60, y - 90 - k * 22, 18 + k * 6); // poeira
     g.fillStyle(0x1b1f3b, 0.3).fillEllipse(x + 10, y + 74, 200, 40); // sombra
     g.fillStyle(0x7b7466, 1).fillCircle(x, y, R);

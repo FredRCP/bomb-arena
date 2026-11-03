@@ -1,0 +1,11 @@
+LOTE 55 - descompacte por cima do projeto (mantém as pastas), depois: npm run dev
+
+1) Fundo da Arena Clássica: o código agora derruba o fundo da fase anterior (se sobrar um, some) e incluí de novo
+   public/themes/classic/background.jpg e public/stages/classic*.jpg (a sala de brinquedos). Se ainda aparecer o mar,
+   confira se public/themes/classic/background.jpg é a sala de brinquedos (1600x900).
+2) 5 arenas novas (aparecem no fim da lista de fases): Selva, Pista de Corrida, Canteiro de Obras, Parquinho, Trenzinho.
+   Perigo novo "tráfego": faixas livres de blocos por onde passa um veículo (carros, trem, trator, bolas, troncos).
+   A faixa pisca de vermelho e as luzes dos dois lados acendem antes; quem estiver na faixa é eliminado (escudo protege).
+   Arte provisória feita em código (public/themes/<fase>/): pode ser trocada pela do Gemini mantendo os nomes dos arquivos.
+3) Templo Perdido: nova arte (blocos de tijolo com vinhas de frente, pedra, pisos, templo 3x3 e pedra rolante).
+Código novo: src/core/traffic.ts, src/render/TrafficView.ts. Testes: 601 passando.

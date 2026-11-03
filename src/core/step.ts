@@ -34,14 +34,16 @@ export function step(state: GameState, intents: Intents = {}): void {
   if (state.round.phase === 'over') return;
 
   for (const player of state.players) {
-    if (player.alive && intents[player.id]?.placeBomb) placeBomb(state, player);
-    if (player.alive && intents[player.id]?.special) useSpecial(state, player);
-    if (player.alive && intents[player.id]?.power) usePower(state, player);
+    const frozen = (player.frozenTicks ?? 0) > 0;
+    if (player.alive && !frozen && intents[player.id]?.placeBomb) placeBomb(state, player);
+    if (player.alive && !frozen && intents[player.id]?.special) useSpecial(state, player);
+    if (player.alive && !frozen && intents[player.id]?.power) usePower(state, player);
     if (!player.alive) sidelineAct(state, player, intents[player.id]);
   }
 
   for (const player of state.players) {
-    let move = intents[player.id]?.move ?? null;
+    let move = (player.frozenTicks ?? 0) > 0 ? null : intents[player.id]?.move ?? null;
+    if (move === null && player.slide && (player.frozenTicks ?? 0) > 0) player.slide = null;
     // Controles invertidos (item ruim): esquerda vira direita, cima vira baixo.
     if (move !== null && player.invertTicks > 0) move = OPPOSITE[move];
     // Faixas de gelo: andando em cima de uma, o jogador desliza na direção em que começou até bater em algo (parede,
@@ -95,6 +97,7 @@ function tickEffects(state: GameState): void {
     if (player.slowTicks > 0) player.slowTicks -= 1;
     if ((player.sprintTicks ?? 0) > 0) player.sprintTicks! -= 1;
     if ((player.invisibleTicks ?? 0) > 0) player.invisibleTicks! -= 1;
+    if ((player.frozenTicks ?? 0) > 0) player.frozenTicks! -= 1;
     if (player.shieldTicks > 0) player.shieldTicks -= 1;
     if (player.heroTicks > 0) player.heroTicks -= 1;
   }

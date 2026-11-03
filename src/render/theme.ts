@@ -61,6 +61,11 @@ export const THEMES: Record<string, ThemeDef> = {
   pirates: { id: 'pirates', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xb07a3c, 0x8a5a2a, 0xd9b36a] },
   sea: { id: 'sea', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xbdeeff, 0x7fd0f0, 0xe8fbff], bubbles: true },
   volcano: { id: 'volcano', floors: true, wall: true, wallWidth: 72, blockVariants: 3, blockWidth: 68, rubble: false, background: true, chips: [0xff7a1a, 0x9a5a38, 0x2a2228], volcano: true, embers: true },
+  jungle: { id: 'jungle', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0x4c8f2f, 0x2f6b1f, 0x9bd16b] },
+  racing: { id: 'racing', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xe03131, 0xf1f3f5, 0x343a40] },
+  construction: { id: 'construction', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xc0522d, 0xe8a85a, 0x8a8f98] },
+  playground: { id: 'playground', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xf4d58d, 0xe0b868, 0xff8fab] },
+  train: { id: 'train', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0x8b5a2b, 0xd9a566, 0xc92a2a] },
   ice: { id: 'ice', floors: true, wall: true, wallWidth: 56, blockVariants: 3, blockWidth: 62, rubble: true, background: true, chips: [0xe3f6ff, 0xb9e3f7, 0x7fc4e8], igloo: true, snow: true },
 };
 
@@ -89,7 +94,10 @@ export function preloadThemes(scene: Phaser.Scene): void {
     if (theme.igloo) add('igloo', 'igloo.png');
     if (theme.sphinx) add('sphinx', 'sphinx.png');
     if (theme.scrolls) add('scroll', 'scroll.png');
-    if (theme.island) add('island', 'island.png');
+    if (theme.island) {
+      add('island', 'island.png');
+      add('boulder', 'boulder.png');
+    }
     if (theme.deck) add('deck', 'deck.png');
     if (theme.volcano) {
       add('volcano', 'volcano.png');

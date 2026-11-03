@@ -1,4 +1,5 @@
 import { BOULDER_FIRST_DELAY_TICKS, BOULDER_HIT_HALF, BOULDER_STUN_TICKS, BOULDER_PERIOD_TICKS, BOULDER_SPEED, BOULDER_WARN_TICKS, CHASM_WIDTH, PYRAMID_SIZE, BLOCK_REGROW_TICKS, ROLLER_BREAKS_BLOCKS, ROLLER_PERIOD_TICKS, ROLLER_SPEED, ICE_CRACK_LEVELS, ICE_PATCHES, DART_FIRST_DELAY_TICKS, DART_HIT_HALF, DART_SLOW_TICKS, DART_PERIOD_TICKS, DART_SPEED, DART_WARN_TICKS, QUICKSAND_PATCHES, QUICKSAND_SPEED_FACTOR, BRIDGE_DOWN_TICKS, BRIDGE_FIRST_TICKS, BRIDGE_PERIOD_TICKS, BRIDGE_WARN_TICKS } from '../config/hazards';
+import type { TrafficKind } from '../config/hazards';
 import { cellIndex, getCell, isTunnel } from './arena';
 import { applyExtraHazards, updateExtraHazards } from './extraHazards';
 import { dropPowerups, revealItem } from './items';
@@ -44,6 +45,8 @@ export interface HazardOptions {
   cannons?: boolean;
   /** Templo: de 60 em 60 s uma das pontes cai (com aviso) e volta 10 s depois. Precisa de `chasm`. */
   bridgeFall?: boolean;
+  /** Tráfego de veículos nas faixas da arena (carros, trem, trator, bolas ou troncos). */
+  traffic?: TrafficKind;
   /** Vulcão de pedra 3 x 3 no meio da arena, que entra em erupção lançando bolas de lava. */
   volcano?: boolean;
   /** Templo 3 x 3 no meio do abismo, com um túnel (a ponte do meio passa por dentro dele). Precisa de `chasm`. */

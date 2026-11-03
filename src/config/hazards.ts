@@ -70,6 +70,9 @@ export const LAVA2_DELAY_TICKS = 150;
 export const VOLCANO_FIRST_TICKS = 12 * 60;
 export const VOLCANO_PERIOD_TICKS = 24 * 60;
 export const VOLCANO_PERIOD_LATE_TICKS = 7 * 60;
+/** No último minuto da partida o vulcão erupciona bem mais seguido (a cada 8 s). */
+export const VOLCANO_PERIOD_LAST_MINUTE_TICKS = 8 * 60;
+export const VOLCANO_LAST_MINUTE_TICKS = 60 * 60;
 export const VOLCANO_SHOTS = 8;
 export const VOLCANO_SHOT_GAP = 14;
 /** A sombra aparece 2 s antes da bola cair. */
@@ -89,3 +92,26 @@ export const CANNON_PERIOD_TICKS = 30 * 60;
 export const CANNON_SHOTS = 3;
 export const CANNON_SHOT_GAP = 40;
 export const CANNON_FALL_TICKS = 120;
+
+/**
+ * Tráfego (arenas Selva, Pista de Corrida, Canteiro de Obras, Parquinho e Trenzinho): faixas livres de blocos, de ponta a ponta,
+ * por onde passa um veículo de tempos em tempos (a faixa pisca antes). Quem estiver na faixa quando ele passa é eliminado.
+ * Velocidades em células por passo; comprimentos em células; tempos em passos de 1/60 s.
+ */
+export type TrafficKind = 'cars' | 'train' | 'bulldozer' | 'ball' | 'log';
+export interface TrafficCfg {
+  speed: number;
+  length: number;
+  warn: number;
+  first: number;
+  period: number;
+  /** true = cada faixa tem sempre o mesmo sentido (mão de rua); false = o sentido muda a cada passagem. */
+  fixedDir: boolean;
+}
+export const TRAFFIC: Record<TrafficKind, TrafficCfg> = {
+  cars: { speed: 0.22, length: 1.5, warn: 80, first: 12 * 60, period: 7 * 60, fixedDir: true },
+  train: { speed: 0.1, length: 6, warn: 150, first: 14 * 60, period: 20 * 60, fixedDir: false },
+  bulldozer: { speed: 0.07, length: 2.2, warn: 110, first: 14 * 60, period: 11 * 60, fixedDir: false },
+  ball: { speed: 0.12, length: 1, warn: 100, first: 14 * 60, period: 10 * 60, fixedDir: false },
+  log: { speed: 0.11, length: 1.3, warn: 110, first: 14 * 60, period: 12 * 60, fixedDir: false },
+};

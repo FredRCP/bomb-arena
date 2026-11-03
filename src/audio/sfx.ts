@@ -2,7 +2,7 @@
 // Ficam fora do core: som é apresentação, a regra do jogo não depende dele.
 
 export type PowerSfx = 'power-elephant' | 'power-airplane' | 'power-shield' | 'power-freeze' | 'power-stork' | 'power-confuse' | 'power-ghost' | 'power-jump' | 'power-sprint' | 'power-slime' | 'power-invisible' | 'power-twinbombs' | 'power-fog' | 'power-chocolate';
-export type SfxKind = 'place' | 'explode' | 'hit' | 'win' | 'lose' | 'pickup' | 'tick' | 'confirm' | 'fanfare' | 'sad' | 'cannon' | PowerSfx;
+export type SfxKind = 'place' | 'explode' | 'hit' | 'win' | 'lose' | 'pickup' | 'tick' | 'confirm' | 'fanfare' | 'sad' | 'cannon' | 'horn' | PowerSfx;
 
 /**
  * Arquivos de som próprios (opcional): se existir public/sfx/<nome>.ogg (ou .mp3/.wav), ele toca no lugar do som sintetizado.
@@ -82,6 +82,7 @@ export class Sfx {
     else if (kind === 'fanfare') this.fanfare(ctx, now);
     else if (kind === 'sad') this.sad(ctx, now);
     else if (kind === 'cannon') this.cannon(ctx, now);
+    else if (kind === 'horn') this.horn(ctx, now);
     else this.power(ctx, now, kind);
   }
 
@@ -282,6 +283,13 @@ export class Sfx {
     this.boom(ctx, t);
     this.sweep(ctx, t, 'sine', 90, 30, 0.5, 0.35);
     this.hiss(ctx, t, 'bandpass', 900, 200, 0.5, 0.18);
+  }
+
+  /** Buzina e vento de um veículo que passa (tráfego das arenas novas). */
+  private horn(ctx: AudioContext, t: number): void {
+    this.sweep(ctx, t, 'square', 392, 392, 0.2, 0.06);
+    this.sweep(ctx, t + 0.26, 'square', 392, 392, 0.2, 0.06);
+    this.hiss(ctx, t, 'bandpass', 300, 1400, 1.0, 0.07, 2);
   }
 
   /** Um som para cada superpoder (sintetizado; troque por arquivo em public/sfx/ quando quiser). */

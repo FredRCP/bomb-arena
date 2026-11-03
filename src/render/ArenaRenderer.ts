@@ -620,6 +620,7 @@ export function syncPlayerView(view: Movable, player: PlayerState, arena?: Arena
 /** Transparência do jogador: invisível (Violeta) quase some; escudo pisca; fantasma fica meio transparente. */
 function playerAlpha(player: PlayerState, tick: number): number {
   if ((player.invisibleTicks ?? 0) > 0) return player.invisibleTicks! < 60 && tick % 8 < 4 ? 0.5 : 0.1;
+  if ((player.frozenTicks ?? 0) > 0) return 0.6;
   if (player.shieldTicks > 0) return tick % 10 < 5 ? 0.35 : 1;
   return player.ghostTicks > 0 ? 0.5 : 1;
 }

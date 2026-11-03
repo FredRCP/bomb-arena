@@ -3,6 +3,7 @@ import { BOULDER_SPEED, BRIDGE_DOWN_TICKS } from '../config/hazards';
 import { cellIndex, getCell } from './arena';
 import { slideProjection } from './bombs';
 import { lavaFlowTicks } from './extraHazards';
+import { trafficRunTicks } from './traffic';
 import { blastOf } from './explosions';
 import { STEP_DISTANCE, stepDistanceOf } from './movement';
 import { closingHazards } from './shrink';
@@ -99,6 +100,22 @@ export function buildHazards(state: GameState, extraBomb?: BombState, selfId?: P
     const from = lava.phase === 'warn' ? Math.max(0, lava.timer - 30) : 0;
     const to = lava.phase === 'warn' ? lava.timer + flow : Math.ceil(flow * (lava.dir === 1 ? (arena.rows + 4 - lava.y) : lava.y + 4) / (arena.rows + 4));
     for (let row = 1; row < arena.rows - 1; row++) if (getCell(arena, lava.col, row) !== 'wall') windows[cellIndex(arena, lava.col, row)]!.push([from, to]);
+  }
+  // Tráfego: a faixa é perigosa do aviso até o veículo sair dela.
+  const traffic = state.hazards?.traffic;
+  if (traffic) {
+    for (const lane of traffic.lanes) {
+      if (lane.phase === 'idle') continue;
+      const size = lane.axis === 'row' ? arena.cols : arena.rows;
+      const run = trafficRunTicks(traffic.kind, size);
+      const from = lane.phase === 'warn' ? Math.max(0, lane.timer - 20) : 0;
+      const to = lane.phase === 'warn' ? lane.timer + run : Math.ceil(run * (lane.dir === 1 ? size - lane.pos : lane.pos) / size) + 20;
+      for (let k = 1; k < size - 1; k++) {
+        const col = lane.axis === 'row' ? k : lane.index;
+        const row = lane.axis === 'row' ? lane.index : k;
+        windows[cellIndex(arena, col, row)]!.push([from, to]);
+      }
+    }
   }
   // Ponte do templo que vai cair: perigosa do aviso até voltar.
   const fall = state.hazards?.bridgeFall;

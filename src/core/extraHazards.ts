@@ -1,11 +1,13 @@
-import { CANNON_FALL_TICKS, CANNON_FIRST_TICKS, CANNON_PERIOD_TICKS, CANNON_SHOT_GAP, CANNON_SHOTS, CURRENT_PUSH, LAVA_FIRST_TICKS, LAVA_LENGTH, LAVA2_DELAY_TICKS, LAVA_PERIOD_TICKS, LAVA_SPEED, LAVA_WARN_TICKS, VOLCANO_FALL_TICKS, VOLCANO_FIRST_TICKS, VOLCANO_HIT_HALF, VOLCANO_PERIOD_LATE_TICKS, VOLCANO_PERIOD_TICKS, VOLCANO_SHOT_GAP, VOLCANO_SHOTS } from '../config/hazards';
+import { CANNON_FALL_TICKS, CANNON_FIRST_TICKS, CANNON_PERIOD_TICKS, CANNON_SHOT_GAP, CANNON_SHOTS, CURRENT_PUSH, LAVA_FIRST_TICKS, LAVA_LENGTH, LAVA2_DELAY_TICKS, LAVA_PERIOD_TICKS, LAVA_SPEED, LAVA_WARN_TICKS, VOLCANO_FALL_TICKS, VOLCANO_FIRST_TICKS, VOLCANO_HIT_HALF, VOLCANO_LAST_MINUTE_TICKS, VOLCANO_PERIOD_LAST_MINUTE_TICKS, VOLCANO_PERIOD_LATE_TICKS, VOLCANO_PERIOD_TICKS, VOLCANO_SHOT_GAP, VOLCANO_SHOTS } from '../config/hazards';
 import { VEST_BREAK_SHIELD_TICKS } from '../config/items';
 import { cellIndex, getCell } from './arena';
 import { blockedCellsFor, walkThroughCellsFor } from './bombs';
 import { dropPowerups, revealItem } from './items';
 import { bodyOverlapsCell, movePlayer, stepDistanceOf } from './movement';
 import { createRng } from './random';
+import { createTraffic, updateTraffic } from './traffic';
 import type { Arena, Cell, CurrentLane, GameState, HazardsState } from './types';
+import type { TrafficKind } from '../config/hazards';
 
 // Perigos do Fundo do Mar (correnteza) e do Vulcão (lava que escorre, erupções e o vulcão no meio).
 // Ficam fora de hazards.ts só para esse arquivo não crescer demais; createHazards/updateHazards chamam estas funções.
@@ -17,6 +19,7 @@ export interface ExtraHazardOptions {
   volcano?: boolean;
   /** Ilha dos Piratas: canhões do navio. */
   cannons?: boolean;
+  traffic?: TrafficKind;
 }
 
 /** O vulcão: 3 x 3 de pedra no meio da arena. */
@@ -62,6 +65,7 @@ export function applyExtraHazards(arena: Arena, options: ExtraHazardOptions, see
     hazards.lava = { phase: 'idle', timer: LAVA_FIRST_TICKS - LAVA_WARN_TICKS, col: 0, dir: 1, y: 0 };
     hazards.lava2 = { phase: 'idle', timer: LAVA_FIRST_TICKS - LAVA_WARN_TICKS + LAVA2_DELAY_TICKS, col: 0, dir: 1, y: 0 };
   }
+  if (options.traffic) hazards.traffic = createTraffic(arena, options.traffic, seed);
   if (options.cannons) hazards.cannon = { phase: 'idle', timer: CANNON_FIRST_TICKS, remaining: 0, gap: 0, shots: [] };
   if (options.volcano || options.lava) hazards.volcano = { phase: 'idle', timer: VOLCANO_FIRST_TICKS, remaining: 0, gap: 0, shots: [] };
 }
@@ -75,6 +79,7 @@ export function updateExtraHazards(state: GameState): void {
   if (hz.lava2) updateLava(state, hz.lava2, hz.lava, 2);
   if (hz.volcano) updateShots(state, hz.volcano, VOLCANO_SHOTS_CFG);
   if (hz.cannon) updateShots(state, hz.cannon, CANNON_CFG);
+  if (hz.traffic) updateTraffic(state);
 }
 
 /** Correnteza: quem está numa célula da faixa é levado na direção dela (sem atravessar nada). */
@@ -184,16 +189,20 @@ interface ShotConfig {
   count: number;
   period: number;
   periodLate: number;
+  /** Intervalo no último minuto da partida (opcional). */
+  periodLast?: number;
   /** Evento de lançamento/queda: o do vulcão ou o do canhão. */
   kind: 'volcano' | 'cannon';
 }
-const VOLCANO_SHOTS_CFG: ShotConfig = { fall: VOLCANO_FALL_TICKS, gap: VOLCANO_SHOT_GAP, count: VOLCANO_SHOTS, period: VOLCANO_PERIOD_TICKS, periodLate: VOLCANO_PERIOD_LATE_TICKS, kind: 'volcano' };
+const VOLCANO_SHOTS_CFG: ShotConfig = { fall: VOLCANO_FALL_TICKS, gap: VOLCANO_SHOT_GAP, count: VOLCANO_SHOTS, period: VOLCANO_PERIOD_TICKS, periodLate: VOLCANO_PERIOD_LATE_TICKS, periodLast: VOLCANO_PERIOD_LAST_MINUTE_TICKS, kind: 'volcano' };
 const CANNON_CFG: ShotConfig = { fall: CANNON_FALL_TICKS, gap: CANNON_SHOT_GAP, count: CANNON_SHOTS, period: CANNON_PERIOD_TICKS, periodLate: CANNON_PERIOD_TICKS, kind: 'cannon' };
 
 /** Vulcão e canhões: de tempos em tempos lançam uma salva de bolas que caem em células sorteadas (sombra no chão antes da queda). */
 function updateShots(state: GameState, volcano: NonNullable<HazardsState['volcano']>, cfg: ShotConfig): void {
   if (state.round.phase === 'playing') {
     if (volcano.phase === 'idle') {
+      const last = cfg.periodLast !== undefined && state.round.ticksLeft > 0 && state.round.ticksLeft <= VOLCANO_LAST_MINUTE_TICKS;
+      if (last && volcano.timer > cfg.periodLast!) volcano.timer = cfg.periodLast!;
       volcano.timer -= 1;
       if (volcano.timer <= 0) {
         volcano.phase = 'erupt';
@@ -214,7 +223,7 @@ function updateShots(state: GameState, volcano: NonNullable<HazardsState['volcan
       }
       if (volcano.remaining <= 0) {
         volcano.phase = 'idle';
-        volcano.timer = state.round.ticksLeft === 0 ? cfg.periodLate : cfg.period;
+        volcano.timer = state.round.ticksLeft === 0 ? cfg.periodLate : cfg.periodLast !== undefined && state.round.ticksLeft <= VOLCANO_LAST_MINUTE_TICKS ? cfg.periodLast : cfg.period;
       }
     }
   }

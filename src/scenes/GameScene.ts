@@ -45,6 +45,8 @@ import { createHud } from '../render/Hud';
 import { TOP_HEIGHT, placeArena, sideWidthFor } from '../render/layout';
 import { HazardsView } from '../render/HazardsView';
 import { ElephantView } from '../render/ElephantView';
+import { HaloView } from '../render/HaloView';
+import { TrafficView } from '../render/TrafficView';
 import { PlaneView } from '../render/PlaneView';
 import { SnowView } from '../render/SnowView';
 import { BubblesView } from '../render/BubblesView';
@@ -103,6 +105,8 @@ export class GameScene extends Phaser.Scene {
   private closedView!: ClosedView;
   private hazardsView!: HazardsView;
   private elephantView!: ElephantView;
+  private haloView!: HaloView;
+  private trafficView!: TrafficView;
   private planeView!: PlaneView;
   private snowView: SnowView | null = null;
   private bubblesView: BubblesView | null = null;
@@ -207,6 +211,7 @@ export class GameScene extends Phaser.Scene {
     if (theme.background && has(this, theme, 'background')) {
       // Fundo da fase: uma imagem do tamanho da tela (a câmera desliza, por isso começa no canto da tela, e não em 0,0).
       // Fica numa cena por baixo da partida (BackdropScene): a câmera da partida é transparente e a arena pode sumir por uns segundos.
+      this.scene.stop('Backdrop'); // garante que o fundo da fase anterior não sobra
       this.scene.launch('Backdrop', { key: themeKey(theme, 'background'), title: this.freshStart ? stage.name : '' });
       this.scene.sendToBack('Backdrop');
       this.cameras.main.setAlpha(1);
@@ -214,6 +219,7 @@ export class GameScene extends Phaser.Scene {
       setPageBackdrop(`${import.meta.env.BASE_URL}themes/${theme.id}/background.jpg`);
     } else {
       setPageBackdrop(null);
+      this.scene.stop('Backdrop');
       addMenuBackground(this, undefined, false); // fundo colorido da tela (sem bolhas, para não distrair)
     }
     this.stepper.reset();
@@ -238,6 +244,8 @@ export class GameScene extends Phaser.Scene {
     this.closedView = createClosedView(this, theme.id);
     this.hazardsView = new HazardsView(this, this.gameState);
     this.elephantView = new ElephantView(this);
+    this.haloView = new HaloView(this);
+    this.trafficView = new TrafficView(this, this.gameState);
     this.planeView = new PlaneView(this);
     this.snowView = theme.snow ? new SnowView(this) : null;
     this.bubblesView = theme.bubbles ? new BubblesView(this) : null;
@@ -581,6 +589,8 @@ export class GameScene extends Phaser.Scene {
       if (event.type === 'lavaShot') heard.add('tick');
       if (event.type === 'lavaImpact') heard.add('explode');
       if (event.type === 'lavaRiver') heard.add('tick');
+      if (event.type === 'trafficWarn') heard.add('tick');
+      if (event.type === 'trafficGo') sfx.play('horn');
       if (event.type === 'bridgeWarn') {
         heard.add('tick');
         this.cameras.main.shake(3000, 0.0012);
@@ -604,6 +614,7 @@ export class GameScene extends Phaser.Scene {
     }
 
     this.elephantView.onEvents(events);
+    this.trafficView.onEvents(events);
     this.extraHazards.onEvents(events);
     this.fx.onEvents(events, this.gameState);
     this.flameSprites.onEvents(events, this.gameState, FLAME_TICKS);
@@ -680,6 +691,8 @@ export class GameScene extends Phaser.Scene {
     }
     this.hazardsView.update(this.gameState);
     this.elephantView.update(this.gameState);
+    this.haloView.update(this.gameState);
+    this.trafficView.update(this.gameState);
     this.planeView.update(this.gameState);
     this.snowView?.update();
     this.bubblesView?.update();

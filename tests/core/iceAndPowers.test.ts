@@ -360,7 +360,7 @@ describe('superpoder do Lucas: avião', () => {
     return state;
   };
 
-  it('carregado, o avião sobrevoa a arena toda em 4 voltas largando 6 bombas e some', () => {
+  it('carregado, o avião sobrevoa a arena toda em 4 voltas largando 7 bombas e some', () => {
     const state = field();
     const p = state.players[0]!;
     givePower(p, 'airplane');
@@ -385,7 +385,7 @@ describe('superpoder do Lucas: avião', () => {
       }
     }
     expect(placed).toBe(AIRPLANE_BOMBS);
-    expect(AIRPLANE_BOMBS).toBe(6);
+    expect(AIRPLANE_BOMBS).toBe(7);
     expect(AIRPLANE_LAPS).toBe(4);
     expect(maxX - minX).toBeGreaterThan(state.arena.cols * 0.6); // cobriu a largura da arena
     expect(gone).toBe(true);
