@@ -1,0 +1,16 @@
+LOTE 62 - +10% de itens, volumes padrao, arremesso de bomba sem "dar a volta"
+Copie por cima (mantendo as pastas):
+  src/config/items.ts      ITEM_DROP_CHANCE 0.14 -> 0.154 (+10% de itens por partida)
+  src/menu/menuModel.ts    volume padrao dos efeitos 50% (era 70%), musica 40% (era 50%)
+  src/config/bombs.ts      THROW_FLIGHT_TICKS / THROW_ARC_CELLS (voo da bomba)
+  src/core/types.ts        BombState.flight (opcional, so desenho)
+  src/core/bombs.ts        findLanding sem "dar a volta"; flightOffset e advanceFlights
+  src/core/step.ts         chama advanceFlights
+  src/core/sideline.ts     bomba das laterais tambem voa
+  src/render/ArenaRenderer.ts  bomba desenhada em arco, com sombra no chao
+  tests/core/abilities.test.ts testes novos/ajustados
+Arremesso: a bomba que passaria da borda NAO reaparece do lado oposto; cai na casa livre mais longe que couber antes
+da borda (ex.: com 1 casa sobrando, cai nela). Durante 20 passos (~0,3 s) ela voa em arco ate la.
+Volumes: so valem para quem nunca mexeu nas Opcoes; quem ja salvou volume no navegador continua com o dele
+(Opcoes > volume dos sons 5 / musica 4, ou limpar os dados do site).
+Verificado: typecheck, 602 testes, build. O arco foi testado em teste de unidade; nao vi o voo em video.

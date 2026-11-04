@@ -198,6 +198,8 @@ export interface BombState {
   slide?: { direction: Direction; ticks: number; /** Passos por célula (chute: KICK_SLIDE_TICKS; correnteza: mais lento). */ interval?: number } | null;
   /** Congelada (poder da Van): o pavio não anda enquanto isto for maior que zero. */
   frozenTicks?: number;
+  /** Bomba arremessada ainda no ar (só desenho: a bomba já "vale" na célula de destino). */
+  flight?: { fromCol: number; fromRow: number; ticks: number } | null;
 }
 
 /** Uma célula em chamas. Machuca quem estiver nela enquanto `ticksLeft` for maior que zero. */

@@ -51,6 +51,7 @@ import { PlaneView } from '../render/PlaneView';
 import { SnowView } from '../render/SnowView';
 import { BubblesView } from '../render/BubblesView';
 import { setPageBackdrop } from '../render/pageBackdrop';
+import { ASSET_VERSION } from '../config/assetVersion';
 import { EmbersView } from '../render/EmbersView';
 import { ExtraHazardsView } from '../render/ExtraHazardsView';
 import { POWER_LABELS } from '../config/powers';
@@ -216,7 +217,7 @@ export class GameScene extends Phaser.Scene {
       this.scene.sendToBack('Backdrop');
       this.cameras.main.setAlpha(1);
       backdrop = true;
-      setPageBackdrop(`${import.meta.env.BASE_URL}themes/${theme.id}/background.jpg`);
+      setPageBackdrop(`${import.meta.env.BASE_URL}themes/${theme.id}/background.jpg${ASSET_VERSION}`);
     } else {
       setPageBackdrop(null);
       this.scene.stop('Backdrop');
@@ -451,7 +452,7 @@ export class GameScene extends Phaser.Scene {
     this.pauseObjects = [
       this.add.rectangle(width / 2, height / 2, width, height, 0x0b0c1a, 0.72).setDepth(100),
       this.add.text(width / 2, height / 2 - 230, 'Pausado', { fontFamily: font, fontSize: '72px', fontStyle: 'bold', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 8 }).setOrigin(0.5).setDepth(101),
-      this.add.text(width / 2, height / 2 + 250, '↑ ↓ escolher     ← → ajustar     Enter confirmar     Esc continuar', { fontFamily: font, fontSize: '22px', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 4 }).setOrigin(0.5).setDepth(101),
+      this.add.text(width / 2, height / 2 + 305, '↑ ↓ escolher     ← → ajustar     Enter confirmar     Esc continuar', { fontFamily: font, fontSize: '22px', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 4 }).setOrigin(0.5).setDepth(101),
     ];
     this.pauseRow = 0;
     this.pauseTexts = GameScene.PAUSE_ITEMS.map((id, index) => {

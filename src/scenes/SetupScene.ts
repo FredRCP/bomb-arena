@@ -10,6 +10,7 @@ import { DIFFICULTY_TAGLINES, NEXT_LABELS, SCREEN_TITLES, canStart, changeValue,
 import type { MenuScreen, MenuSettings, MenuState } from '../menu/menuModel';
 import { needsTeamsScreen } from '../menu/teamsModel';
 import { loadSettings, saveSettings } from '../menu/settingsStorage';
+import { ASSET_VERSION } from '../config/assetVersion';
 import { TILE_SIZE } from '../render/ArenaRenderer';
 import { placeArena } from '../render/layout';
 import { addMenuBackground, addPanel } from '../render/menuBackground';
@@ -60,7 +61,7 @@ export class SetupScene extends Phaser.Scene {
   preload(): void {
     if (this.menu.screen !== 'stage') return;
     this.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, () => undefined);
-    for (const stage of STAGES) if (!this.textures.exists(`stage-${stage.id}`)) this.load.image(`stage-${stage.id}`, `stages/${stage.id}.jpg`);
+    for (const stage of STAGES) if (!this.textures.exists(`stage-${stage.id}`)) this.load.image(`stage-${stage.id}`, `stages/${stage.id}.jpg${ASSET_VERSION}`);
   }
 
   create(): void {

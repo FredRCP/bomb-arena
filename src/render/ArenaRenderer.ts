@@ -1,7 +1,7 @@
 import { addCharacter, animateSprite, createSpriteView, hasSprites, isSpriteView } from './CharacterView';
 import type { CharacterDef } from '../characters/characters';
 import Phaser from 'phaser';
-import { getCell, inwardDirection, ringCells, slideOffset } from '../core';
+import { flightOffset, getCell, inwardDirection, ringCells, slideOffset } from '../core';
 import type { Arena, BombState, FlameState, GameState, HazardsState, ItemState, PlayerState } from '../core';
 import { iglooCells, iglooDoors, pyramidOrigin, pyramidWallCells, volcanoCells } from '../core';
 import { PYRAMID_SIZE } from '../config/hazards';
@@ -65,6 +65,8 @@ export function drawArena(scene: Phaser.Scene, arena: Arena, themeId = 'classic'
   const pillarImages = !!theme.pillar && has(scene, theme, 'pillar');
   const sphinxOn = !!theme.sphinx && has(scene, theme, 'sphinx');
   const scrollOn = !!theme.scrolls && has(scene, theme, 'scroll');
+  const frameKey = theme.frameImages ? `frame${arena.cols}` : '';
+  const frameOn = !!frameKey && has(scene, theme, frameKey) && arena.rows === 13;
   const glyphs = theme.borderGlyphs ?? 0;
   const glyphImages = glyphs > 0 && has(scene, theme, 'glyph1');
   const pyramidOn = !!theme.pyramid && has(scene, theme, 'pyramid') && !!hazards?.tunnel;
@@ -86,6 +88,7 @@ export function drawArena(scene: Phaser.Scene, arena: Arena, themeId = 'classic'
       if (getCell(arena, col, row) !== 'wall') continue;
       if (pyramidAt.has(row * arena.cols + col)) continue; // imagens grandes, desenhadas depois
       const inner = col > 0 && row > 0 && col < arena.cols - 1 && row < arena.rows - 1;
+      if (frameOn && !inner) continue; // a moldura em imagem cobre o anel da borda
       if (!inner && glyphImages) {
         // Borda: a esfinge no bloco do meio da fileira de cima; no resto alternam pedra lisa, hieróglifo e pergaminho
         // (a variação só depende da posição).
@@ -105,6 +108,9 @@ export function drawArena(scene: Phaser.Scene, arena: Arena, themeId = 'classic'
       else drawWall(g, x, y);
     }
   }
+
+  if (frameOn) scene.add.image(0, 0, themeKey(theme, frameKey)).setOrigin(0, 0).setDepth(6.2);
+  if (theme.frameFx) drawFrameFx(scene, arena);
 
   if (pyramidOn) {
     // Quadrado de PYRAMID_SIZE células, por cima dos jogadores: quem anda no túnel some enquanto passa por dentro.
@@ -153,6 +159,40 @@ export function drawArena(scene: Phaser.Scene, arena: Arena, themeId = 'classic'
 
   g.setDepth(0);
   return g;
+}
+
+/**
+ * Efeito 3D da borda. A luz vem de cima e da esquerda: a borda de cima projeta a sombra mais longa sobre o piso,
+ * a da esquerda uma média e as outras duas só um escurecimento leve (oclusão ambiente). A sombra é feita de faixas
+ * finas cuja opacidade cai suavemente, e um friso claro na quina de dentro da borda de cima e da esquerda
+ * (lado voltado para a luz) e um escuro embaixo e à direita completam o relevo.
+ */
+function drawFrameFx(scene: Phaser.Scene, arena: Arena): void {
+  const g = scene.add.graphics().setDepth(0.6);
+  const x0 = TILE_SIZE;
+  const y0 = TILE_SIZE;
+  const w = (arena.cols - 2) * TILE_SIZE;
+  const h = (arena.rows - 2) * TILE_SIZE;
+  const strip = 2;
+  const edges = [
+    { len: 40, peak: 0.6, side: 'top' },
+    { len: 30, peak: 0.45, side: 'left' },
+    { len: 20, peak: 0.3, side: 'bottom' },
+    { len: 20, peak: 0.3, side: 'right' },
+  ] as const;
+  for (const e of edges) {
+    for (let d = 0; d < e.len; d += strip) {
+      const t = 1 - d / e.len;
+      g.fillStyle(0x000000, e.peak * t * t);
+      if (e.side === 'top') g.fillRect(x0, y0 + d, w, strip);
+      else if (e.side === 'bottom') g.fillRect(x0, y0 + h - d - strip, w, strip);
+      else if (e.side === 'left') g.fillRect(x0 + d, y0, strip, h);
+      else g.fillRect(x0 + w - d - strip, y0, strip, h);
+    }
+  }
+  // Frisos de relevo na quina interna da moldura.
+  g.fillStyle(0xffffff, 0.22).fillRect(x0 - 3, y0 - 3, w + 6, 2).fillRect(x0 - 3, y0 - 3, 2, h + 6);
+  g.fillStyle(0x000000, 0.35).fillRect(x0 - 3, y0 + h + 1, w + 6, 2).fillRect(x0 + w + 1, y0 - 3, 2, h + 6);
 }
 
 /** Pilar em imagem (a pirâmide do Egito): base na base da célula, subindo um pouco. */
@@ -409,9 +449,10 @@ export function createEffectsView(scene: Phaser.Scene): Graphics {
   return g;
 }
 
-function drawBomb(g: Graphics, bomb: BombState, tick: number, offset: { x: number; y: number } = { x: 0, y: 0 }, mine = false): void {
+function drawBomb(g: Graphics, bomb: BombState, tick: number, offset: { x: number; y: number } = { x: 0, y: 0 }, mine = false, lift = 0): void {
   const cx = (bomb.col + 0.5 + offset.x) * TILE_SIZE;
-  const cy = (bomb.row + 0.5 + offset.y) * TILE_SIZE;
+  const groundY = (bomb.row + 0.5 + offset.y) * TILE_SIZE;
+  const cy = groundY - lift * TILE_SIZE;
 
   // A bomba "pulsa" e pulsa mais rápido quando falta pouco para explodir.
   const frozen = (bomb.frozenTicks ?? 0) > 0;
@@ -419,8 +460,9 @@ function drawBomb(g: Graphics, bomb: BombState, tick: number, offset: { x: numbe
   const pulse = frozen ? 1 : 1 + 0.07 * Math.sin((tick / 7) * urgency);
   const r = 22 * pulse;
 
-  g.fillStyle(COLORS.shadow, 0.25);
-  g.fillEllipse(cx, cy + 20, 40, 12);
+  // A sombra fica no chão e encolhe com a altura do arco.
+  g.fillStyle(COLORS.shadow, 0.25 * (1 - Math.min(0.6, lift / 2)));
+  g.fillEllipse(cx, groundY + 20, 40 * (1 - Math.min(0.4, lift / 3)), 12);
   if (bomb.pierce || mine) {
     // perfurante: mina marítima (como o ícone do item): corpo azul-marinho com oito pontas
     const spike = 8;
@@ -436,15 +478,23 @@ function drawBomb(g: Graphics, bomb: BombState, tick: number, offset: { x: numbe
       g.fillCircle(cx + ux * (tip - 1), cy + 3 + uy * (tip - 1), 2.4);
     }
   }
-  g.fillStyle(frozen ? 0x7fc8e8 : mine ? 0x4a4f36 : bomb.pierce ? 0x232a45 : COLORS.bombBody);
+  // Corpo com contorno grosso, rebordo escuro e o lado da luz (cima e esquerda) mais claro: efeito de volume.
+  const bodyColor = frozen ? 0x7fc8e8 : mine ? 0x4a4f36 : bomb.pierce ? 0x232a45 : 0x1b1c22;
+  g.fillStyle(frozen ? 0x2f5d7a : 0x08080c);
+  g.fillCircle(cx, cy + 3, r + 3);
+  g.fillStyle(bodyColor);
   g.fillCircle(cx, cy + 3, r);
+  g.fillStyle(0xffffff, 0.09);
+  g.fillCircle(cx - 3, cy, r - 4);
   if (bomb.remote) {
     // bomba-relógio: luz roxa piscando no meio
     g.fillStyle(tick % 30 < 15 ? 0xd0a0ff : 0x9c36b5);
     g.fillCircle(cx, cy + 5, 6);
   }
-  g.fillStyle(COLORS.bombHighlight, 0.6);
-  g.fillCircle(cx - 8, cy - 6, 6);
+  // Brilhos do lado da luz: um oval grande e uma pinta embaixo dele.
+  g.fillStyle(0xffffff, 0.92);
+  g.fillEllipse(cx - 9, cy - 4, 9, 14);
+  g.fillCircle(cx - 11, cy + 9, 3);
 
   if (frozen) {
     // Bomba congelada: casca de gelo azul-clara com brilho, cristais em volta e sem faísca (o pavio fica parado).
@@ -480,11 +530,43 @@ function drawBomb(g: Graphics, bomb: BombState, tick: number, offset: { x: numbe
     return;
   }
 
-  // Pavio com uma faísca que pisca.
-  g.lineStyle(4, COLORS.bombFuse, 1);
-  g.lineBetween(cx + 6, cy - r + 6, cx + 14, cy - r - 4);
-  g.fillStyle(COLORS.bombSpark);
-  g.fillCircle(cx + 15, cy - r - 6, tick % 8 < 4 ? 5 : 3);
+  // Tampa (bico) na quina de cima à direita, pavio de corda e uma faísca em estrela que pisca.
+  const ux = 0.6;
+  const uy = -0.8; // direção do bico, para fora do corpo
+  const bx = cx + ux * (r - 1);
+  const by = cy + 3 + uy * (r - 1);
+  const px = -uy;
+  const py = ux;
+  const quad = (len: number, half: number, color: number): void => {
+    g.fillStyle(color);
+    g.fillPoints([
+      { x: bx - px * half, y: by - py * half },
+      { x: bx + px * half, y: by + py * half },
+      { x: bx + px * half + ux * len, y: by + py * half + uy * len },
+      { x: bx - px * half + ux * len, y: by - py * half + uy * len },
+    ], true);
+  };
+  quad(11, 9, 0x08080c);
+  quad(9, 7, 0x2b2c35);
+  quad(3, 7, 0x45464f);
+  const tx = bx + ux * 11;
+  const ty = by + uy * 11;
+  const sx = tx + 6;
+  const sy = ty - 9;
+  g.lineStyle(5, 0x7a4a22, 1).lineBetween(tx, ty, sx, sy);
+  g.lineStyle(3, 0xd9a066, 1).lineBetween(tx, ty, sx, sy);
+  const big = tick % 8 < 4;
+  const star = (outer: number, inner: number, color: number): void => {
+    const pts: { x: number; y: number }[] = [];
+    for (let k = 0; k < 12; k++) {
+      const rad = k % 2 === 0 ? outer : inner;
+      const a = (k * Math.PI) / 6 + 0.2;
+      pts.push({ x: sx + 3 + Math.cos(a) * rad, y: sy - 2 + Math.sin(a) * rad });
+    }
+    g.fillStyle(color).fillPoints(pts, true);
+  };
+  star(big ? 12 : 9, big ? 5 : 4, 0xb3120f);
+  star(big ? 8 : 6, 3.5, 0xffc107);
 }
 
 // ---------------------------------------------------------------------------------------------------------------
@@ -558,7 +640,11 @@ function drawFlames(g: Graphics, flames: readonly FlameState[], tick: number): v
 export function drawEffects(g: Graphics, state: GameState, spriteFlames = false): void {
   g.clear();
   if (!spriteFlames) drawFlames(g, state.flames, state.tick);
-  for (const bomb of state.bombs) drawBomb(g, bomb, state.tick, slideOffset(state, bomb), !!state.hazards?.currents);
+  for (const bomb of state.bombs) {
+    const slide = slideOffset(state, bomb);
+    const fly = flightOffset(bomb);
+    drawBomb(g, bomb, state.tick, { x: slide.x + fly.x, y: slide.y + fly.y }, !!state.hazards?.currents, fly.lift);
+  }
   // Em equipes, um anel fino na cor do time embaixo de cada jogador (azul = time 1, vermelho = time 2).
   const teamGame = state.players.some((a) => state.players.some((b) => b.id !== a.id && b.team === a.team));
   if (teamGame) {

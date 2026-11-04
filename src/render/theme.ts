@@ -1,10 +1,15 @@
 import Phaser from 'phaser';
+import { ASSET_VERSION } from '../config/assetVersion';
 
 // Aparência de cada fase (só desenho; nenhuma regra do jogo mora aqui). As imagens ficam em public/themes/<fase>/.
 // Qualquer imagem que faltar é ignorada: a arena usa o desenho provisório feito em código (ver ArenaRenderer.ts).
 
 export interface ThemeDef {
   id: string;
+  /** Efeito 3D da borda: sombra no piso junto das paredes externas e frisos de luz (desenhado em código). */
+  frameFx?: boolean;
+  /** Moldura em imagem (frame15.png, frame19.png: arena inteira, só o anel de borda pintado). */
+  frameImages?: boolean;
   /** Piso em imagem (floorA.png e floorB.png, alternados como um tabuleiro)? Senão, o piso colorido provisório. */
   floors: boolean;
   /** Parede fixa em imagem (wall.png)? */
@@ -55,7 +60,7 @@ export interface ThemeDef {
 }
 
 export const THEMES: Record<string, ThemeDef> = {
-  classic: { id: 'classic', floors: false, wall: true, wallWidth: 62, blockVariants: 1, blockWidth: 62, rubble: false, background: true, chips: [0xd9822b, 0xa65a1c, 0x6e3a12] },
+  classic: { id: 'classic', frameFx: true, frameImages: true, floors: false, wall: true, wallWidth: 62, blockVariants: 1, blockWidth: 62, rubble: false, background: true, chips: [0xd9822b, 0xa65a1c, 0x6e3a12] },
   egypt: { id: 'egypt', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xf3d896, 0xe0b868, 0xb88f46], borderGlyphs: 22, pyramid: true, floorFull: true, columns: true, quicksand: true, sphinx: true, scrolls: true },
   temple: { id: 'temple', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xc9965c, 0x9b6b3a, 0x5f8f3f], island: true },
   pirates: { id: 'pirates', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xb07a3c, 0x8a5a2a, 0xd9b36a] },
@@ -80,7 +85,7 @@ export function preloadThemes(scene: Phaser.Scene): void {
   scene.load.on(Phaser.Loader.Events.FILE_LOAD_ERROR, () => undefined);
   for (const theme of Object.values(THEMES)) {
     const base = `themes/${theme.id}`;
-    const add = (name: string, file: string): void => void scene.load.image(themeKey(theme, name), `${base}/${file}`);
+    const add = (name: string, file: string): void => void scene.load.image(themeKey(theme, name), `${base}/${file}${ASSET_VERSION}`);
     if (theme.floors) {
       add('floorA', 'floorA.png');
       add('floorB', 'floorB.png');
@@ -106,6 +111,10 @@ export function preloadThemes(scene: Phaser.Scene): void {
     if (theme.floorFull) add('floorFull', 'floor.jpg');
     if (theme.columns) add('column', 'column.png');
     if (theme.quicksand) add('quicksand', 'quicksand.png');
+    if (theme.frameImages) {
+      add('frame15', 'frame15.png');
+      add('frame19', 'frame19.png');
+    }
     if (theme.background) add('background', 'background.jpg');
   }
 }

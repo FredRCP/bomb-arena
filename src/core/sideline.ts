@@ -1,4 +1,4 @@
-import { BOMB_FUSE_TICKS, REVIVE_SHIELD_TICKS, SIDELINE_MOVE_TICKS, SIDELINE_THROW_DISTANCE } from '../config/bombs';
+import { BOMB_FUSE_TICKS, REVIVE_SHIELD_TICKS, SIDELINE_MOVE_TICKS, SIDELINE_THROW_DISTANCE, THROW_FLIGHT_TICKS } from '../config/bombs';
 import { cellIndex, getCell, inBounds } from './arena';
 import { findLanding, hitByThrownBomb } from './bombs';
 import { bodyOverlapsCell } from './movement';
@@ -95,6 +95,7 @@ export function sidelineAct(state: GameState, player: PlayerState, intent: Playe
       ticksLeft: BOMB_FUSE_TICKS,
       range: player.bombRange,
       walkThrough: state.players.filter((p) => p.alive && bodyOverlapsCell(p.x, p.y, landing.col, landing.row)).map((p) => p.id),
+      flight: { fromCol: from.col, fromRow: from.row, ticks: THROW_FLIGHT_TICKS },
     });
     state.events.push({ type: 'bombPlaced', col: landing.col, row: landing.row, owner: player.id });
     state.events.push({ type: 'bombThrown', fromCol: from.col, fromRow: from.row, col: landing.col, row: landing.row });

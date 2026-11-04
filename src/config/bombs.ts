@@ -22,6 +22,10 @@ export const KICK_SLIDE_TICKS = 5;
 /** Distância do arremesso, em células (passa por cima de blocos, paredes e bombas). */
 export const THROW_DISTANCE = 3;
 
+/** Voo da bomba arremessada (só visual): dura 20 passos e sobe em arco até 1,1 célula de altura. */
+export const THROW_FLIGHT_TICKS = 20;
+export const THROW_ARC_CELLS = 1.1;
+
 /** Proteção de quem volta a jogar depois de eliminar alguém das laterais: 2 segundos sem poder ser atingido por chamas. */
 export const REVIVE_SHIELD_TICKS = 120;
 

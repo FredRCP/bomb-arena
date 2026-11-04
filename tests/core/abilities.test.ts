@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import { BOMB_FUSE_TICKS, GHOST_TICKS, KICK_SLIDE_TICKS, REMOTE_FUSE_TICKS, THROW_DISTANCE } from '../../src/config/bombs';
-import { applyItem, createGameState, drainEvents, step } from '../../src/core';
+import { BOMB_FUSE_TICKS, GHOST_TICKS, KICK_SLIDE_TICKS, REMOTE_FUSE_TICKS, THROW_DISTANCE, THROW_FLIGHT_TICKS } from '../../src/config/bombs';
+import { applyItem, createGameState, drainEvents, flightOffset, step } from '../../src/core';
 import { addBomb, burning, cells, run } from '../helpers/bombHelpers';
 import { stateFromText } from '../helpers/stateFromText';
 
@@ -220,7 +220,7 @@ describe('arremesso', () => {
     near.players[0]!.facing = 'right';
     step(near, { 1: { move: null, placeBomb: true } });
     step(near, { 1: { move: null, special: true } });
-    expect(near.bombs[0]!.col).toBe(2); // o miolo só tem 3 casas: a bomba dá a volta e cai na casa do meio
+    expect(near.bombs[0]!.col).toBe(3); // o miolo só tem 3 casas: a bomba para na última casa antes da borda
 
     const none = stateFromText(['###', '#.#', '###'], [{ id: 1, col: 1, row: 1 }]);
     none.players[0]!.canThrow = true;
@@ -229,19 +229,34 @@ describe('arremesso', () => {
     expect(none.bombs[0]).toMatchObject({ col: 1, row: 1 });
   });
 
-  it('a bomba arremessada para fora da arena reaparece do lado oposto (como no Bomberman)', () => {
+  it('a bomba arremessada para fora da arena não reaparece do outro lado: cai na casa livre mais longe que couber', () => {
     const state = stateFromText(['#######', '#.....#', '#######'], [{ id: 1, col: 4, row: 1 }]);
     state.players[0]!.canThrow = true;
     state.players[0]!.facing = 'right';
     step(state, { 1: { move: null, placeBomb: true } });
     step(state, { 1: { move: null, special: true } });
-    expect(state.bombs[0]).toMatchObject({ col: 2, row: 1 }); // 4 + 3 = 7 passa da borda: volta pela esquerda
+    expect(state.bombs[0]).toMatchObject({ col: 5, row: 1 }); // 4 + 3 = 7 passa da borda: fica na última casa (5)
     const tall = stateFromText(['#####', '#...#', '#...#', '#...#', '#...#', '#...#', '#####'], [{ id: 1, col: 2, row: 4 }]);
     tall.players[0]!.canThrow = true;
     tall.players[0]!.facing = 'down';
     step(tall, { 1: { move: null, placeBomb: true } });
     step(tall, { 1: { move: null, special: true } });
-    expect(tall.bombs[0]).toMatchObject({ col: 2, row: 2 }); // 4 + 3 = 7 -> volta pelo alto
+    expect(tall.bombs[0]).toMatchObject({ col: 2, row: 5 }); // 4 + 3 = 7: para na última linha jogável
+  });
+
+  it('a bomba arremessada voa em arco por uns passos e depois assenta', () => {
+    const state = stateFromText(HALL, [{ id: 1, col: 1, row: 1 }]);
+    state.players[0]!.canThrow = true;
+    state.players[0]!.facing = 'right';
+    step(state, { 1: { move: null, placeBomb: true } });
+    step(state, { 1: { move: null, special: true } });
+    const bomb = state.bombs[0]!;
+    expect(bomb.flight).toMatchObject({ fromCol: 1, fromRow: 1 });
+    const start = flightOffset(bomb);
+    expect(start.x).toBeLessThan(0); // sai da mão (à esquerda do destino)
+    for (let i = 0; i < THROW_FLIGHT_TICKS + 1; i++) step(state, {});
+    expect(bomb.flight ?? null).toBeNull();
+    expect(flightOffset(bomb)).toEqual({ x: 0, y: 0, lift: 0 });
   });
 
   it('sem o item, nada acontece; o pavio continua', () => {

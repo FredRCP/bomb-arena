@@ -1,4 +1,4 @@
-import { BOMB_FUSE_TICKS, KICK_SLIDE_TICKS, REMOTE_FUSE_TICKS, THROW_DISTANCE } from '../config/bombs';
+import { BOMB_FUSE_TICKS, KICK_SLIDE_TICKS, REMOTE_FUSE_TICKS, THROW_ARC_CELLS, THROW_DISTANCE, THROW_FLIGHT_TICKS } from '../config/bombs';
 import { cellIndex, getCell, inBounds, isTunnel } from './arena';
 import { PLAYER_HALF_SIZE } from '../config/simulation';
 import { loseRandomPowerup } from './items';
@@ -165,6 +165,23 @@ export function slideOffset(state: GameState, bomb: BombState): { x: number; y: 
   return { x: dc * t, y: dr * t };
 }
 
+/** Posição de desenho de uma bomba no ar: deslocamento (em células) até a de destino e a altura do arco (em células). Só visual. */
+export function flightOffset(bomb: BombState): { x: number; y: number; lift: number } {
+  const f = bomb.flight;
+  if (!f) return { x: 0, y: 0, lift: 0 };
+  const t = 1 - f.ticks / THROW_FLIGHT_TICKS; // 0 = saindo da mão, 1 = chegou
+  return { x: (f.fromCol - bomb.col) * (1 - t), y: (f.fromRow - bomb.row) * (1 - t), lift: Math.sin(Math.PI * t) * THROW_ARC_CELLS };
+}
+
+/** O voo anda um passo; ao chegar, a bomba assenta. */
+export function advanceFlights(state: GameState): void {
+  for (const bomb of state.bombs) {
+    if (!bomb.flight) continue;
+    bomb.flight.ticks -= 1;
+    if (bomb.flight.ticks <= 0) bomb.flight = null;
+  }
+}
+
 /** Bombas chutadas andam uma célula a cada KICK_SLIDE_TICKS passos e param ao bater em parede, bloco, bomba ou jogador. */
 export function advanceSlidingBombs(state: GameState): void {
   for (const bomb of state.bombs) {
@@ -199,6 +216,7 @@ export function throwBomb(state: GameState, player: PlayerState): boolean {
 
   const landing = findLanding(state, col, row, player.facing);
   if (!landing) return false;
+  bomb.flight = { fromCol: col, fromRow: row, ticks: THROW_FLIGHT_TICKS };
   bomb.col = landing.col;
   bomb.row = landing.row;
   // Quem estiver embaixo de onde a bomba caiu pode sair de lá.
@@ -226,12 +244,12 @@ export function findLanding(
   const distances: number[] = [];
   for (let d = distance; d <= reach; d++) distances.push(d);
   for (let d = distance - 1; d >= 1; d--) distances.push(d);
-  // Como no Bomberman: a bomba que passaria da borda da arena reaparece do lado oposto, seguindo na mesma direção
-  // (o miolo jogável vai da coluna 1 à cols - 2 e da linha 1 à rows - 2; a borda é parede).
-  const wrap = (value: number, size: number): number => ((((value - 1) % (size - 2)) + (size - 2)) % (size - 2)) + 1;
+  // A bomba nunca sai da arena: o que passaria da borda é descartado e ela cai na casa livre mais longe que couber
+  // (primeiro de `distance` para a frente, depois voltando em direção a quem jogou). Nada de reaparecer do outro lado.
   for (const d of distances) {
-    const toCol = wrap(col + dc * d, cols);
-    const toRow = wrap(row + dr * d, rows);
+    const toCol = col + dc * d;
+    const toRow = row + dr * d;
+    if (toCol < 1 || toRow < 1 || toCol > cols - 2 || toRow > rows - 2) continue;
     if (toCol === col && toRow === row) continue;
     if (inBounds(state.arena, toCol, toRow) && isFreeForBomb(state, toCol, toRow)) return { col: toCol, row: toRow };
   }
