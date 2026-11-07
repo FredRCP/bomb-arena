@@ -321,24 +321,25 @@ describe('menu: níveis', () => {
 });
 
 describe('menu: fase e resumo', () => {
-  it('a fase percorre a lista (13 fases, todas jogáveis)', () => {
+  it('a fase percorre a lista (17 fases, todas jogáveis)', () => {
     const menu = createMenu(DEFAULT_SETTINGS, 'stage');
     goTo(menu, 'stage');
-    const expected: Array<[string, boolean]> = [['Arena Clássica', true], ['Arena Clássica Grande', true], ['Fase do Gelo', true], ['Fase do Egito', true], ['Templo Perdido', true], ['Ilha dos Piratas', true], ['Fundo do Mar', true], ['Vulcão', true], ['Selva', true], ['Pista de Corrida', true], ['Canteiro de Obras', true], ['Parquinho', true], ['Trenzinho', true]];
+    const expected: Array<[string, boolean]> = [['Arena Clássica', true], ['Arena Clássica Grande', true], ['Fase do Gelo', true], ['Fase do Gelo Grande', true], ['Fase do Egito', true], ['Fase do Egito Grande', true], ['Templo Perdido', true], ['Templo Perdido Grande', true], ['Ilha dos Piratas', true], ['Fundo do Mar', true], ['Vulcão', true], ['Vulcão Grande', true], ['Selva', true], ['Pista de Corrida', true], ['Canteiro de Obras', true], ['Parquinho', true], ['Trenzinho', true]];
     for (const [name, playable] of expected) {
       expect(describeRow(menu.settings, 'stage').value).toBe(name);
       expect(canStart(menu.settings)).toBe(playable);
       changeValue(menu, 1);
     }
-    expect(menu.settings.stage).toBe('classic'); // deu a volta nas 13 fases
+    expect(menu.settings.stage).toBe('classic'); // deu a volta nas 17 fases
   });
 
   it('stageIssue: celular não joga arena grande; fase pequena demais não comporta todos', () => {
-    const big = stageById('egypt');
+    const big = stageById('egypt19');
     expect(stageIssue(big, 2, false)).toBeNull();
     expect(stageIssue(big, 2, true)).toMatch(/grande demais para celular/);
+    expect(stageIssue(stageById('egypt'), 2, true)).toBeNull(); // as versões normais cabem no celular
     expect(stageIssue(stageById('temple'), 5, false)).toMatch(/até 4 jogadores/);
-    expect(stageIssue(big, 7, false)).toMatch(/até 6 jogadores/);
+    expect(stageIssue(stageById('egypt'), 7, false)).toMatch(/até 6 jogadores/);
     expect(stageIssue(stageById('classic'), 5, true)).toBeNull();
   });
 

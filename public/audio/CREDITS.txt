@@ -10,3 +10,5 @@ temple_a.ogg (battleThemeA), temple_b.ogg (battleThemeB), sinister_abode.ogg —
 mar.ogg (the_world_is_ours) — Fundo do Mar; vulcao.ogg (vulc_o) — Vulcão; pirata_adventure.ogg (pirate_adventure) e piratas.ogg — Ilha dos Piratas. Enviadas pelo Fred. Licença: CC0 (informado pelo Fred).
 
 Observação (31/10/2026): o Fred confirmou que todas as músicas enviadas por ele são CC0, então não é obrigatório dar crédito.
+
+Efeitos de poder enviados pelo Fred (05/11/2026), em public/sfx: power-airplane.mp3 (Lucas, avião; cortado em 8,5 s com fade) e power-ghost.mp3 (Filippe, fantasma; 5,1 s). Volumes igualados.

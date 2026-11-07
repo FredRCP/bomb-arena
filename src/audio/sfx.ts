@@ -10,6 +10,9 @@ export type SfxKind = 'place' | 'explode' | 'hit' | 'win' | 'lose' | 'pickup' | 
  */
 const OVERRIDE_EXTENSIONS = ['ogg', 'mp3', 'wav'] as const;
 
+/** Sons de arquivo que existem em public/sfx e devem estar prontos antes do primeiro uso. */
+const PRELOAD = ['power-airplane', 'power-ghost'] as const;
+
 export class Sfx {
   muted = false;
   /** Volume de 0 a 1 (o menu usa 0 a 10; veja setLevel). */
@@ -114,6 +117,11 @@ export class Sfx {
     this.master = this.context.createGain();
     this.master.gain.value = this.volume * Sfx.GAIN;
     this.master.connect(this.context.destination);
+    // Sons de arquivo conhecidos já carregam agora, para tocarem logo na primeira vez (senão a 1ª vez sairia o sintetizado).
+    for (const kind of PRELOAD) {
+      this.overrides.set(kind, null);
+      void this.loadOverride(this.context, kind);
+    }
     return this.context;
   }
 

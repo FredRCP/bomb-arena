@@ -60,32 +60,56 @@ export class PodiumScene extends Phaser.Scene {
     const { ranked, characters } = this.data0;
     // Posições dos degraus: [índice na classificação, x do centro, altura do degrau].
     const steps: Array<[number, number, number]> = [
-      [1, WIDTH / 2 - 215, 150],
-      [0, WIDTH / 2, 215],
-      [2, WIDTH / 2 + 215, 105],
+      [1, WIDTH / 2 - 215, 175],
+      [0, WIDTH / 2, 225],
+      [2, WIDTH / 2 + 215, 135],
     ];
     const baseY = 600;
+    this.spotlight(WIDTH / 2, baseY - 225);
+    // Chão do pódio (sombra embaixo dos degraus).
+    this.add.ellipse(WIDTH / 2, baseY + 6, 760, 34, 0x000000, 0.28).setDepth(1);
     for (const [rank, x, height] of steps) {
       const entry = ranked[rank];
       if (!entry) continue;
       const color = STEP_COLORS[rank]!;
+      const top = baseY - height;
       const g = this.add.graphics().setDepth(2);
-      g.fillStyle(color.front, 1).fillRoundedRect(x - 95, baseY - height, 190, height, 10);
-      g.fillStyle(color.top, 1).fillRoundedRect(x - 95, baseY - height, 190, 22, { tl: 10, tr: 10, bl: 0, br: 0 });
-      g.lineStyle(4, 0x1b1f3b, 1).strokeRoundedRect(x - 95, baseY - height, 190, height, 10);
-      this.add.text(x, baseY - height + 62, String(rank + 1), { fontFamily: FONT, fontSize: '70px', fontStyle: 'bold', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 7 }).setOrigin(0.5).setDepth(3);
+      g.fillStyle(0x000000, 0.25).fillRoundedRect(x - 90, top + 8, 190, height, 10);
+      g.fillStyle(color.front, 1).fillRoundedRect(x - 95, top, 190, height, 10);
+      g.fillStyle(0xffffff, 0.16).fillRect(x - 91, top + 26, 26, height - 32);
+      g.fillStyle(0x000000, 0.14).fillRect(x + 62, top + 26, 29, height - 32);
+      g.fillStyle(color.top, 1).fillRoundedRect(x - 95, top, 190, 24, { tl: 10, tr: 10, bl: 0, br: 0 });
+      g.fillStyle(0xffffff, 0.45).fillRoundedRect(x - 85, top + 4, 170, 5, 2);
+      g.lineStyle(4, 0x1b1f3b, 1).strokeRoundedRect(x - 95, top, 190, height, 10);
       const character = characterById(characters[entry.id]);
-      this.add.text(x, baseY - height + 118, `${entry.points} pts`, { fontFamily: FONT, fontSize: '26px', fontStyle: 'bold', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 5 }).setOrigin(0.5).setDepth(3);
-      this.add.text(x, baseY + 28, character.name, { fontFamily: FONT, fontSize: '34px', fontStyle: 'bold', color: rank === 0 ? '#ffe66d' : '#ffffff', stroke: '#1b1f3b', strokeThickness: 6 }).setOrigin(0.5).setDepth(3);
-      const figure = this.makeFigure(character.id, x, baseY - height);
-      this.tweens.add({ targets: figure, y: figure.y - (rank === 0 ? 26 : 12), duration: rank === 0 ? 420 : 640, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: rank * 140 });
+      // Número (ou, no 1º lugar, a taça com o número dentro) e a plaquinha de pontos, sempre dentro da coluna.
+      const plaqueY = baseY - 30;
+      if (rank === 0) {
+        const trophy = this.add.graphics().setDepth(3);
+        this.drawTrophy(trophy, x, top + 26, 1.0);
+        this.add.text(x, top + 66, '1', { fontFamily: FONT, fontSize: '38px', fontStyle: 'bold', color: '#7a4f00' }).setOrigin(0.5).setDepth(4);
+      } else {
+        const numberY = top + 24 + (plaqueY - 24 - (top + 24)) / 2;
+        this.add.text(x, numberY, String(rank + 1), { fontFamily: FONT, fontSize: '64px', fontStyle: 'bold', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 7 }).setOrigin(0.5).setDepth(3);
+      }
+      const plaque = this.add.graphics().setDepth(3);
+      plaque.fillStyle(0x1b1f3b, 0.85).fillRoundedRect(x - 62, plaqueY - 18, 124, 36, 18);
+      this.add.text(x, plaqueY, `${entry.points} pts`, { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5).setDepth(4);
+      this.add.text(x, baseY + 34, character.name, { fontFamily: FONT, fontSize: '34px', fontStyle: 'bold', color: rank === 0 ? '#ffe66d' : '#ffffff', stroke: '#1b1f3b', strokeThickness: 6 }).setOrigin(0.5).setDepth(3);
+      const figure = this.makeFigure(character.id, x, top);
+      this.tweens.add({ targets: figure, y: figure.y - (rank === 0 ? 24 : 12), duration: rank === 0 ? 420 : 640, yoyo: true, repeat: -1, ease: 'Sine.easeInOut', delay: rank * 140 });
     }
-    if (ranked[0]) this.add.text(WIDTH / 2, 140, `${characterById(characters[ranked[0].id]).name} é o campeão!`, { fontFamily: FONT, fontSize: '32px', fontStyle: 'bold', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 6 }).setOrigin(0.5);
+    // Estrelinhas piscando em volta do campeão.
+    for (let i = 0; i < 8; i++) {
+      const star = this.add.star(WIDTH / 2 + Math.cos(i * 0.785) * 250, baseY - 330 + Math.sin(i * 0.785) * 90, 5, 5, 12, 0xfff3a0, 0.9).setDepth(2);
+      this.tweens.add({ targets: star, alpha: 0.15, scale: 0.5, duration: 600 + i * 90, yoyo: true, repeat: -1, delay: i * 120 });
+    }
+    if (ranked[0]) this.add.text(WIDTH / 2, 128, `🏆 ${characterById(characters[ranked[0].id]).name} é o campeão! 🏆`, { fontFamily: FONT, fontSize: '32px', fontStyle: 'bold', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 6 }).setOrigin(0.5);
 
     // Do 4º em diante.
     ranked.slice(3, 7).forEach((entry, i) => {
       const name = characterById(characters[entry.id]).name;
-      this.add.text(WIDTH / 2, 668 + i * 28, `${i + 4}º  ${name} · ${entry.points} pts`, { fontFamily: FONT, fontSize: '22px', color: '#e3e7ff' }).setOrigin(0.5).setDepth(3);
+      this.add.text(WIDTH / 2, 692 + i * 26, `${i + 4}º  ${name} · ${entry.points} pts`, { fontFamily: FONT, fontSize: '22px', color: '#e3e7ff' }).setOrigin(0.5).setDepth(3);
     });
     this.add.text(WIDTH / 2, HEIGHT - 26, 'Enter: jogar de novo   ·   Esc: menu', { fontFamily: FONT, fontSize: '24px', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 4 }).setOrigin(0.5).setDepth(3);
 
@@ -119,10 +143,38 @@ export class PodiumScene extends Phaser.Scene {
     const key = `char-${character.id}-win`;
     if (character.sprites && this.textures.exists(key)) {
       const image = this.add.image(0, 0, key).setOrigin(0.5, 1);
-      image.setScale(210 / image.height);
+      image.setScale(190 / image.height);
       return this.add.container(x, topY + 4, [image]).setDepth(4);
     }
     return addCharacter(this, character, x, topY - 70, 70).setDepth(4);
+  }
+
+  /** Raios de luz girando devagar atrás do campeão. */
+  private spotlight(x: number, y: number): void {
+    const g = this.add.graphics({ x, y }).setDepth(1);
+    g.fillStyle(0xfff3a0, 0.08);
+    for (let i = 0; i < 8; i++) {
+      const a = (i * Math.PI) / 4;
+      g.fillTriangle(0, 0, Math.cos(a - 0.12) * 430, Math.sin(a - 0.12) * 430, Math.cos(a + 0.12) * 430, Math.sin(a + 0.12) * 430);
+    }
+    this.tweens.add({ targets: g, angle: 360, duration: 40000, repeat: -1 });
+  }
+
+  /** Taça dourada desenhada com formas simples; (x, y) é o topo da borda da taça. */
+  private drawTrophy(g: Phaser.GameObjects.Graphics, x: number, y: number, scale: number): void {
+    const k = scale;
+    const outline = 0x1b1f3b;
+    // alças
+    g.lineStyle(7 * k, outline, 1).strokeCircle(x - 44 * k, y + 28 * k, 15 * k).strokeCircle(x + 44 * k, y + 28 * k, 15 * k);
+    g.lineStyle(4 * k, 0xffd84a, 1).strokeCircle(x - 44 * k, y + 28 * k, 15 * k).strokeCircle(x + 44 * k, y + 28 * k, 15 * k);
+    // haste e base
+    g.fillStyle(0xe0a800, 1).fillRect(x - 8 * k, y + 78 * k, 16 * k, 18 * k);
+    g.fillStyle(0x7a4f00, 1).fillRoundedRect(x - 34 * k, y + 108 * k, 68 * k, 16 * k, 4 * k);
+    g.fillStyle(0xb57a00, 1).fillRoundedRect(x - 26 * k, y + 94 * k, 52 * k, 16 * k, 4 * k);
+    // taça
+    g.fillStyle(0xffd84a, 1).fillRoundedRect(x - 40 * k, y, 80 * k, 86 * k, { tl: 6 * k, tr: 6 * k, bl: 40 * k, br: 40 * k });
+    g.fillStyle(0xffffff, 0.45).fillRoundedRect(x - 30 * k, y + 8 * k, 10 * k, 52 * k, 5 * k);
+    g.lineStyle(3 * k, outline, 1).strokeRoundedRect(x - 40 * k, y, 80 * k, 86 * k, { tl: 6 * k, tr: 6 * k, bl: 40 * k, br: 40 * k });
   }
 
   /** Confete caindo (retângulos coloridos girando), em laço. */

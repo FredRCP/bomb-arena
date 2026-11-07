@@ -1,0 +1,9 @@
+LOTE 63 - sons do poder do Lucas (aviao) e do Filippe (fantasma)
+Copie por cima (mantendo as pastas):
+  public/sfx/power-airplane.mp3   Lucas: seu arquivo cortado em 8,5 s (o aviao voa 8,7 s), fade out nos ultimos 1,5 s, +7 dB com limitador
+  public/sfx/power-ghost.mp3      Filippe: seu arquivo inteiro (5,1 s), fade out de 0,45 s, -9,5 dB (estava no maximo)
+  src/audio/sfx.ts                carrega esses dois arquivos assim que o audio liga (antes a 1a vez tocava o som sintetizado)
+  public/audio/CREDITS.txt        registro dos arquivos
+Volumes: os dois ficaram em media ~-14 dB, para nenhum dos poderes soar muito mais alto que o outro.
+O volume segue o controle "Volume dos sons" das Opcoes. Depois: Ctrl+F5.
+Verificado: typecheck, 602 testes, build (os 2 mp3 saem em dist/sfx). Nao ouvi o resultado no jogo.

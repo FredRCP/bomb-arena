@@ -13,7 +13,7 @@ import { loadSettings, saveSettings } from '../menu/settingsStorage';
 import { ASSET_VERSION } from '../config/assetVersion';
 import { TILE_SIZE } from '../render/ArenaRenderer';
 import { placeArena } from '../render/layout';
-import { addMenuBackground, addPanel } from '../render/menuBackground';
+import { addMenuBackground, addPanel, drawPill } from '../render/menuBackground';
 import type { GameSession } from './GameScene';
 
 const FONT = 'system-ui, "Segoe UI", Roboto, sans-serif';
@@ -80,7 +80,7 @@ export class SetupScene extends Phaser.Scene {
     const total = this.session ? totalSteps({ ...this.menu.settings, players: this.session.config.players, enemies: this.session.config.enemies }) : totalSteps(this.menu.settings);
     if (step) this.add.text(WIDTH / 2, 160, `Passo ${step} de ${total}`, { fontFamily: FONT, fontSize: '24px', color: '#e3e7ff' }).setOrigin(0.5);
     this.add
-      .text(WIDTH / 2, HEIGHT - 50, this.menu.screen === 'stage' ? '← → trocar de fase     Enter jogar     Esc voltar     (ou use o controle)' : '↑ ↓ escolher     ← → mudar     Enter continuar     Esc voltar     (ou use o controle)', { fontFamily: FONT, fontSize: '24px', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 4 })
+      .text(WIDTH / 2, HEIGHT - 50, this.menu.screen === 'stage' ? '← → trocar de fase     Enter jogar     Esc voltar     (ou use o controle)' : '↑ ↓ escolher     ← → mudar     Enter continuar     Esc voltar     (ou use o controle)', { fontFamily: FONT, fontSize: '20px', color: '#dfe4ff', stroke: '#1b1f3b', strokeThickness: 3 })
       .setOrigin(0.5);
 
     this.bindKeys();
@@ -267,12 +267,14 @@ export class SetupScene extends Phaser.Scene {
       this.texts.push(this.add.text(WIDTH / 2, 666, issueText, { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold', color: '#ff8fa3', stroke: '#1b1f3b', strokeThickness: 4 }).setOrigin(0.5));
     }
     const blocked = issueText !== null;
+    const playPill = this.add.graphics();
+    drawPill(playPill, WIDTH / 2, 724, 420, 66, true, blocked);
     this.texts.push(
+      playPill,
       this.add
-        .text(WIDTH / 2, 712, NEXT_LABELS.stage, { fontFamily: FONT, fontSize: '50px', fontStyle: 'bold', color: blocked ? '#6c7293' : '#ffe66d', stroke: '#1b1f3b', strokeThickness: 6 })
-        .setOrigin(0.5)
-        .setInteractive({ useHandCursor: true })
-        .on('pointerdown', () => this.confirm()),
+        .text(WIDTH / 2, 724, NEXT_LABELS.stage, { fontFamily: FONT, fontSize: '38px', fontStyle: 'bold', color: blocked ? '#c9cde6' : '#1b1f3b' })
+        .setOrigin(0.5),
+      this.add.rectangle(WIDTH / 2, 724, 420, 66, 0xffffff, 0).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.confirm()),
     );
   }
 
@@ -288,19 +290,22 @@ export class SetupScene extends Phaser.Scene {
     rows.forEach((row, index) => {
       const y = ROW_TOP + index * ROW_STEP;
       const selected = row === current;
+      const pill = this.add.graphics();
+      this.texts.push(pill);
       if (row === 'next') {
         const blocked = this.menu.screen === 'stage' && !canStart(this.menu.settings, this.touch, this.totalPlayers());
         const label = NEXT_LABELS[this.menu.screen];
-        const color = blocked ? '#6c7293' : selected ? '#ffe66d' : '#c9a93a';
-        this.texts.push(this.add.text(WIDTH / 2, y + 24, label, { fontFamily: FONT, fontSize: '50px', fontStyle: 'bold', color, stroke: '#1b1f3b', strokeThickness: 6 }).setOrigin(0.5));
+        drawPill(pill, WIDTH / 2, y + 24, 420, 66, selected, blocked);
+        this.texts.push(this.add.text(WIDTH / 2, y + 24, label, { fontFamily: FONT, fontSize: '38px', fontStyle: 'bold', color: selected ? '#1b1f3b' : '#ffe66d' }).setOrigin(0.5));
         return;
       }
       const { label, value } = describeRow(this.menu.settings, row);
-      const color = selected ? '#ffe66d' : '#e3e7ff';
-      const style = { fontFamily: FONT, fontSize: '32px', fontStyle: selected ? 'bold' : 'normal', color };
+      drawPill(pill, WIDTH / 2, y, 700, 54, selected);
+      const color = selected ? '#1b1f3b' : '#e3e7ff';
+      const style = { fontFamily: FONT, fontSize: '30px', fontStyle: 'bold', color };
       this.texts.push(
-        this.add.text(150, y, label, style).setOrigin(0, 0.5),
-        this.add.text(WIDTH - 150, y, selected ? `◀  ${value}  ▶` : value, style).setOrigin(1, 0.5),
+        this.add.text(WIDTH / 2 - 320, y, label, style).setOrigin(0, 0.5),
+        this.add.text(WIDTH / 2 + 320, y, selected ? `◀  ${value}  ▶` : value, style).setOrigin(1, 0.5),
       );
     });
 

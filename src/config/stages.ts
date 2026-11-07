@@ -26,7 +26,7 @@ export interface StageDef {
   music: readonly string[];
 }
 
-export const STAGES: readonly StageDef[] = [
+const STAGES_BASE: readonly StageDef[] = [
   { id: 'classic', name: 'Arena Clássica', available: true, tagline: 'Caixotes de madeira e blocos de pedra: o jeito clássico de jogar.', cols: 15, rows: 13, maxPlayers: 5, mobileOk: true, music: ['audio/100_victories.ogg'] },
   { id: 'classic17', name: 'Arena Clássica Grande', theme: 'classic', available: true, tagline: 'A clássica em tamanho família (19 x 13), com mais espaço para fugir.', cols: 19, rows: 13, maxPlayers: 7, mobileOk: false, music: ['audio/100_victories.ogg'] },
   { id: 'ice', name: 'Fase do Gelo', available: true, tagline: 'Neve caindo, faixas escorregadias, gelo fino que racha e dois iglus que soltam bola de neve e pinguim!', cols: 15, rows: 13, maxPlayers: 5, mobileOk: true, hazards: { slippery: true, thinIce: true, igloo: true, regrow: true }, music: ['audio/gelo_loop.ogg', 'audio/gelo_intro.ogg'] },
@@ -38,7 +38,7 @@ export const STAGES: readonly StageDef[] = [
     cols: 17,
     rows: 13,
     maxPlayers: 6,
-    mobileOk: false,
+    mobileOk: true,
     hazards: { quicksand: true, dartRow: 9, pyramid: true },
     music: ['audio/egypt.ogg', 'audio/suez.ogg'],
   },
@@ -50,7 +50,7 @@ export const STAGES: readonly StageDef[] = [
     cols: 17,
     rows: 13,
     maxPlayers: 4,
-    mobileOk: false,
+    mobileOk: true,
     hazards: { chasm: true, boulder: true, island: true, bridgeFall: true },
     music: ['audio/temple_a.ogg', 'audio/temple_b.ogg', 'audio/sinister_abode.ogg'],
   },
@@ -62,7 +62,7 @@ export const STAGES: readonly StageDef[] = [
     cols: 17,
     rows: 13,
     maxPlayers: 7,
-    mobileOk: false,
+    mobileOk: true,
     hazards: { cannons: true },
     music: ['audio/pirata_adventure.ogg', 'audio/piratas.ogg'],
   },
@@ -86,7 +86,7 @@ export const STAGES: readonly StageDef[] = [
     cols: 17,
     rows: 13,
     maxPlayers: 6,
-    mobileOk: false,
+    mobileOk: true,
     hazards: { lava: true, volcano: true },
     music: ['audio/vulcao.ogg'],
   },
@@ -151,6 +151,25 @@ export const STAGES: readonly StageDef[] = [
     music: ['audio/suez.ogg'],
   },
 ];
+
+/** Versão grande (19 x 13) de uma fase: mesmo tema e perigos, mais espaço e mais jogadores. */
+function bigVersion(id: string, name: string, maxPlayers: number): StageDef {
+  const base = STAGES_BASE.find((stage) => stage.id === id)!;
+  return { ...base, id: `${id}19`, name, theme: themeIdOf(base), cols: 19, maxPlayers, mobileOk: false, tagline: `${base.name} em tamanho família (19 x 13), com mais espaço e até ${maxPlayers} jogadores.` };
+}
+
+const BIG: Record<string, [string, number]> = {
+  ice: ['Fase do Gelo Grande', 7],
+  egypt: ['Fase do Egito Grande', 7],
+  temple: ['Templo Perdido Grande', 6],
+  volcano: ['Vulcão Grande', 7],
+};
+
+/** A lista final: cada fase com versão grande aparece logo depois da versão normal. */
+export const STAGES: readonly StageDef[] = STAGES_BASE.flatMap((stage) => {
+  const big = BIG[stage.id];
+  return big ? [stage, bigVersion(stage.id, big[0], big[1])] : [stage];
+});
 
 export const DEFAULT_STAGE = 'classic';
 

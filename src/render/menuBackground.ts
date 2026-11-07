@@ -48,10 +48,17 @@ export function addMenuBackground(scene: Phaser.Scene, colors: BackgroundColors 
   return made;
 }
 
-/** Plaquinha escura e translúcida atrás de um bloco de texto, para ele ler bem sobre o fundo colorido. */
+/** Cartão azul-marinho com borda clara: o mesmo das telas de menu e da pausa. */
 export function addPanel(scene: Phaser.Scene, x: number, y: number, width: number, height: number): Phaser.GameObjects.Graphics {
   const g = scene.add.graphics().setDepth(-50);
-  g.fillStyle(0x14163a, 0.55);
-  g.fillRoundedRect(x - width / 2, y - height / 2, width, height, 28);
+  g.fillStyle(0x000000, 0.28).fillRoundedRect(x - width / 2 + 6, y - height / 2 + 10, width, height, 30);
+  g.fillStyle(0x1a1d45, 0.93).fillRoundedRect(x - width / 2, y - height / 2, width, height, 30);
+  g.lineStyle(3, 0x5560c8, 1).strokeRoundedRect(x - width / 2, y - height / 2, width, height, 30);
   return g;
+}
+
+/** Botão em pílula (o mesmo estilo do menu principal e da pausa): amarelo quando selecionado. */
+export function drawPill(g: Phaser.GameObjects.Graphics, x: number, y: number, width: number, height: number, selected: boolean, disabled = false): void {
+  g.fillStyle(selected ? (disabled ? 0x6c7293 : 0xffe66d) : 0x252a5c, selected ? 1 : 0.85).fillRoundedRect(x - width / 2, y - height / 2, width, height, height / 2);
+  if (selected) g.lineStyle(3, 0xffffff, 0.8).strokeRoundedRect(x - width / 2, y - height / 2, width, height, height / 2);
 }

@@ -133,6 +133,8 @@ export class GameScene extends Phaser.Scene {
   /** Menu da pausa: linha selecionada e os textos (atualizados quando algo muda). */
   private pauseRow = 0;
   private pauseTexts: Phaser.GameObjects.Text[] = [];
+  private endMs = 0;
+  private pauseGfx?: Phaser.GameObjects.Graphics;
   private readonly padMemory = new Map<number, PadMemory>();
   /** Diagnóstico de velocidade (?debug=1): quantos passos de simulação rodaram no último segundo. */
   private debugText: Phaser.GameObjects.Text | null = null;
@@ -226,6 +228,7 @@ export class GameScene extends Phaser.Scene {
     this.stepper.reset();
     this.lastFrameMs = performance.now();
     this.overlayShown = false;
+    this.endMs = 0;
     this.countdownTicks = (config.countdown ?? COUNTDOWN_SECONDS) * TICKS_PER_SECOND;
     // Começo de partida: uns 2,5 s só com o fundo da fase (e o nome dela) antes de a arena aparecer.
     this.prerollTicks = backdrop && this.freshStart && this.countdownTicks > 0 ? PREROLL_TICKS : 0;
@@ -317,6 +320,25 @@ export class GameScene extends Phaser.Scene {
     const roundOver = this.gameState.round.phase === 'over';
     const paused = this.pauseObjects.length > 0;
     this.touchControls?.setState(paused, roundOver);
+
+    // Rede de segurança do fim da partida: se por qualquer motivo o aviso do resultado não saiu, mostra agora;
+    // e depois de um instante vai ao pódio, sem depender de evento, de temporizador da cena nem do estado da pausa.
+    if (roundOver) {
+      const outcome = this.gameState.round.outcome;
+      if (!this.overlayShown && outcome) {
+        try { this.showResult(outcome); } catch (error) { console.error('[Bomb Arena] falha ao mostrar o resultado', error); }
+      }
+      if (this.session.match.finished) {
+        this.endMs += delta;
+        if (this.endMs >= MATCH_END_PODIUM_DELAY_MS && !paused) {
+          this.endMs = -1e9;
+          this.restart(true);
+          return;
+        }
+      }
+    } else {
+      this.endMs = 0;
+    }
 
     // Start do controle: pausa/continua; com a rodada acabada, vai para a próxima (como a tecla R).
     if (this.keyboardInput.consumeStart()) {
@@ -449,22 +471,39 @@ export class GameScene extends Phaser.Scene {
     const width = this.gameState.arena.cols * TILE_SIZE;
     const height = this.gameState.arena.rows * TILE_SIZE;
     const font = 'system-ui, "Segoe UI", Roboto, sans-serif';
+    const cx = width / 2;
+    const cy = height / 2;
+    const panelW = 600;
+    const panelH = 650;
+    const top = cy - panelH / 2;
+    const panel = this.add.graphics().setDepth(100.2);
+    panel.fillStyle(0x000000, 0.35).fillRoundedRect(cx - panelW / 2 + 6, top + 10, panelW, panelH, 30);
+    panel.fillStyle(0x1a1d45, 0.96).fillRoundedRect(cx - panelW / 2, top, panelW, panelH, 30);
+    panel.fillStyle(0x2a2f6b, 1).fillRoundedRect(cx - panelW / 2, top, panelW, 96, { tl: 30, tr: 30, bl: 0, br: 0 });
+    panel.lineStyle(3, 0x5560c8, 1).strokeRoundedRect(cx - panelW / 2, top, panelW, panelH, 30);
+    panel.fillStyle(0xffe66d, 1).fillRoundedRect(cx - 40, top + 84, 80, 6, 3);
+    this.pauseGfx = this.add.graphics().setDepth(100.5);
     this.pauseObjects = [
-      this.add.rectangle(width / 2, height / 2, width, height, 0x0b0c1a, 0.72).setDepth(100),
-      this.add.text(width / 2, height / 2 - 230, 'Pausado', { fontFamily: font, fontSize: '72px', fontStyle: 'bold', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 8 }).setOrigin(0.5).setDepth(101),
-      this.add.text(width / 2, height / 2 + 305, '↑ ↓ escolher     ← → ajustar     Enter confirmar     Esc continuar', { fontFamily: font, fontSize: '22px', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 4 }).setOrigin(0.5).setDepth(101),
+      this.add.rectangle(cx, cy, width, height, 0x0b0c1a, 0.7).setDepth(100),
+      panel,
+      this.pauseGfx,
+      this.add.text(cx, top + 48, 'Pausado', { fontFamily: font, fontSize: '50px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5).setDepth(101),
+      this.add.text(cx, top + panelH - 30, '↑↓ escolher    ←→ ajustar    Enter ok    Esc continuar', { fontFamily: font, fontSize: '18px', color: '#9aa3d8' }).setOrigin(0.5).setDepth(101),
     ];
     this.pauseRow = 0;
     this.pauseTexts = GameScene.PAUSE_ITEMS.map((id, index) => {
+      const isVolume = id === 'sfx' || id === 'music';
       const text = this.add
-        .text(width / 2, height / 2 - 120 + index * 62, '', { fontFamily: font, fontSize: '38px', fontStyle: 'bold', color: '#e3e7ff', stroke: '#1b1f3b', strokeThickness: 6 })
+        .text(cx, top + 150 + index * 62, '', { fontFamily: font, fontSize: '30px', fontStyle: 'bold', color: '#e3e7ff', align: isVolume ? 'left' : 'center' })
+        .setFixedSize(520, 52)
+        .setPadding(isVolume ? 24 : 0, 8, 0, 0)
         .setOrigin(0.5)
         .setDepth(101)
         .setInteractive({ useHandCursor: true });
       // Toque/mouse: tocar numa linha a seleciona e confirma; nas linhas de volume, tocar na metade esquerda diminui e na direita aumenta.
       text.on('pointerdown', (pointer: Phaser.Input.Pointer) => {
         this.pauseRow = index;
-        if (id === 'sfx' || id === 'music') this.pauseAction(pointer.worldX < text.x ? 'left' : 'right');
+        if (isVolume) this.pauseAction(pointer.worldX < text.x + 60 ? 'left' : 'right');
         else this.pauseAction('confirm');
       });
       this.pauseObjects.push(text);
@@ -475,19 +514,33 @@ export class GameScene extends Phaser.Scene {
 
   private renderPause(): void {
     const settings = loadSettings();
-    const pct = (v: number): string => (v === 0 ? 'mudo' : `${v * 10}%`);
     const labels: Record<(typeof GameScene.PAUSE_ITEMS)[number], string> = {
-      resume: 'Continuar',
-      sfx: `◀  Volume dos sons: ${pct(settings.volume)}  ▶`,
-      music: `◀  Volume da música: ${pct(settings.music)}  ▶`,
+      resume: '▶  Continuar',
+      sfx: 'Sons',
+      music: 'Música',
       controls: 'Controles',
       restart: 'Reiniciar a rodada',
-      arenas: 'Sair para a escolha de arenas',
+      arenas: 'Escolher outra arena',
       quit: 'Sair para o menu',
     };
+    const g = this.pauseGfx;
+    g?.clear();
     this.pauseTexts.forEach((text, index) => {
-      text.setText(labels[GameScene.PAUSE_ITEMS[index]!]);
-      text.setColor(index === this.pauseRow ? '#ffe66d' : '#e3e7ff');
+      const id = GameScene.PAUSE_ITEMS[index]!;
+      const selected = index === this.pauseRow;
+      text.setText(labels[id]);
+      text.setColor(selected ? '#1b1f3b' : '#e3e7ff');
+      if (!g) return;
+      const x = text.x - 260;
+      const y = text.y - 26;
+      g.fillStyle(selected ? 0xffe66d : 0x252a5c, selected ? 1 : 0.8).fillRoundedRect(x, y, 520, 52, 26);
+      if (id === 'sfx' || id === 'music') {
+        const level = id === 'sfx' ? settings.volume : settings.music;
+        for (let i = 0; i < 10; i++) {
+          const on = i < level;
+          g.fillStyle(on ? (selected ? 0x1b1f3b : 0xffe66d) : selected ? 0xc9b44a : 0x3d4388, 1).fillRoundedRect(x + 520 - 24 - (10 - i) * 20, y + 15, 14, 22, 4);
+        }
+      }
     });
   }
 
@@ -564,6 +617,12 @@ export class GameScene extends Phaser.Scene {
   private handleEvents(): void {
     const events = drainEvents(this.gameState);
     if (events.length === 0) return;
+    // O fim da rodada vem primeiro e isolado: um erro em som/efeito de outro evento não pode impedir o resultado.
+    for (const event of events) {
+      if (event.type === 'roundEnded') {
+        try { this.showResult(event.outcome); } catch (error) { console.error('[Bomb Arena] falha ao mostrar o resultado', error); }
+      }
+    }
 
     // Várias bombas na mesma explosão em cadeia tocam um único estrondo (senão o volume se soma).
     const heard = new Set<string>();
@@ -611,7 +670,6 @@ export class GameScene extends Phaser.Scene {
       if (event.type === 'playerHit' || event.type === 'thrownHit') heard.add('hit');
       if (event.type === 'itemPicked' || event.type === 'vestBroken') heard.add('pickup');
       if (event.type === 'playerRevived') heard.add('pickup');
-      if (event.type === 'roundEnded') this.showResult(event.outcome);
     }
 
     this.elephantView.onEvents(events);
@@ -662,7 +720,7 @@ export class GameScene extends Phaser.Scene {
     this.hud.update(this.gameState, match, this.session.scores);
     showOutcomeOverlay(this, this.gameState.arena.cols * TILE_SIZE, this.gameState.arena.rows * TILE_SIZE, text);
     // Fim da partida: depois de um instante com o resultado da rodada na tela, vai sozinho para o pódio (sem apertar nada).
-    if (match.finished) this.time.delayedCall(MATCH_END_PODIUM_DELAY_MS, () => { if (this.scene.isActive() && this.gameState.round.phase === 'over' && this.pauseObjects.length === 0) this.restart(true); });
+    // (a ida ao pódio é feita no update, veja a rede de segurança lá)
   }
 
   /** Fim da partida: guarda a pontuação de cada pessoa no Top 10. Devolve um aviso se alguém entrou no ranking. */
