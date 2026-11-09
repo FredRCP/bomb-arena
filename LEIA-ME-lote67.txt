@@ -1,0 +1,5 @@
+Lote 67 - Egito: borda com os mesmos blocos indestrutiveis + hieroglifos variados
+Arquivos: public/themes/egypt/glyph1..22.png (novos), src/render/theme.ts, src/render/ArenaRenderer.ts, src/config/assetVersion.ts (?v=63)
+Inclui tambem o lote 66 (wall.png do falcao) - se ja instalou, sem problema.
+A esfinge no meio da fileira de cima foi mantida.
+Fim da partida/podio: este lote NAO muda; o conserto esta no lote 65 (GameScene.ts). Se o podio ainda falhar, confirme que o 65 foi instalado e recarregue o app (PWA guarda cache).

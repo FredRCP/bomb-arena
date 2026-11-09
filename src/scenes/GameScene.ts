@@ -86,7 +86,7 @@ export interface GameSession {
 const PREROLL_TICKS = 150;
 
 /** Tempo que o resultado da última rodada fica na tela antes de o pódio aparecer sozinho. */
-const MATCH_END_PODIUM_DELAY_MS = 3000;
+const MATCH_END_PODIUM_DELAY_MS = 2500;
 
 export class GameScene extends Phaser.Scene {
   private gameState!: GameState;

@@ -1,0 +1,7 @@
+Lote 69
+1) Escolha da fase: cartao mais largo, descricao quebra em duas linhas, tudo dentro do cartao. SetupScene.ts
+2) Times: com muitos jogadores as linhas encolhem para caberem todos na coluna. TeamsScene.ts
+3) Podio apos 2,5 s. GameScene.ts
+4) Tela principal: Lucas +15% (220->250), Ana e Filippe -15% (300->255). MenuScene.ts
+Arquivos: src/scenes/{SetupScene,TeamsScene,GameScene,MenuScene}.ts
+Validado: tsc (2 configs), 605 testes, build, prints (7 jogadores nos times; fase com descricao longa).

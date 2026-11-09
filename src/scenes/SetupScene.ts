@@ -2,11 +2,11 @@ import Phaser from 'phaser';
 import { music } from '../audio/music';
 import { sfx } from '../audio/sfx';
 import { ARENA_COLS, ARENA_ROWS } from '../config/arena';
-import { STAGES, stageById } from '../config/stages';
+import { STAGES } from '../config/stages';
 import { wantsTouchControls } from '../input/touchUi';
 import { createMatch } from '../core';
 import { PadNav } from '../input/padNav';
-import { DIFFICULTY_TAGLINES, NEXT_LABELS, SCREEN_TITLES, canStart, changeValue, stageIssue, createMenu, describeRow, moveSelection, selectedRow, stepNumber, toGameConfig, totalSteps, visibleRows } from '../menu/menuModel';
+import { stagesFor, DIFFICULTY_TAGLINES, NEXT_LABELS, SCREEN_TITLES, canStart, changeValue, stageIssue, createMenu, describeRow, moveSelection, selectedRow, stepNumber, toGameConfig, totalSteps, visibleRows } from '../menu/menuModel';
 import type { MenuScreen, MenuSettings, MenuState } from '../menu/menuModel';
 import { needsTeamsScreen } from '../menu/teamsModel';
 import { loadSettings, saveSettings } from '../menu/settingsStorage';
@@ -71,7 +71,7 @@ export class SetupScene extends Phaser.Scene {
     music.setLevel(this.menu.settings.music);
     this.texts = [];
     addMenuBackground(this);
-    if (this.menu.screen === 'stage') addPanel(this, WIDTH / 2, 470, WIDTH - 120, 560);
+    if (this.menu.screen === 'stage') addPanel(this, WIDTH / 2, 470, WIDTH + 160, 560);
     else addPanel(this, WIDTH / 2, 470, WIDTH - 200, 440);
     this.add
       .text(WIDTH / 2, 100, SCREEN_TITLES[this.menu.screen], { fontFamily: FONT, fontSize: '64px', fontStyle: 'bold', color: '#ffe66d', stroke: '#1b1f3b', strokeThickness: 8 })
@@ -193,12 +193,18 @@ export class SetupScene extends Phaser.Scene {
 
   /** Carrossel de fases: a escolhida grande no meio, as vizinhas menores e apagadas dos lados. */
   private renderStage(): void {
-    const ids = STAGES.map((stage) => stage.id);
-    const at = ids.indexOf(stageById(this.menu.settings.stage).id);
-    const stage = STAGES[at]!;
-    const prev = STAGES[(at - 1 + STAGES.length) % STAGES.length]!;
-    const next = STAGES[(at + 1) % STAGES.length]!;
-    const cardY = 362;
+    // Só as fases que comportam os jogadores da partida (e que cabem no celular, se for toque).
+    const list = stagesFor(this.totalPlayers(), this.touch);
+    this.menu.stageIds = list.map((def) => def.id);
+    let at = list.findIndex((def) => def.id === this.menu.settings.stage);
+    if (at < 0) {
+      at = 0;
+      this.menu.settings.stage = list[0]!.id;
+    }
+    const stage = list[at]!;
+    const prev = list[(at - 1 + list.length) % list.length]!;
+    const next = list[(at + 1) % list.length]!;
+    const cardY = 350;
     const total = this.totalPlayers();
     /** Rótulo da faixa em cima do cartão de uma fase que não pode ser jogada agora (ou null). */
     const cardIssue = (def: (typeof STAGES)[number]): string | null => {
@@ -251,30 +257,30 @@ export class SetupScene extends Phaser.Scene {
     );
 
     // Bolinhas: qual das fases está na tela.
-    STAGES.forEach((def, index) => {
-      const x = WIDTH / 2 + (index - (STAGES.length - 1) / 2) * 28;
-      this.texts.push(this.add.circle(x, 532, index === at ? 8 : 5, index === at ? 0xffe66d : 0xffffff, index === at ? 1 : 0.5));
+    list.forEach((def, index) => {
+      const x = WIDTH / 2 + (index - (list.length - 1) / 2) * 28;
+      this.texts.push(this.add.circle(x, 516, index === at ? 8 : 5, index === at ? 0xffe66d : 0xffffff, index === at ? 1 : 0.5));
       void def;
     });
 
     const issueText = stageIssue(stage, total, this.touch);
     this.texts.push(
-      this.add.text(WIDTH / 2, 562, stage.name, { fontFamily: FONT, fontSize: '42px', fontStyle: 'bold', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 6 }).setOrigin(0.5),
-      this.add.text(WIDTH / 2, 604, stage.available ? stage.tagline : `${stage.tagline} (em breve)`, { fontFamily: FONT, fontSize: '23px', color: '#e3e7ff' }).setOrigin(0.5),
-      this.add.text(WIDTH / 2, 636, `Arena ${stage.cols} x ${stage.rows}  ·  até ${stage.maxPlayers} jogadores${stage.hazards ? '  ·  com perigos no terreno' : ''}`, { fontFamily: FONT, fontSize: '21px', color: '#ffe66d' }).setOrigin(0.5),
+      this.add.text(WIDTH / 2, 546, stage.name, { fontFamily: FONT, fontSize: '42px', fontStyle: 'bold', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 6 }).setOrigin(0.5),
+      this.add.text(WIDTH / 2, 576, stage.available ? stage.tagline : `${stage.tagline} (em breve)`, { fontFamily: FONT, fontSize: '22px', color: '#e3e7ff', align: 'center', wordWrap: { width: WIDTH + 60 } }).setOrigin(0.5, 0),
+      this.add.text(WIDTH / 2, 648, `Arena ${stage.cols} x ${stage.rows}  ·  até ${stage.maxPlayers} jogadores${stage.hazards ? '  ·  com perigos no terreno' : ''}`, { fontFamily: FONT, fontSize: '21px', color: '#ffe66d' }).setOrigin(0.5),
     );
     if (issueText && stage.available) {
-      this.texts.push(this.add.text(WIDTH / 2, 666, issueText, { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold', color: '#ff8fa3', stroke: '#1b1f3b', strokeThickness: 4 }).setOrigin(0.5));
+      this.texts.push(this.add.text(WIDTH / 2, 674, issueText, { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold', color: '#ff8fa3', stroke: '#1b1f3b', strokeThickness: 4 }).setOrigin(0.5));
     }
     const blocked = issueText !== null;
     const playPill = this.add.graphics();
-    drawPill(playPill, WIDTH / 2, 724, 420, 66, true, blocked);
+    drawPill(playPill, WIDTH / 2, 716, 420, 62, true, blocked);
     this.texts.push(
       playPill,
       this.add
-        .text(WIDTH / 2, 724, NEXT_LABELS.stage, { fontFamily: FONT, fontSize: '38px', fontStyle: 'bold', color: blocked ? '#c9cde6' : '#1b1f3b' })
+        .text(WIDTH / 2, 716, NEXT_LABELS.stage, { fontFamily: FONT, fontSize: '38px', fontStyle: 'bold', color: blocked ? '#c9cde6' : '#1b1f3b' })
         .setOrigin(0.5),
-      this.add.rectangle(WIDTH / 2, 724, 420, 66, 0xffffff, 0).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.confirm()),
+      this.add.rectangle(WIDTH / 2, 716, 420, 62, 0xffffff, 0).setInteractive({ useHandCursor: true }).on('pointerdown', () => this.confirm()),
     );
   }
 
@@ -303,10 +309,12 @@ export class SetupScene extends Phaser.Scene {
       drawPill(pill, WIDTH / 2, y, 700, 54, selected);
       const color = selected ? '#1b1f3b' : '#e3e7ff';
       const style = { fontFamily: FONT, fontSize: '30px', fontStyle: 'bold', color };
-      this.texts.push(
-        this.add.text(WIDTH / 2 - 320, y, label, style).setOrigin(0, 0.5),
-        this.add.text(WIDTH / 2 + 320, y, selected ? `◀  ${value}  ▶` : value, style).setOrigin(1, 0.5),
-      );
+      const labelText = this.add.text(WIDTH / 2 - 320, y, label, style).setOrigin(0, 0.5);
+      const valueText = this.add.text(WIDTH / 2 + 320, y, selected ? `◀  ${value}  ▶` : value, style).setOrigin(1, 0.5);
+      // Valores compridos ("2 jogadores (mesmo teclado)") diminuem a letra para não passar por cima do nome da linha.
+      const room = 640 - labelText.width - 24;
+      if (valueText.width > room) valueText.setFontSize(Math.max(18, Math.floor(30 * (room / valueText.width))));
+      this.texts.push(labelText, valueText);
     });
 
     if (this.menu.screen === 'participants' && this.menu.maxHumans < 3) {

@@ -58,6 +58,8 @@ export interface MenuState {
   selected: number;
   /** Quantas pessoas cabem agora: 2, ou o número de controles conectados (até 5). A cena atualiza. */
   maxHumans: number;
+  /** Fases oferecidas na escolha de fase (as que comportam os jogadores da partida). Vazio = todas. */
+  stageIds?: readonly string[];
 }
 
 export const DEFAULT_SETTINGS: MenuSettings = {
@@ -157,8 +159,9 @@ export function changeValue(menu: MenuState, delta: -1 | 1): boolean {
   } else if (row === 'sideline') {
     s.sideline = !s.sideline;
   } else if (row === 'stage') {
-    const ids = STAGES.map((stage) => stage.id);
-    s.stage = cycle(ids, s.stage, delta);
+    const ids = menu.stageIds && menu.stageIds.length > 0 ? menu.stageIds : STAGES.map((stage) => stage.id);
+    const current = ids.includes(s.stage) ? s.stage : ids[0]!;
+    s.stage = cycle(ids, current, delta);
   } else if (row === 'volume') {
     const next = Math.min(MAX_VOLUME, Math.max(0, s.volume + delta));
     if (next === s.volume) return false;
@@ -254,6 +257,12 @@ export function stageIssue(stage: StageDef, total: number, touch: boolean): stri
   return null;
 }
 
+/** As fases que comportam `total` jogadores (e, na tela de toque, que cabem no celular), na ordem da lista. */
+export function stagesFor(total: number, touch: boolean): StageDef[] {
+  const fit = STAGES.filter((stage) => stage.maxPlayers >= total && (!touch || stage.mobileOk));
+  return fit.length > 0 ? fit : [...STAGES];
+}
+
 /** A fase escolhida pode ser jogada? `total` = jogadores da partida (pessoas + computador); `touch` = tela de toque. */
 export function canStart(settings: MenuSettings, touch = false, total: number = settings.players + settings.enemies): boolean {
   return stageIssue(stageById(settings.stage), total, touch) === null;
@@ -285,7 +294,7 @@ export function parseSettings(raw: string | null): MenuSettings {
   if (typeof data !== 'object' || data === null) return result;
   const record = data as Record<string, unknown>;
   if (typeof record.players === 'number' && Number.isInteger(record.players) && record.players >= 1 && record.players <= 5) result.players = record.players as MenuSettings['players'];
-  if (typeof record.enemies === 'number' && Number.isInteger(record.enemies) && record.enemies >= 0 && record.enemies <= 4) {
+  if (typeof record.enemies === 'number' && Number.isInteger(record.enemies) && record.enemies >= 0 && record.enemies <= MAX_TOTAL_PLAYERS - 1) {
     result.enemies = record.enemies as MenuSettings['enemies'];
   }
   if (typeof record.difficulty === 'string' && (DIFFICULTIES as string[]).includes(record.difficulty)) {

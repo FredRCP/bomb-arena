@@ -96,7 +96,7 @@ export function drawArena(scene: Phaser.Scene, arena: Arena, themeId = 'classic'
         const slot = (col + row) % 4; // 0 = hieróglifo, 2 = pergaminho, 1 e 3 = pedra lisa
         let key = themeKey(theme, 'wall');
         if (sphinxOn && row === 0 && col === Math.floor(arena.cols / 2)) key = themeKey(theme, 'sphinx');
-        else if (slot === 0 || !wallImages) key = themeKey(theme, `glyph${1 + (pick % glyphs)}`);
+        else if (slot === 0 || !wallImages || theme.borderAllGlyphs) key = themeKey(theme, `glyph${1 + (pick % glyphs)}`);
         else if (slot === 2 && scrollOn) key = themeKey(theme, 'scroll');
         const image = scene.add.image((col + 0.5) * TILE_SIZE, (row + 1) * TILE_SIZE - 1, key).setOrigin(0.5, 1).setDepth(6);
         image.setScale(theme.wallWidth / image.width);

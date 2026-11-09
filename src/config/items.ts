@@ -1,7 +1,7 @@
 // Itens (power-ups) escondidos nos blocos. Importado pelo core: sem Phaser e sem navegador.
 
 /** Chance de um bloco esconder um item. */
-export const ITEM_DROP_CHANCE = 0.154; // era 0.14: +10% de itens por partida
+export const ITEM_DROP_CHANCE = 0.17; // era 0.14 -> 0.154 -> 0.17 (+10% de novo)
 
 /** Peso de cada tipo no sorteio (não precisa somar 1). */
 export const ITEM_WEIGHTS = { bomb: 4, range: 4, speed: 3, kick: 2, pierce: 1, remote: 1, throw: 1, ghost: 1, invert: 1, slow: 1, vest: 1, hero: 1 } as const;

@@ -12,6 +12,7 @@ import {
   parseSettings,
   selectedRow,
   stageIssue,
+  stagesFor,
   stepNumber,
   summaryLines,
   toGameConfig,
@@ -398,5 +399,23 @@ describe('mais pessoas com controles de videogame', () => {
     expect(parseGameConfig('?players=4&enemies=5')).toMatchObject({ players: 4, enemies: 3 });
     expect(parseSettings(JSON.stringify({ players: 3 }))).toEqual({ ...DEFAULT_SETTINGS, players: 3, enemies: 1 });
     expect(summaryLines({ ...DEFAULT_SETTINGS, players: 3, enemies: 0 })[0]).toBe('3 pessoas');
+  });
+});
+
+describe('quantidade de jogadores x fases', () => {
+  it('só oferece as fases que comportam o total de jogadores', () => {
+    const six = stagesFor(6, false).map((stage) => stage.id);
+    expect(six.length).toBeGreaterThan(0);
+    for (const stage of stagesFor(6, false)) expect(stage.maxPlayers).toBeGreaterThanOrEqual(6);
+    expect(six).not.toContain('classic'); // a clássica 15x13 comporta até 5
+    expect(stagesFor(2, false).map((stage) => stage.id)).toContain('classic');
+  });
+
+  it('no celular só aparecem as fases que cabem na tela de toque', () => {
+    for (const stage of stagesFor(2, true)) expect(stage.mobileOk).toBe(true);
+  });
+
+  it('a configuração salva aceita até 6 inimigos do computador (7 jogadores no total)', () => {
+    expect(parseSettings(JSON.stringify({ players: 1, enemies: 6 })).enemies).toBe(6);
   });
 });

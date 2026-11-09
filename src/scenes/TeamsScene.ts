@@ -138,19 +138,22 @@ export class TeamsScene extends Phaser.Scene {
   private render(): void {
     for (const object of this.dynamic) object.destroy();
     this.dynamic = [];
+    // Com muita gente, as linhas encolhem para todos caberem na coluna.
+    const count = this.teams.sides.length;
+    const step = Math.min(ROW_STEP, (COLUMN_H - 120) / count);
     this.teams.sides.forEach((side, index) => {
       // Cada jogador tem a sua linha fixa em qualquer coluna: o 1º fica na 1ª linha, o 2º na 2ª, e assim por diante.
       const x = COLUMN_X[side];
-      const y = COLUMN_TOP + 110 + index * ROW_STEP;
+      const y = COLUMN_TOP + 100 + step / 2 + index * step;
       const selected = index === this.teams.selected;
       const character = characterById(this.session.characters?.[index + 1] ?? 'pipoca');
       if (selected) {
-        const frame = this.add.rectangle(x, y, COLUMN_W - 40, ROW_STEP - 12, 0xffffff, 0.22).setStrokeStyle(4, 0xffe66d);
+        const frame = this.add.rectangle(x, y, COLUMN_W - 40, step - 8, 0xffffff, 0.22).setStrokeStyle(4, 0xffe66d);
         this.dynamic.push(frame);
       }
-      this.dynamic.push(addCharacter(this, character, x - 130, y, 28));
+      this.dynamic.push(addCharacter(this, character, x - 130, y, Math.min(28, step * 0.36)));
       this.dynamic.push(
-        this.add.text(x - 80, y, this.labels[index]!, { fontFamily: FONT, fontSize: '32px', fontStyle: selected ? 'bold' : 'normal', color: '#ffffff', stroke: '#0b0c1a', strokeThickness: 4 }).setOrigin(0, 0.5),
+        this.add.text(x - 80, y, this.labels[index]!, { fontFamily: FONT, fontSize: `${Math.round(Math.min(32, step * 0.5))}px`, fontStyle: selected ? 'bold' : 'normal', color: '#ffffff', stroke: '#0b0c1a', strokeThickness: 4 }).setOrigin(0, 0.5),
       );
     });
     this.warning.setText(isValidTeams(this.teams.sides) ? '' : 'Coloque alguém em outro time (ou no meio) para continuar.');

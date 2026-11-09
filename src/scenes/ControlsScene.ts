@@ -112,8 +112,10 @@ export class ControlsScene extends Phaser.Scene {
     this.text(250, 388, 'andar', 24, '#e3e7ff');
     this.key(250, 450, 'Espaço', 210);
     this.text(250, 502, 'bomba', 24, '#e3e7ff');
-    this.key(250, 560, 'E');
-    this.text(250, 612, 'especial', 24, '#e3e7ff');
+    this.key(180, 560, 'E');
+    this.text(180, 612, 'especial', 24, '#e3e7ff');
+    this.key(320, 560, 'F', 62, 0xffe66d);
+    this.text(320, 612, 'poder', 24, '#ffe66d');
     // Jogador 2
     this.panelTitle(710, 200, 'JOGADOR 2', '#ff8fa3');
     this.key(710, 270, '↑');
@@ -123,9 +125,12 @@ export class ControlsScene extends Phaser.Scene {
     this.text(710, 388, 'andar (ou 8 4 2 6 do teclado numérico)', 21, '#e3e7ff');
     this.key(710, 450, 'Enter', 150);
     this.text(710, 502, 'bomba', 24, '#e3e7ff');
-    this.key(710, 560, '9');
-    this.text(710, 612, 'especial', 24, '#e3e7ff');
-    this.text(WIDTH / 2, 656, 'Especial: detonar bomba-relógio ou arremessar a bomba (com o item).', 21, '#ffe66d');
+    this.key(640, 560, '9');
+    this.text(640, 612, 'especial', 24, '#e3e7ff');
+    this.key(780, 560, '0', 62, 0xffe66d);
+    this.text(780, 612, 'poder', 24, '#ffe66d');
+    this.text(WIDTH / 2, 650, 'Especial: detonar bomba-relógio ou arremessar a bomba (com o item).', 21, '#e3e7ff');
+    this.text(WIDTH / 2, 680, 'Poder: o superpoder de cada personagem (ex.: o avião do Lucas), quando a barrinha enche.', 21, '#ffe66d');
   }
 
   private pagePad(): void {
@@ -147,6 +152,10 @@ export class ControlsScene extends Phaser.Scene {
       g.fillStyle(color, 1).fillCircle(x, y, 18);
       this.layer.push(this.add.text(x, y, label, { fontFamily: FONT, fontSize: '22px', fontStyle: 'bold', color: '#1b1f3b' }).setOrigin(0.5));
     }
+    // Botões de cima (LB/RB): o poder do personagem
+    g.fillStyle(0xffe66d, 1).fillRoundedRect(cx - 215, 190, 90, 22, 8).fillRoundedRect(cx + 125, 190, 90, 22, 8);
+    this.text(cx - 170, 178, 'LB / LT', 17, '#ffe66d');
+    this.text(cx + 170, 178, 'RB / RT', 17, '#ffe66d');
     // Select e Start
     g.fillStyle(0x151833, 1).fillRoundedRect(cx - 42, 238, 30, 12, 6).fillRoundedRect(cx + 12, 238, 30, 12, 6);
     this.text(cx - 27, 222, 'Select', 17, '#c9d1ff');
@@ -154,7 +163,8 @@ export class ControlsScene extends Phaser.Scene {
 
     this.text(cx - 330, 296, 'Direcional ou\nalavanca:\nandar', 24, '#e3e7ff');
     this.text(cx + 340, 296, 'A ou X:\nbomba', 24, '#51cf66');
-    this.text(cx + 340, 372, 'B ou Y:\nespecial', 24, '#ff8fa3');
+    this.text(cx + 340, 372, 'B ou Y:\nespecial\n(detonar/arremessar)', 22, '#ff8fa3');
+    this.text(cx - 350, 400, 'LB, RB, LT ou RT:\npoder do personagem\n(ex.: avião do Lucas)', 22, '#ffe66d');
     this.text(cx - 27, 462, 'Select: volta ao menu (com o jogo pausado)', 24, '#e3e7ff');
     this.text(cx + 27, 500, 'Start: pausa e continua', 24, '#e3e7ff');
     this.text(cx, 566, 'O controle 1 comanda o jogador 1, o controle 2 o jogador 2, e assim por diante.', 22, '#ffe66d');

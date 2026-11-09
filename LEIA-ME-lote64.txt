@@ -1,8 +1,0 @@
-Lote 64 - pódio novo, pausa limpa, volume 50%/50%
-Arquivos (copie por cima, mesmos caminhos):
-  src/scenes/PodiumScene.ts   (degraus maiores, pontos dentro da coluna, troféu, raios de luz, estrelas)
-  src/scenes/GameScene.ts     (menu de pausa em cartão com barras de volume)
-  src/menu/menuModel.ts       (volume padrão: sons 50% e música 50%)
-Instalar: copiar os arquivos, rodar npm run build / deploy.
-Limitação: quem já salvou volume no navegador mantém o valor salvo; o padrão vale para instalações novas ou após limpar dados do site.
-Validado: tsc (2 configs), 602 testes, build.

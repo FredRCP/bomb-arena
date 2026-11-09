@@ -31,6 +31,8 @@ export interface ThemeDef {
   pillarWidth?: number;
   /** Quantas imagens de hieróglifo (glyph1.png...) formam a borda da arena? 0 = a borda usa a imagem de parede. */
   borderGlyphs?: number;
+  /** A borda inteira usa os hieróglifos (nenhuma pedra lisa nem pergaminho entre eles). */
+  borderAllGlyphs?: boolean;
   /** Pirâmide central 5 x 5 com túnel (pyramid.png)? */
   pyramid?: boolean;
   /** Iglu central 3 x 3 (igloo.png)? */
@@ -61,7 +63,7 @@ export interface ThemeDef {
 
 export const THEMES: Record<string, ThemeDef> = {
   classic: { id: 'classic', frameFx: true, frameImages: true, floors: false, wall: true, wallWidth: 62, blockVariants: 1, blockWidth: 62, rubble: false, background: true, chips: [0xd9822b, 0xa65a1c, 0x6e3a12] },
-  egypt: { id: 'egypt', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xf3d896, 0xe0b868, 0xb88f46], borderGlyphs: 22, pyramid: true, floorFull: true, columns: true, quicksand: true, sphinx: true, scrolls: true },
+  egypt: { id: 'egypt', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xf3d896, 0xe0b868, 0xb88f46], borderAllGlyphs: true, borderGlyphs: 22, pyramid: true, floorFull: true, columns: true, quicksand: true, sphinx: true, scrolls: true },
   temple: { id: 'temple', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xc9965c, 0x9b6b3a, 0x5f8f3f], island: true },
   pirates: { id: 'pirates', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xb07a3c, 0x8a5a2a, 0xd9b36a] },
   sea: { id: 'sea', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xbdeeff, 0x7fd0f0, 0xe8fbff], bubbles: true },
