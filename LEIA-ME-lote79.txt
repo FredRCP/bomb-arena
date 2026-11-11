@@ -1,0 +1,2 @@
+LOTE 79 - copie por cima. Rampa removida; iglus como antigamente (colunas 4-6 e 8-10, portas 5 e 9); bola de neve (3 colunas) sai dos 2 iglus, alternando (uma a cada 6 s, acelera no fim). Jogador do meio de cima volta a nascer na fileira 1. Pode apagar public/themes/ice/ramp.png e ramp_alert.png (nao sao mais usados).
+Codigo: src/core/{hazards,state,arena}.ts, src/config/hazards.ts, src/render/{ArenaRenderer,HazardsView,theme}.ts, tests/core/iceAndPowers.test.ts. tsc x2, vitest 616, build ok.

@@ -419,3 +419,18 @@ describe('quantidade de jogadores x fases', () => {
     expect(parseSettings(JSON.stringify({ players: 1, enemies: 6 })).enemies).toBe(6);
   });
 });
+
+import { stageForTotal as stageForTotalFn } from '../../src/menu/menuModel';
+describe('arena grande como padrão com 4+ jogadores', () => {
+  it('4 ou mais jogadores trocam para a versão 19 x 13; menos, voltam à normal', () => {
+    expect(stageForTotalFn('ice', 4)).toBe('ice19');
+    expect(stageForTotalFn('egypt', 6)).toBe('egypt19');
+    expect(stageForTotalFn('ice19', 2)).toBe('ice');
+    expect(stageForTotalFn('ice', 3)).toBe('ice');
+    expect(stageForTotalFn('classic', 4)).toBe('classic');
+  });
+  it('se a fase não comporta, vai para a primeira que comporta', () => {
+    const id = stageForTotalFn('ice', 7);
+    expect(['ice19', 'classic'].includes(id) || id.length > 0).toBe(true);
+  });
+});

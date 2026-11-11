@@ -2,6 +2,7 @@ import Phaser from 'phaser';
 import type { GameState } from '../core';
 import { TILE_SIZE } from './ArenaRenderer';
 import { BOULDER_WARN_TICKS } from '../config/hazards';
+import { penguinRows } from '../core';
 import { themeKey, themeById } from './theme';
 
 // Desenho da armadilha de dardos: uma faixa discreta na fileira (sempre visível), setas vermelhas piscando nas duas bordas
@@ -21,6 +22,12 @@ export class HazardsView {
   private readonly boulderG: Phaser.GameObjects.Graphics;
   /** Imagens da pedra (uma por coluna em queda), se o tema tiver boulder.png. */
   private readonly boulderImages: Phaser.GameObjects.Image[] = [];
+  /** Imagens da bola de neve e do pinguim (uma por rolo em campo). */
+  private readonly rollerImages = new Map<number, Phaser.GameObjects.Image>();
+  /** Buracos de gelo das laterais (por onde saem os pinguins). */
+  private readonly holes: Array<{ image: Phaser.GameObjects.Image; row: number; left: boolean }> = [];
+  /** Poeira de neve atrás de cada pinguim. */
+  private readonly dustImages = new Map<number, Phaser.GameObjects.Image>();
 
   constructor(private readonly scene: Phaser.Scene, state: GameState) {
     this.g = scene.add.graphics().setDepth(9);
@@ -28,6 +35,7 @@ export class HazardsView {
     this.glow = scene.add.graphics().setDepth(11);
     this.sand = scene.add.graphics().setDepth(0.55);
     this.drawSlippery(state);
+    this.createIceStructures(state);
     this.drawChasm(state);
     this.boulderG = scene.add.graphics().setDepth(10.2);
     const trap = state.hazards?.dartTrap;
@@ -38,6 +46,40 @@ export class HazardsView {
     this.warn.push(scene.add.text(-6, y, '⚠', style).setOrigin(1, 0.5).setDepth(10).setVisible(false));
     this.warn.push(scene.add.text(state.arena.cols * TILE_SIZE + 6, y, '⚠', style).setOrigin(0, 0.5).setDepth(10).setVisible(false));
     this.drawStrip(state);
+  }
+
+  /** Rampa da avalanche no centro de cima e buracos de gelo (por onde saem os pinguins) nas duas laterais. */
+  private createIceStructures(state: GameState): void {
+    const hz = state.hazards;
+    if (!hz?.doors || !hz.penguinGate) return;
+    const theme = themeById('ice');
+    const has = (name: string): boolean => this.scene.textures.exists(themeKey(theme, name));
+    if (has('hole1') && has('hole2') && has('hole3')) {
+      for (const row of penguinRows(state.arena.rows)) {
+        for (const left of [true, false]) {
+          const x = left ? TILE_SIZE / 2 : (state.arena.cols - 0.5) * TILE_SIZE;
+          const image = this.scene.add.image(x, (row + 0.5) * TILE_SIZE, themeKey(theme, 'hole1')).setDepth(7);
+          image.setScale(62 / image.width).setVisible(false);
+          this.holes.push({ image, row, left });
+        }
+      }
+    }
+  }
+
+  private updateIceStructures(state: GameState): void {
+    const theme = themeById('ice');
+    const gate = state.hazards?.penguinGate;
+    if (!gate) return;
+    for (const hole of this.holes) {
+      const active = gate.row === hole.row && gate.fromLeft === hole.left;
+      // Parado, o buraco fica escondido (aparece o bloco da borda); no aviso racha (gelo trincado, depois abrindo); ao sair, buraco aberto.
+      const name = active && gate.warning ? (gate.timer > 45 ? 'hole1' : 'hole2') : active && gate.openTicks > 0 ? 'hole3' : null;
+      hole.image.setVisible(name !== null);
+      if (name) {
+        hole.image.setTexture(themeKey(theme, name));
+        hole.image.setScale(62 / hole.image.width);
+      }
+    }
   }
 
   /** Abismo do Templo Perdido (fundo escuro com neblina e bordas de pedra) e as pontes de corda por cima. Desenhado uma vez. */
@@ -255,9 +297,55 @@ export class HazardsView {
 
   /** Bola de neve (rola) e pinguim (escorrega de barriga) que descem do iglu. */
   private drawRollers(state: GameState, g: Phaser.GameObjects.Graphics): void {
+    // Aviso do pinguim: a fileira toda fica avermelhada e uma seta pisca na lateral por onde ele vai entrar.
+    const gate = state.hazards?.penguinGate;
+    if (gate?.warning) {
+      const on = Math.floor(gate.timer / 8) % 2 === 0;
+      const cy = (gate.row + 0.5) * TILE_SIZE;
+      const width = state.arena.cols * TILE_SIZE;
+      g.fillStyle(0xff3b3b, on ? 0.16 : 0.06).fillRect(0, gate.row * TILE_SIZE, width, TILE_SIZE);
+      if (on) {
+        const sign = gate.fromLeft ? 1 : -1;
+        const bx = gate.fromLeft ? 8 : width - 8;
+        for (const k of [0, 1]) {
+          const tx = bx + sign * k * 18;
+          g.fillStyle(0xff4d4d, 1).fillTriangle(tx, cy - 16, tx, cy + 16, tx + sign * 24, cy);
+        }
+      }
+    }
+    const iceTheme = themeById('ice');
+    const useImages = this.scene.textures.exists(themeKey(iceTheme, 'snowball')) && this.scene.textures.exists(themeKey(iceTheme, 'penguin1'));
+    const alive = new Set<number>();
     for (const roller of state.hazards?.rollers ?? []) {
       const x = roller.x * TILE_SIZE;
       const y = roller.y * TILE_SIZE;
+      if (useImages) {
+        alive.add(roller.id);
+        let image = this.rollerImages.get(roller.id);
+        if (!image) {
+          image = this.scene.add.image(x, y, themeKey(iceTheme, roller.kind === 'snowball' ? 'snowball' : 'penguin1')).setDepth(9.5);
+          this.rollerImages.set(roller.id, image);
+        }
+        if (roller.kind === 'snowball') {
+          g.fillStyle(0x1b1f3b, 0.25).fillEllipse(x, y + 84, 180, 34);
+          image.setPosition(x, y).setScale(3 * TILE_SIZE / image.width).setRotation(roller.y * 0.67);
+        } else {
+          const frame = [1, 2, 3, 4, 3, 2][Math.floor(state.tick / 5) % 6]!;
+          g.fillStyle(0x1b1f3b, 0.25).fillEllipse(x, y + 26, 70, 14);
+          if (this.scene.textures.exists(themeKey(iceTheme, 'dust'))) {
+            let dust = this.dustImages.get(roller.id);
+            if (!dust) {
+              dust = this.scene.add.image(x, y, themeKey(iceTheme, 'dust')).setDepth(9.4);
+              this.dustImages.set(roller.id, dust);
+            }
+            const back = roller.dir === 'left' ? 1 : -1; // a poeira fica atrás do pinguim
+            const pulse = 0.8 + 0.2 * Math.sin(state.tick * 0.35);
+            dust.setPosition(x + back * 58, y + 6).setScale(0.42 * pulse).setAlpha(0.8).setFlipX(roller.dir === 'right');
+          }
+          image.setTexture(themeKey(iceTheme, `penguin${frame}`)).setPosition(x, y).setScale(0.55).setFlipX(roller.dir === 'left');
+        }
+        continue;
+      }
       if (roller.kind === 'penguin') g.fillStyle(0x1b1f3b, 0.25).fillEllipse(x, y + 22, 44, 12); // sombra
       if (roller.kind === 'snowball') {
         // Bola de neve gigante (o dobro do tamanho de antes).
@@ -273,15 +361,32 @@ export class HazardsView {
           g.lineBetween(x + Math.cos(a) * 16, y + Math.sin(a) * 16, x + Math.cos(a) * 40, y + Math.sin(a) * 40);
         }
       } else {
-        // Pinguim de barriga para baixo, olhando para a frente (para baixo na tela).
-        g.fillStyle(0x1f2540, 1).fillEllipse(x, y, 40, 54);
-        g.fillStyle(0xf4f7ff, 1).fillEllipse(x, y + 4, 24, 40);
-        g.fillStyle(0x1f2540, 1).fillEllipse(x - 24, y - 2, 10, 30).fillEllipse(x + 24, y - 2, 10, 30); // nadadeiras abertas
-        g.fillStyle(0xff9f1a, 1).fillTriangle(x - 7, y + 22, x + 7, y + 22, x, y + 34); // bico
-        g.fillStyle(0xff9f1a, 1).fillEllipse(x - 10, y - 28, 14, 8).fillEllipse(x + 10, y - 28, 14, 8); // pés
-        g.fillStyle(0xffffff, 1).fillCircle(x - 6, y + 14, 3).fillCircle(x + 6, y + 14, 3);
-        g.fillStyle(0x1b1f3b, 1).fillCircle(x - 6, y + 14, 1.5).fillCircle(x + 6, y + 14, 1.5);
+        // Pinguim de barriga para baixo, olhando para a frente; nas laterais o desenho é girado para a direção em que anda.
+        const dir = roller.dir ?? 'down';
+        const rotated = dir !== 'down';
+        if (rotated) {
+          g.save();
+          g.translateCanvas(x, y);
+          g.rotateCanvas(dir === 'right' ? -Math.PI / 2 : Math.PI / 2);
+        }
+        const ox = rotated ? 0 : x;
+        const oy = rotated ? 0 : y;
+        g.fillStyle(0x1f2540, 1).fillEllipse(ox, oy, 40, 54);
+        g.fillStyle(0xf4f7ff, 1).fillEllipse(ox, oy + 4, 24, 40);
+        g.fillStyle(0x1f2540, 1).fillEllipse(ox - 24, oy - 2, 10, 30).fillEllipse(ox + 24, oy - 2, 10, 30); // nadadeiras abertas
+        g.fillStyle(0xff9f1a, 1).fillTriangle(ox - 7, oy + 22, ox + 7, oy + 22, ox, oy + 34); // bico
+        g.fillStyle(0xff9f1a, 1).fillEllipse(ox - 10, oy - 28, 14, 8).fillEllipse(ox + 10, oy - 28, 14, 8); // pés
+        g.fillStyle(0xffffff, 1).fillCircle(ox - 6, oy + 14, 3).fillCircle(ox + 6, oy + 14, 3);
+        g.fillStyle(0x1b1f3b, 1).fillCircle(ox - 6, oy + 14, 1.5).fillCircle(ox + 6, oy + 14, 1.5);
+        if (rotated) g.restore();
       }
+    }
+    for (const [id, image] of this.rollerImages) {
+      if (alive.has(id)) continue;
+      image.destroy();
+      this.rollerImages.delete(id);
+      this.dustImages.get(id)?.destroy();
+      this.dustImages.delete(id);
     }
   }
 
@@ -320,6 +425,7 @@ export class HazardsView {
     this.drawQuicksand(state);
     this.drawIce(state);
     this.drawBoulder(state);
+    this.updateIceStructures(state);
     const tunnel = state.hazards?.tunnel;
     if (tunnel) {
       this.glow.clear();

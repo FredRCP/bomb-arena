@@ -113,17 +113,27 @@ export function createHud(scene: Phaser.Scene, state: GameState, choices: Charac
   });
 
   // Teclas gerais, no canto esquerdo da tela (o fundo colorido, ao lado da arena)
-  scene.add
-    .text(left + 24, 24, 'Esc  pausa\nR  reinicia a rodada\nQ  menu\nM  som', { ...style(side >= 256 ? 20 : 15, '#ffffff', 4), lineSpacing: 6 })
+  // Com um controle de videogame ligado, as dicas passam a falar dos botões dele.
+  const KEYBOARD_HINTS = 'Esc  pausa\nR  reinicia a rodada\nQ  menu\nM  som';
+  const PAD_HINTS = 'Start  pausa/continua\nSelect  menu (na pausa)';
+  const hints = scene.add
+    .text(left + 24, 24, KEYBOARD_HINTS, { ...style(side >= 256 ? 20 : 15, '#ffffff', 4), lineSpacing: 6 })
     .setOrigin(0, 0)
     .setDepth(5)
     .setAlpha(0.85);
+  const padConnected = (): boolean => (scene.input.gamepad?.total ?? 0) > 0;
+  let showingPad = false;
 
   let lastClock = '';
   let lastKey = '';
 
   return {
     update(current, match, scores) {
+      const pad = padConnected();
+      if (pad !== showingPad) {
+        showingPad = pad;
+        hints.setText(pad ? PAD_HINTS : KEYBOARD_HINTS);
+      }
       // Barra de carga do superpoder (muda a cada passo, por isso fica antes da checagem de "nada mudou").
       for (const card of cards) {
         const live = current.players.find((p) => p.id === card.player.id);

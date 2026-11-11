@@ -185,7 +185,7 @@ describe('reiniciar: uma rodada nova não herda nada da anterior', () => {
     expect(fresh.bombs).toEqual([]);
     expect(fresh.flames).toEqual([]);
     expect(fresh.events).toEqual([]);
-    expect(fresh.round).toEqual({ phase: 'playing', endsAtTick: null, outcome: null, ticksLeft: ROUND_TIME_TICKS, suddenDeath: false, closedCount: 0, nextCloseIn: SUDDEN_DEATH_INTERVAL_TICKS });
+    expect(fresh.round).toEqual({ phase: 'playing', endsAtTick: null, outcome: null, ticksLeft: ROUND_TIME_TICKS, totalTicks: ROUND_TIME_TICKS, suddenDeath: false, closedCount: 0, nextCloseIn: SUDDEN_DEATH_INTERVAL_TICKS });
     expect(fresh.tick).toBe(0);
     expect(fresh.players.every((p) => p.alive)).toBe(true);
     expect(fresh.players[0]).toMatchObject({ x: 1.5, y: 1.5 });

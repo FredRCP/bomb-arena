@@ -126,6 +126,20 @@ export interface RollerState {
   kind: RollerKind;
   x: number;
   y: number;
+  /** Para onde anda (sem isso, desce). Os pinguins entram pelas laterais. */
+  dir?: Direction;
+  /** Jogadores que a bola de neve já amassou (cada um só uma vez por bola). */
+  hit?: PlayerId[];
+}
+
+/** Entrada dos pinguins pelas laterais: o relógio, a fileira sorteada e o aviso (aceso nos últimos passos antes de sair). */
+export interface PenguinGate {
+  timer: number;
+  row: number;
+  fromLeft: boolean;
+  warning: boolean;
+  /** Passos em que o buraco continua aberto depois de o pinguim sair. */
+  openTicks: number;
 }
 
 /** Avião do Lucas (superpoder): dá 4 voltas pela arena toda (espiral fechando) largando 6 bombas em células aleatórias perto dele. */
@@ -253,6 +267,8 @@ export type GameEvent =
   /** A neve fez crescer um bloco destrutível. */
   | { type: 'blockGrown'; col: number; row: number }
   | { type: 'rollerGone'; id: number; col: number; row: number }
+  | { type: 'penguinWarn'; row: number; fromLeft: boolean }
+  | { type: 'squashed'; playerId: PlayerId }
   /** Tráfego: a faixa vai ser percorrida em instantes (aviso) e o veículo entrou nela. */
   | { type: 'trafficWarn'; kind: TrafficKind; axis: 'row' | 'col'; index: number }
   | { type: 'trafficGo'; kind: TrafficKind; axis: 'row' | 'col'; index: number }
@@ -287,6 +303,8 @@ export interface RoundState {
   outcome: RoundOutcome | null;
   /** Passos que faltam para o tempo da rodada acabar (só conta enquanto a fase é 'playing'). */
   ticksLeft: number;
+  /** Tempo total da rodada, em passos (para saber o quanto já passou). */
+  totalTicks?: number;
   /** O tempo acabou: começou a morte súbita (as paredes fecham a arena de fora para dentro). */
   suddenDeath: boolean;
   /** Quantas posições da espiral de fechamento já foram percorridas (veja shrink.ts). */
@@ -331,6 +349,8 @@ export interface HazardsState {
   /** Portas dos iglus (célula de onde saem a bola de neve e o pinguim), cada uma com o seu relógio. */
   doors?: IglooDoor[];
   rollers?: RollerState[];
+  /** Pinguins que entram pelas laterais, em fileiras sorteadas, com aviso antes. */
+  penguinGate?: PenguinGate;
   /** Células (índices) que começaram com bloco: é nelas que a neve faz blocos novos crescerem. */
   blockSpots?: number[];
   /** Passos até crescer o próximo bloco de neve. */

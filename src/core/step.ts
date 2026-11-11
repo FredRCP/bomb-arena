@@ -52,7 +52,12 @@ export function step(state: GameState, intents: Intents = {}): void {
     if (!player.alive) player.slide = null;
     if (player.alive && strips) {
       if (!strips.includes(cellIndex(state.arena, Math.floor(player.x), Math.floor(player.y)))) player.slide = null;
-      else if (player.slide) move = player.slide;
+      else if (player.slide) {
+        // Saída lateral: no centro de uma célula da pista, apertar uma direção de lado larga o deslize e segue por ela
+        // (sem isso, quem precisa sair pelo meio da pista passava direto do centro e ficava indo e voltando).
+        if (move !== null && move !== player.slide && move !== OPPOSITE[player.slide] && alignedOnSlideAxis(player)) player.slide = move;
+        else move = player.slide;
+      }
       else if (move !== null) player.slide = move;
     }
     if (player.alive && move !== null) {
@@ -87,6 +92,12 @@ function slowFactor(player: PlayerState): number {
   if (player.slowTicks <= 0) return 1;
   const slowest = stepDistanceOf({ speedBonus: MIN_SPEED_BONUS, speedScale: player.speedScale });
   return Math.min(1, slowest / stepDistanceOf(player));
+}
+
+/** O corpo está no centro (com meio passo de folga) da célula, na direção em que desliza. */
+function alignedOnSlideAxis(player: PlayerState): boolean {
+  const along = player.slide === 'left' || player.slide === 'right' ? player.x : player.y;
+  return Math.abs(along - Math.floor(along) - 0.5) <= stepDistanceOf(player) / 2 + 1e-6;
 }
 
 const OPPOSITE = { up: 'down', down: 'up', left: 'right', right: 'left' } as const;

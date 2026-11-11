@@ -229,3 +229,11 @@ export function collectItems(state: GameState): void {
 export function itemCellIndex(arena: Arena, item: Pick<ItemState, 'col' | 'row'>): number {
   return cellIndex(arena, item.col, item.row);
 }
+
+/** Bloco que cresceu de novo (neve): com a mesma chance de antes, esconde um item. */
+export function maybeHideItem(state: GameState, col: number, row: number, rng: () => number): void {
+  if (state.hiddenItems.some((item) => item.col === col && item.row === row)) return;
+  const roll = rng();
+  const kindRoll = rng();
+  if (roll < ITEM_DROP_CHANCE) state.hiddenItems.push({ col, row, kind: pickKind(kindRoll) });
+}

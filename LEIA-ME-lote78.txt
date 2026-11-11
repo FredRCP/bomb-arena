@@ -1,0 +1,1 @@
+LOTE 78 - copie por cima: (1) blocos da borda do gelo voltam a 56 px (src/render/theme.ts); (2) rampa sobe ate a borda de cima (src/render/HazardsView.ts); (3) iglus de volta a posicao antiga, colunas 4 e colunas-5, fora da zona de nascimento (src/core/hazards.ts, src/render/ArenaRenderer.ts); teste atualizado (tests/core/iceAndPowers.test.ts). tsc x2, vitest 616, build ok.

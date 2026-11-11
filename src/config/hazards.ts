@@ -26,7 +26,12 @@ export const ICE_PATCHES = 5;
 export const ICE_CRACK_LEVELS = 4;
 
 /** Iglu: a cada 10 s (cada iglu; o segundo sai 5 s depois do primeiro) desce uma bola de neve ou um pinguim (alternando), em linha reta, empurrando quem estiver no caminho. */
-export const ROLLER_PERIOD_TICKS = 10 * 60;
+export const ROLLER_PERIOD_TICKS = 12 * 60;
+
+/** Pinguins pelas laterais: o primeiro entra 12 s depois do começo, depois um a cada 10 s; o aviso (seta piscando na lateral) vem 1,5 s antes. */
+export const PENGUIN_FIRST_TICKS = 12 * 60;
+export const PENGUIN_PERIOD_TICKS = 10 * 60;
+export const PENGUIN_WARN_TICKS = 90;
 
 /** A neve faz crescer, aos poucos e em lugares sorteados, os blocos que tinham sido quebrados: um a cada 8 s. */
 export const BLOCK_REGROW_TICKS = 8 * 60;
@@ -115,3 +120,11 @@ export const TRAFFIC: Record<TrafficKind, TrafficCfg> = {
   ball: { speed: 0.12, length: 1, warn: 100, first: 14 * 60, period: 10 * 60, fixedDir: false },
   log: { speed: 0.11, length: 1.3, warn: 110, first: 14 * 60, period: 12 * 60, fixedDir: false },
 };
+
+/** Bola de neve amassa (congela) quem ela atropela, por 4 s. */
+export const SNOWBALL_FREEZE_TICKS = 4 * 60;
+/** Perto do fim do tempo, iglus e pinguins ficam mais frequentes: de 1x no começo até 3x no fim (e na morte súbita). */
+export const ROLLER_MAX_RATE = 3;
+
+/** A bola de neve da avalanche tem 3 colunas de largura (meia largura = 1,5 célula). */
+export const SNOWBALL_HALF_WIDTH = 1.5;

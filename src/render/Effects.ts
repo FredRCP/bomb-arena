@@ -69,6 +69,42 @@ export class Effects {
     this.spawnDust(deltaMs / 1000, state);
     this.particles.update(deltaMs / 1000);
     this.draw();
+    this.drawDizzy(state);
+  }
+
+  /** Confuso (controles trocados: poder do Glauceste, flechas, pedra...): estrelinhas piscando girando sobre a cabeça. */
+  private drawDizzy(state: GameState): void {
+    const g = this.g;
+    for (const p of state.players) {
+      // Congelado (bola de neve, poder de gelo): contorno de gelo em volta do corpo, piscando perto de descongelar.
+      if (p.alive && (p.frozenTicks ?? 0) > 0 && ((p.frozenTicks ?? 0) > 60 || Math.floor(state.tick / 5) % 2 === 0)) {
+        const fx = p.x * TILE_SIZE;
+        const fy = p.y * TILE_SIZE - 6;
+        g.fillStyle(0x9fe3ff, 0.32).fillRoundedRect(fx - 27, fy - 32, 54, 66, 14);
+        g.lineStyle(5, 0x3aa0e0, 0.95).strokeRoundedRect(fx - 27, fy - 32, 54, 66, 14);
+        g.lineStyle(2.5, 0xeafaff, 1).strokeRoundedRect(fx - 24, fy - 29, 48, 60, 12);
+        g.fillStyle(0xffffff, 0.9).fillTriangle(fx - 19, fy - 24, fx - 8, fy - 24, fx - 19, fy - 10); // brilho
+        g.fillStyle(0xffffff, 0.8).fillTriangle(fx + 17, fy + 22, fx + 8, fy + 24, fx + 17, fy + 12);
+      }
+      if (!p.alive || (p.invertTicks <= 0 && p.slowTicks <= 0)) continue;
+      const cx = p.x * TILE_SIZE;
+      const cy = p.y * TILE_SIZE - 44;
+      for (let k = 0; k < 3; k++) {
+        const a = state.tick * 0.09 + (k * Math.PI * 2) / 3;
+        const x = cx + Math.cos(a) * 20;
+        const y = cy + Math.sin(a) * 6;
+        const on = (Math.floor(state.tick / 6) + k) % 2 === 0;
+        const r = on ? 7 : 4;
+        g.fillStyle(on ? 0xffe66d : 0xffffff, on ? 1 : 0.7);
+        const pts: Array<{ x: number; y: number }> = [];
+        for (let i = 0; i < 10; i++) {
+          const ang = (i / 10) * Math.PI * 2 - Math.PI / 2;
+          const rad = i % 2 === 0 ? r : r * 0.45;
+          pts.push({ x: x + Math.cos(ang) * rad, y: y + Math.sin(ang) * rad });
+        }
+        g.fillPoints(pts, true);
+      }
+    }
   }
 
   private draw(): void {

@@ -57,6 +57,8 @@ export interface ThemeDef {
   volcano?: boolean;
   /** Pergaminho (scroll.png) alternando com as outras pedras da borda? */
   scrolls?: boolean;
+  /** Bola de neve e pinguim em imagem (snowball.png, penguin1..4.png)? */
+  rollers?: boolean;
   /** Areia movediça em imagem (quicksand.png)? */
   quicksand?: boolean;
 }
@@ -73,7 +75,7 @@ export const THEMES: Record<string, ThemeDef> = {
   construction: { id: 'construction', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xc0522d, 0xe8a85a, 0x8a8f98] },
   playground: { id: 'playground', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xf4d58d, 0xe0b868, 0xff8fab] },
   train: { id: 'train', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0x8b5a2b, 0xd9a566, 0xc92a2a] },
-  ice: { id: 'ice', floors: true, wall: true, wallWidth: 56, blockVariants: 3, blockWidth: 62, rubble: true, background: true, chips: [0xe3f6ff, 0xb9e3f7, 0x7fc4e8], igloo: true, snow: true },
+  ice: { id: 'ice', floors: true, wall: true, wallWidth: 56, blockVariants: 3, blockWidth: 62, rubble: true, background: true, chips: [0xe3f6ff, 0xb9e3f7, 0x7fc4e8], igloo: true, snow: true, rollers: true },
 };
 
 export function themeById(id: string | undefined): ThemeDef {
@@ -99,6 +101,12 @@ export function preloadThemes(scene: Phaser.Scene): void {
     for (let i = 1; i <= (theme.borderGlyphs ?? 0); i++) add(`glyph${i}`, `glyph${i}.png`);
     if (theme.pyramid) add('pyramid', 'pyramid.png');
     if (theme.igloo) add('igloo', 'igloo.png');
+    if (theme.rollers) {
+      add('snowball', 'snowball.png');
+      add('dust', 'dust.png');
+      for (let i = 1; i <= 3; i++) add(`hole${i}`, `hole${i}.png`);
+      for (let i = 1; i <= 4; i++) add(`penguin${i}`, `penguin${i}.png`);
+    }
     if (theme.sphinx) add('sphinx', 'sphinx.png');
     if (theme.scrolls) add('scroll', 'scroll.png');
     if (theme.island) {

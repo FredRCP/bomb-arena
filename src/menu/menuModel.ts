@@ -146,10 +146,12 @@ export function changeValue(menu: MenuState, delta: -1 | 1): boolean {
     const values = Array.from({ length: Math.max(2, menu.maxHumans) }, (_, i) => i + 1);
     s.players = cycle(values, Math.min(s.players, values.length), delta) as MenuSettings['players'];
     s.enemies = clampEnemies(s.players, s.enemies); // ao trocar o modo, ajusta os inimigos à faixa permitida
+    s.stage = stageForTotal(s.stage, s.players + s.enemies);
   } else if (row === 'enemies') {
     const { min, max } = enemyRange(s.players);
     const values = Array.from({ length: max - min + 1 }, (_, i) => min + i);
     s.enemies = cycle(values, s.enemies, delta) as MenuSettings['enemies'];
+    s.stage = stageForTotal(s.stage, s.players + s.enemies);
   } else if (row === 'difficulty') {
     s.difficulty = cycle(DIFFICULTIES, s.difficulty, delta);
   } else if (row === 'wins') {
@@ -255,6 +257,20 @@ export function stageIssue(stage: StageDef, total: number, touch: boolean): stri
   if (touch && !stage.mobileOk) return 'Esta arena é grande demais para celular.';
   if (total > stage.maxPlayers) return `Esta fase comporta até ${stage.maxPlayers} jogadores (a partida tem ${total}).`;
   return null;
+}
+
+/**
+ * Com 4 jogadores ou mais, a fase que tem versão grande (19 x 13) passa a ser escolhida na versão grande; com menos, volta à normal.
+ * Se a fase não comporta a quantidade, vai para a primeira que comporta.
+ */
+export function stageForTotal(stageId: string, total: number): string {
+  const base = stageId.endsWith('19') ? stageId.slice(0, -2) : stageId;
+  let wanted = stageId;
+  if (total >= 4 && STAGES.some((stage) => stage.id === `${base}19`)) wanted = `${base}19`;
+  else if (total < 4 && stageId !== base && STAGES.some((stage) => stage.id === base)) wanted = base;
+  const fits = STAGES.find((stage) => stage.id === wanted);
+  if (fits && fits.maxPlayers >= total) return wanted;
+  return stagesFor(total, false)[0]?.id ?? stageId;
 }
 
 /** As fases que comportam `total` jogadores (e, na tela de toque, que cabem no celular), na ordem da lista. */

@@ -1,8 +1,8 @@
-import { BOULDER_FIRST_DELAY_TICKS, BOULDER_HIT_HALF, BOULDER_STUN_TICKS, BOULDER_PERIOD_TICKS, BOULDER_SPEED, BOULDER_WARN_TICKS, CHASM_WIDTH, PYRAMID_SIZE, BLOCK_REGROW_TICKS, ROLLER_BREAKS_BLOCKS, ROLLER_PERIOD_TICKS, ROLLER_SPEED, ICE_CRACK_LEVELS, ICE_PATCHES, DART_FIRST_DELAY_TICKS, DART_HIT_HALF, DART_SLOW_TICKS, DART_PERIOD_TICKS, DART_SPEED, DART_WARN_TICKS, QUICKSAND_PATCHES, QUICKSAND_SPEED_FACTOR, BRIDGE_DOWN_TICKS, BRIDGE_FIRST_TICKS, BRIDGE_PERIOD_TICKS, BRIDGE_WARN_TICKS } from '../config/hazards';
+import { BOULDER_FIRST_DELAY_TICKS, BOULDER_HIT_HALF, BOULDER_STUN_TICKS, BOULDER_PERIOD_TICKS, BOULDER_SPEED, BOULDER_WARN_TICKS, CHASM_WIDTH, PYRAMID_SIZE, BLOCK_REGROW_TICKS, ROLLER_BREAKS_BLOCKS, ROLLER_PERIOD_TICKS, ROLLER_SPEED, ROLLER_MAX_RATE, SNOWBALL_FREEZE_TICKS, SNOWBALL_HALF_WIDTH, PENGUIN_FIRST_TICKS, PENGUIN_PERIOD_TICKS, PENGUIN_WARN_TICKS, ICE_CRACK_LEVELS, ICE_PATCHES, DART_FIRST_DELAY_TICKS, DART_HIT_HALF, DART_SLOW_TICKS, DART_PERIOD_TICKS, DART_SPEED, DART_WARN_TICKS, QUICKSAND_PATCHES, QUICKSAND_SPEED_FACTOR, BRIDGE_DOWN_TICKS, BRIDGE_FIRST_TICKS, BRIDGE_PERIOD_TICKS, BRIDGE_WARN_TICKS } from '../config/hazards';
 import type { TrafficKind } from '../config/hazards';
 import { cellIndex, getCell, isTunnel } from './arena';
 import { applyExtraHazards, updateExtraHazards } from './extraHazards';
-import { dropPowerups, revealItem } from './items';
+import { dropPowerups, maybeHideItem, revealItem } from './items';
 import { bodyOverlapsCell, collidesAt } from './movement';
 import { createRng } from './random';
 import type { Arena, Cell, GameState, HazardsState, PlayerState } from './types';
@@ -110,7 +110,7 @@ export function pyramidExitCells(cols: number, rows: number): Cell[] {
 }
 
 /**
- * Células dos dois iglus dentro da arena: três paredes cada, na fileira 1 (a borda de cima completa o iglu), simétricos.
+ * Iglus: dois, no alto da arena, com a porta para baixo. Cada um tem 3 paredes na fileira 1.
  * Em 15 colunas: colunas 4-6 e 8-10 (a porta de cada um fica na coluna do meio dele: 5 e 9).
  */
 export function iglooCells(cols: number, _rows: number): Cell[] {
@@ -118,7 +118,7 @@ export function iglooCells(cols: number, _rows: number): Cell[] {
   return [c - 3, c - 2, c - 1, c + 1, c + 2, c + 3].map((col) => ({ col, row: 1 }));
 }
 
-/** Portas dos iglus: logo abaixo da coluna do meio de cada um, nas colunas livres 5 e 9; ficam voltadas uma para a outra. */
+/** Portas dos iglus: logo abaixo da coluna do meio de cada um (colunas 5 e 9 em 15 colunas); é de onde sai a bola de neve. */
 export function iglooDoors(cols: number, _rows: number): Cell[] {
   const c = Math.floor(cols / 2);
   return [c - 2, c + 2].map((col) => ({ col, row: 2 }));
@@ -317,9 +317,10 @@ export function createHazards(arena: Arena, options: HazardOptions | undefined, 
   if (options.boulder) hazards.boulder = { phase: 'idle', timer: BOULDER_FIRST_DELAY_TICKS - BOULDER_WARN_TICKS, cols: [], y: 0, last: [] };
   if (tunnel) hazards.tunnel = tunnel;
   if (doors) {
-    // O segundo iglu sai 10 s depois do primeiro e começa pelo pinguim.
+    // O segundo iglu solta a bola 6 s antes do primeiro (alternam).
     hazards.doors = doors.map((door, i) => ({ col: door.col, row: door.row, timer: i === 0 ? ROLLER_PERIOD_TICKS : ROLLER_PERIOD_TICKS / 2, count: i }));
     hazards.rollers = [];
+    hazards.penguinGate = { timer: PENGUIN_FIRST_TICKS, row: 3, fromLeft: true, warning: false, openTicks: 0 };
   }
   if (options.slippery) {
     // As faixas ficam sem blocos (aparecem inteiras desde o começo).
@@ -434,9 +435,29 @@ function updateThinIce(state: GameState): void {
   }
 }
 
+/** Quão rápido os relógios dos iglus e dos pinguins andam: 1x no começo da rodada, até ROLLER_MAX_RATE no fim (sem limite de tempo: sempre 1x). */
+export function rollerRate(state: GameState): number {
+  const round = state.round;
+  if (round.suddenDeath) return ROLLER_MAX_RATE;
+  const total = round.totalTicks;
+  if (!total || !Number.isFinite(total) || total <= 0) return 1;
+  const progress = Math.min(1, Math.max(0, 1 - round.ticksLeft / total));
+  return 1 + (ROLLER_MAX_RATE - 1) * progress;
+}
+
+const ROLLER_VECTORS = { up: [0, -1], down: [0, 1], left: [-1, 0], right: [1, 0] } as const;
+
+/** Fileiras por onde um pinguim pode entrar pela lateral: as ímpares (sem pilares), abaixo da fileira dos iglus. */
+export function penguinRows(rows: number): number[] {
+  const out: number[] = [];
+  for (let row = 3; row <= rows - 2; row += 2) out.push(row);
+  return out;
+}
+
 /**
- * Iglu: a cada 20 s (com a rodada em disputa) sai pela porta de cada iglu uma bola de neve ou um pinguim (alternando) que desce em
- * linha reta. Quem estiver no caminho é empurrado junto, sem dano. Quebra os blocos do caminho e para ao bater em parede, bomba ou buraco
+ * Iglus: a cada 12 s (alternados, uma bola a cada 6 s) sai pela porta de um iglu uma bola de neve que desce em
+ * linha reta. Pelas laterais entram os pinguins: uma fileira ímpar e um lado sorteados, com aviso de 1,5 s (veja PenguinGate). Quem estiver
+ * no caminho é empurrado junto, sem dano. Quebra os blocos do caminho e para ao bater em parede, bomba ou buraco
  * (ou se o jogador empurrado não puder andar mais).
  */
 function updateRollers(state: GameState): void {
@@ -444,50 +465,104 @@ function updateRollers(state: GameState): void {
   if (!hz?.doors || !hz.rollers) return;
   const arena = state.arena;
   if (state.round.phase === 'playing') {
+    const rate = rollerRate(state);
     for (const door of hz.doors) {
-      door.timer -= 1;
+      door.timer -= rate;
       if (door.timer > 0) continue;
       door.timer = ROLLER_PERIOD_TICKS;
-      const kind = door.count % 2 === 0 ? 'snowball' : 'penguin';
       const id = state.tick * 16 + door.col;
       door.count += 1;
-      hz.rollers.push({ id, kind, x: door.col + 0.5, y: door.row + 0.5 });
-      state.events.push({ type: 'rollerSpawned', id, kind, col: door.col, row: door.row });
+      hz.rollers.push({ id, kind: 'snowball', x: door.col + 0.5, y: door.row + 0.5 });
+      state.events.push({ type: 'rollerSpawned', id, kind: 'snowball', col: door.col, row: door.row });
+    }
+    const gate = hz.penguinGate;
+    if (gate) {
+      gate.timer -= gate.warning ? 1 : rate;
+      if (!gate.warning && gate.timer <= PENGUIN_WARN_TICKS) {
+        const rng = createRng(state.tick * 29 + 11);
+        const rows = penguinRows(arena.rows);
+        gate.row = rows[Math.floor(rng() * rows.length)]!;
+        gate.fromLeft = rng() < 0.5;
+        gate.warning = true;
+        state.events.push({ type: 'penguinWarn', row: gate.row, fromLeft: gate.fromLeft });
+      }
+      if (gate.timer <= 0) {
+        const id = state.tick * 16 + 15;
+        const x = gate.fromLeft ? 0.5 : arena.cols - 0.5;
+        hz.rollers.push({ id, kind: 'penguin', x, y: gate.row + 0.5, dir: gate.fromLeft ? 'right' : 'left' });
+        state.events.push({ type: 'rollerSpawned', id, kind: 'penguin', col: Math.floor(x), row: gate.row });
+        gate.timer = PENGUIN_PERIOD_TICKS;
+        gate.warning = false;
+        gate.openTicks = 50; // o buraco fica aberto um instante depois da saída
+      }
+      if (gate.openTicks > 0) gate.openTicks -= 1;
     }
   }
   for (const roller of [...hz.rollers]) {
     const speed = ROLLER_SPEED[roller.kind];
-    const y = roller.y + speed;
+    const [dx, dy] = ROLLER_VECTORS[roller.dir ?? 'down'];
+    const nx = roller.x + dx * speed;
+    const ny = roller.y + dy * speed;
     const col = Math.floor(roller.x);
-    const frontRow = Math.floor(y + 0.5);
-    if (ROLLER_BREAKS_BLOCKS && getCell(arena, col, frontRow) === 'block') {
-      arena.cells[cellIndex(arena, col, frontRow)] = 'empty';
-      state.events.push({ type: 'blockDestroyed', col, row: frontRow });
-      revealItem(state, col, frontRow);
+    const row = Math.floor(roller.y);
+    const frontCol = dx !== 0 ? Math.floor(nx + 0.5 * dx) : col;
+    const frontRow = dy !== 0 ? Math.floor(ny + 0.5 * dy) : row;
+    const giant = roller.kind === 'snowball';
+    // A bola de neve tem 3 colunas de largura: quebra os blocos das 3 colunas e passa por cima dos pilares; só para na borda de baixo
+    // (ou numa bomba na coluna do meio). O pinguim segue a fileira, estoura as bombas do caminho e para na parede.
+    const sideCols = giant ? [-1, 0, 1] : [0];
+    for (const side of sideCols) {
+      const cc = frontCol + side;
+      if (ROLLER_BREAKS_BLOCKS && getCell(arena, cc, frontRow) === 'block') {
+        arena.cells[cellIndex(arena, cc, frontRow)] = 'empty';
+        state.events.push({ type: 'blockDestroyed', col: cc, row: frontRow });
+        revealItem(state, cc, frontRow);
+      }
     }
-    const stop =
-      getCell(arena, col, frontRow) !== 'empty' || state.bombs.some((b) => b.col === col && b.row === frontRow && frontRow > Math.floor(roller.y));
+    const entering = frontCol !== col || frontRow !== row;
+    const bombAhead = entering ? state.bombs.find((b) => b.col === frontCol && b.row === frontRow) : undefined;
+    if (bombAhead && !giant) bombAhead.ticksLeft = Math.min(bombAhead.ticksLeft, 1); // o pinguim detona a bomba e segue
+    const cell = getCell(arena, frontCol, frontRow);
+    const blockedByCell = giant ? frontRow >= arena.rows - 1 : cell !== 'empty';
+    const stop = blockedByCell || (giant && !!bombAhead);
     let stopped = stop;
     if (!stop) {
-      roller.y = y;
-      // Empurra quem está na frente: o jogador fica sempre a ~0,9 célula à frente do rolo.
+      roller.x = nx;
+      roller.y = ny;
+      // Bola de neve: amassa (congela) quem ela atropela nas 3 colunas, sem empurrar; segue rolando.
+      if (giant) {
+        for (const player of state.players) {
+          if (!player.alive || roller.hit?.includes(player.id)) continue;
+          if (Math.abs(player.x - roller.x) > SNOWBALL_HALF_WIDTH - 0.1 || Math.abs(player.y - roller.y) > 0.9) continue;
+          (roller.hit ??= []).push(player.id);
+          if (player.shieldTicks > 0 || player.heroTicks > 0) continue;
+          player.frozenTicks = Math.max(player.frozenTicks ?? 0, SNOWBALL_FREEZE_TICKS);
+          player.slide = null;
+          state.events.push({ type: 'squashed', playerId: player.id });
+        }
+      }
+      // Empurra quem está na frente (só o pinguim): o jogador fica sempre a ~0,9 célula à frente do rolo.
       for (const player of state.players) {
-        if (!player.alive || Math.abs(player.x - roller.x) > 0.8) continue;
-        const ahead = player.y - roller.y;
+        if (giant || !player.alive) continue;
+        const side = dx !== 0 ? Math.abs(player.y - roller.y) : Math.abs(player.x - roller.x);
+        if (side > 0.8) continue;
+        const ahead = dx !== 0 ? (player.x - roller.x) * dx : (player.y - roller.y) * dy;
         if (ahead < -0.1 || ahead > 0.95) continue;
-        const target = roller.y + 0.9;
-        if (target <= player.y) continue;
+        const targetX = dx !== 0 ? roller.x + dx * 0.9 : player.x;
+        const targetY = dy !== 0 ? roller.y + dy * 0.9 : player.y;
+        if (dx !== 0 ? (targetX - player.x) * dx <= 0 : (targetY - player.y) * dy <= 0) continue;
         const blocked = new Set(state.bombs.map((b) => cellIndex(arena, b.col, b.row)));
-        if (collidesAt(arena, player.x, target, blocked)) {
+        if (collidesAt(arena, targetX, targetY, blocked)) {
           stopped = true;
           break;
         }
-        player.y = target;
+        player.x = targetX;
+        player.y = targetY;
       }
     }
     if (stopped) {
       hz.rollers.splice(hz.rollers.indexOf(roller), 1);
-      state.events.push({ type: 'rollerGone', id: roller.id, col, row: Math.floor(roller.y) });
+      state.events.push({ type: 'rollerGone', id: roller.id, col: Math.floor(roller.x), row: Math.floor(roller.y) });
     }
   }
 }
@@ -588,6 +663,7 @@ function updateRegrow(state: GameState): void {
   const rng = createRng(state.tick * 7 + spots.length);
   const index = spots[Math.floor(rng() * spots.length)]!;
   arena.cells[index] = 'block';
+  maybeHideItem(state, index % arena.cols, Math.floor(index / arena.cols), rng);
   state.events.push({ type: 'blockGrown', col: index % arena.cols, row: Math.floor(index / arena.cols) });
 }
 

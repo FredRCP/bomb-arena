@@ -134,9 +134,9 @@ export function drawArena(scene: Phaser.Scene, arena: Arena, themeId = 'classic'
   }
 
   if (iglooOn) {
-    // Dois iglus iguais na lateral de cima, com a porta para baixo, centrados na coluna da porta (a arte fica como foi desenhada).
-    for (const door of iglooDoors(arena.cols, arena.rows)) {
-      const image = scene.add.image((door.col + 0.5) * TILE_SIZE, 2 * TILE_SIZE + 10, themeKey(theme, 'igloo')).setOrigin(0.5, 1).setDepth(6);
+    // Dois iglus iguais na lateral de cima, com a porta para baixo, centrados na coluna da porta (de onde sai a bola de neve).
+    for (const { col } of iglooDoors(arena.cols, arena.rows)) {
+      const image = scene.add.image((col + 0.5) * TILE_SIZE, 2 * TILE_SIZE + 10, themeKey(theme, 'igloo')).setOrigin(0.5, 1).setDepth(6);
       image.setScale(176 / image.width);
     }
   }

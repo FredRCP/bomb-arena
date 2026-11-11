@@ -3,7 +3,7 @@ import { ICE_CRACK_LEVELS } from '../../src/config/hazards';
 import { ELEPHANT_SPEED, POWER_CHARGE_TICKS } from '../../src/config/powers';
 import { AIRPLANE_BOMBS, AIRPLANE_LAPS, AIRPLANE_LAP_TICKS, CONFUSE_POWER_TICKS, FREEZE_POWER_TICKS, GHOST_POWER_TICKS, SHIELD_POWER_TICKS } from '../../src/config/powers';
 import { stageById } from '../../src/config/stages';
-import { aiShouldUsePower, createGameState, drainEvents, getCell, givePower, powerFraction, powerReady, step, createAi, iglooCells, placeBomb, pyramidExitCells, pyramidOrigin, pyramidTunnelCells, pyramidWallCells, slipperyCells } from '../../src/core';
+import { aiShouldUsePower, createGameState, drainEvents, getCell, givePower, powerFraction, powerReady, step, createAi, iglooCells, placeBomb, pyramidExitCells, pyramidOrigin, pyramidTunnelCells, pyramidWallCells, slipperyCells, rollerRate } from '../../src/core';
 import type { GameState } from '../../src/core';
 import { stateFromText } from '../helpers/stateFromText';
 
@@ -84,6 +84,20 @@ describe('Gelo: iglu, faixas e IA', () => {
     for (const d of state.hazards!.doors!) expect(getCell(state.arena, d.col, d.row)).toBe('empty');
   });
 
+  it('ninguém nasce dentro de iglu, com 1 a 7 jogadores, e os iglus ficam longe da zona de nascimento', () => {
+    for (const cols of [15, 17, 19]) {
+      const c = Math.floor(cols / 2);
+      expect(iglooCells(cols, 13).map((cell) => cell.col)).toEqual([c - 3, c - 2, c - 1, c + 1, c + 2, c + 3]);
+    }
+    for (let total = 1; total <= 7; total++) {
+      const state = ice({ players: 1, enemies: (total - 1) as 0 | 1 | 2 | 3 | 4 | 5 | 6 });
+      for (const p of state.players) {
+        expect(getCell(state.arena, Math.floor(p.x), Math.floor(p.y))).not.toBe('wall');
+        expect(getCell(state.arena, Math.floor(p.x), Math.floor(p.y))).not.toBe('block');
+      }
+    }
+  });
+
   it('só 1 pista escorregadia de 4 células, sem bloco e fora do gelo fino; muda de lugar a cada rodada', () => {
     const state = ice({ players: 2 });
     const strips = state.hazards!.slippery!;
@@ -98,7 +112,7 @@ describe('Gelo: iglu, faixas e IA', () => {
     }
   });
 
-  it('a cada 10 s sai uma bola de neve ou um pinguim de cada iglu (o segundo, 5 s antes); descem e param na parede', () => {
+  it('a cada 12 s sai uma bola de neve de cada iglu (alternados, 6 s de diferença); descem e param na parede', () => {
     const state = ice({ players: 1 });
     state.hazards!.thinIce = [];
     state.arena.cells.fill('empty');
@@ -107,14 +121,162 @@ describe('Gelo: iglu, faixas e IA', () => {
     state.players[0]!.x = 1.5;
     state.players[0]!.y = 1.5;
     const seen: Array<[number, string, number]> = [];
+    state.hazards!.penguinGate = undefined; // aqui só os iglus
+    state.round.totalTicks = 0; // sem escalada de ritmo
     for (let i = 0; i < 21 * 60; i++) {
       step(state);
       for (const e of drainEvents(state)) if (e.type === 'rollerSpawned') seen.push([e.col, e.kind, Math.round(state.tick / 60)]);
     }
-    // segundo iglu (coluna 9) em 5 s e 15 s; primeiro (coluna 5) em 10 s e 20 s; alternando bola de neve e pinguim
-    expect(seen).toEqual([[9, 'penguin', 5], [5, 'snowball', 10], [9, 'snowball', 15], [5, 'penguin', 20]]);
-    for (let i = 0; i < 3 * 60; i++) step(state);
+    expect(seen).toEqual([[9, 'snowball', 6], [5, 'snowball', 12], [9, 'snowball', 18]]);
+    for (let i = 0; i < 2.5 * 60; i++) step(state);
     expect(state.hazards!.rollers!.length).toBe(0); // já bateram na parede de baixo
+  });
+
+  it('pinguins entram pelas laterais, em fileira ímpar sorteada, com aviso 1,5 s antes, e atravessam a arena', () => {
+    for (const seed of [1, 2, 3, 4, 5, 6]) {
+      const state = ice({ players: 1, seed });
+      state.hazards!.thinIce = [];
+      state.hazards!.doors = [];
+      state.arena.cells.fill('empty');
+      state.round.phase = 'playing';
+      const p = state.players[0]!;
+      p.x = 7.5;
+      p.y = 1.5;
+      const warns: Array<{ row: number; fromLeft: boolean; tick: number }> = [];
+      const spawns: Array<{ tick: number; kind: string }> = [];
+      let crossed = false;
+      for (let i = 0; i < 14 * 60; i++) {
+        p.y = 1.5;
+        p.x = 7.5;
+        step(state);
+        for (const e of drainEvents(state)) {
+          if (e.type === 'penguinWarn') warns.push({ row: e.row, fromLeft: e.fromLeft, tick: state.tick });
+          if (e.type === 'rollerSpawned') spawns.push({ tick: state.tick, kind: e.kind });
+        }
+        for (const r of state.hazards!.rollers!) if (r.kind === 'penguin' && Math.abs(r.x - 7.5) < 0.1) crossed = true;
+      }
+      expect(warns).toHaveLength(1);
+      expect(warns[0]!.row % 2).toBe(1);
+      expect(warns[0]!.row).toBeGreaterThanOrEqual(3);
+      expect(spawns).toHaveLength(1);
+      expect(spawns[0]!.kind).toBe('penguin');
+      expect(spawns[0]!.tick - warns[0]!.tick).toBeGreaterThanOrEqual(85); // o aviso vem antes
+      expect(crossed).toBe(true);
+    }
+  });
+
+  it('a bola de neve amassa (congela por 4 s) em vez de empurrar, uma vez por bola, e o escudo protege', () => {
+    const state = ice({ players: 2 });
+    state.hazards!.thinIce = [];
+    state.hazards!.doors = [];
+    state.hazards!.penguinGate = undefined;
+    state.arena.cells.fill('empty');
+    for (let c = 0; c < 15; c++) state.arena.cells[10 * 15 + c] = 'wall';
+    state.round.phase = 'playing';
+    const [a, b] = state.players as [typeof state.players[0], typeof state.players[0]];
+    a.x = 7.5; a.y = 5.5; b.x = 9.5; b.y = 5.5; b.shieldTicks = 9999;
+    state.hazards!.rollers = [{ id: 1, kind: 'snowball', x: 7.5, y: 2.5 }];
+    for (let i = 0; i < 90; i++) step(state);
+    expect(a.alive).toBe(true);
+    expect(a.frozenTicks ?? 0).toBeGreaterThan(100); // congelado
+    expect(a.y).toBeCloseTo(5.5, 1); // não foi empurrado
+    expect(b.frozenTicks ?? 0).toBe(0);
+  });
+
+  it('o ritmo dos iglus e pinguins cresce até 3x conforme o tempo acaba', () => {
+    const state = ice({ players: 1 });
+    state.round.totalTicks = 1000;
+    state.round.ticksLeft = 1000;
+    expect(rollerRate(state)).toBe(1);
+    state.round.ticksLeft = 500;
+    expect(rollerRate(state)).toBeCloseTo(2, 5);
+    state.round.ticksLeft = 0;
+    state.round.suddenDeath = true;
+    expect(rollerRate(state)).toBe(3);
+  });
+
+  it('blocos que a neve refaz podem esconder powerups', () => {
+    let seen = 0;
+    for (let seed = 1; seed <= 6; seed++) {
+      const state = ice({ players: 1, seed });
+      state.hazards!.thinIce = [];
+      state.hazards!.doors = [];
+      state.hazards!.penguinGate = undefined;
+      state.players[0]!.x = 1.5; state.players[0]!.y = 1.5;
+      for (const i of state.hazards!.blockSpots!) state.arena.cells[i] = 'empty';
+      state.hiddenItems = [];
+      state.round.phase = 'playing';
+      for (let i = 0; i < 8 * 60 * 40; i++) { step(state); if (state.round.phase !== 'playing') break; }
+      seen += state.hiddenItems.length;
+    }
+    expect(seen).toBeGreaterThan(0);
+  });
+
+  it('a bola de neve tem 3 colunas: quebra blocos dos lados, passa por pilares e congela quem está nas colunas vizinhas', () => {
+    const state = ice({ players: 2 });
+    state.hazards!.thinIce = [];
+    state.hazards!.doors = [];
+    state.hazards!.penguinGate = undefined;
+    state.round.phase = 'playing';
+    state.arena.cells.fill('empty');
+    for (let c = 0; c < 15; c++) state.arena.cells[12 * 15 + c] = 'wall';
+    state.arena.cells[6 * 15 + 6] = 'block'; // lado esquerdo
+    state.arena.cells[6 * 15 + 8] = 'block'; // lado direito
+    state.arena.cells[8 * 15 + 8] = 'wall'; // pilar numa coluna lateral
+    state.arena.cells[4 * 15 + 7] = 'empty';
+    const [a, b] = state.players as [typeof state.players[0], typeof state.players[0]];
+    a.x = 6.5; a.y = 10.5; // coluna vizinha: congela
+    b.x = 11.5; b.y = 10.5; // longe: livre
+    state.hazards!.rollers = [{ id: 1, kind: 'snowball', x: 7.5, y: 3.5 }];
+    let froze = 0;
+    for (let i = 0; i < 400; i++) {
+      step(state);
+      froze = Math.max(froze, a.frozenTicks ?? 0);
+    }
+    expect(state.arena.cells[6 * 15 + 6]).toBe('empty');
+    expect(state.arena.cells[6 * 15 + 8]).toBe('empty');
+    expect(froze).toBeGreaterThan(0);
+    expect(b.frozenTicks ?? 0).toBe(0);
+    expect(state.hazards!.rollers).toHaveLength(0); // chegou à borda de baixo
+  });
+
+  it('o pinguim detona as bombas do caminho e segue', () => {
+    const state = ice({ players: 1 });
+    state.hazards!.thinIce = [];
+    state.hazards!.doors = [];
+    state.hazards!.penguinGate = undefined;
+    state.round.phase = 'playing';
+    state.arena.cells.fill('empty');
+    for (let r = 0; r < 13; r++) state.arena.cells[r * 15 + 14] = 'wall';
+    const p = state.players[0]!;
+    p.x = 1.5; p.y = 1.5;
+    state.bombs.push({ owner: 1, col: 8, row: 5, ticksLeft: 150, range: 2, walkThrough: [], pierce: false } as never);
+    state.hazards!.rollers = [{ id: 1, kind: 'penguin', x: 4.5, y: 5.5, dir: 'right' }];
+    let exploded = false;
+    for (let i = 0; i < 120; i++) {
+      step(state);
+      if (state.bombs.length === 0) { exploded = true; break; }
+    }
+    expect(exploded).toBe(true);
+    expect(state.hazards!.rollers!.length === 1 || state.hazards!.rollers!.length === 0).toBe(true);
+  });
+
+  it('o pinguim lateral empurra quem está na fileira, sem dano, até a parede', () => {
+    const state = ice({ players: 1 });
+    state.hazards!.thinIce = [];
+    state.hazards!.doors = [];
+    state.arena.cells.fill('empty');
+    for (let r = 0; r < 13; r++) state.arena.cells[r * 15 + 14] = 'wall';
+    state.round.phase = 'playing';
+    const p = state.players[0]!;
+    p.x = 6.5;
+    p.y = 5.5;
+    state.hazards!.rollers = [{ id: 1, kind: 'penguin', x: 4.5, y: 5.5, dir: 'right' }];
+    for (let i = 0; i < 200; i++) step(state);
+    expect(p.alive).toBe(true);
+    expect(p.x).toBeGreaterThan(12);
+    expect(p.x).toBeLessThan(13.7);
+    expect(state.hazards!.rollers).toHaveLength(0);
   });
 
   it('quem está no caminho é empurrado (sem dano); sem espaço, o rolo para', () => {
@@ -154,6 +316,26 @@ describe('Gelo: iglu, faixas e IA', () => {
     step(state, { 1: { move: 'right' } });
     for (let i = 0; i < 80; i++) step(state, { 1: { move: null } });
     expect(p.x).toBeGreaterThan(8); // escorregou pela faixa inteira e parou ao sair
+  });
+
+  it('na faixa, apertar uma direção de lado no centro da célula larga o deslize e sai pela lateral', () => {
+    const state = ice({ players: 1 });
+    state.hazards!.thinIce = [];
+    const p = state.players[0]!;
+    state.arena.cells.fill('empty');
+    state.hazards!.slippery = [3 * 15 + 3, 3 * 15 + 4, 3 * 15 + 5, 3 * 15 + 6];
+    p.x = 3.5;
+    p.y = 3.5;
+    step(state, { 1: { move: 'right' } });
+    expect(p.slide).toBe('right');
+    step(state, { 1: { move: 'down' } }); // fora do centro: o deslize continua
+    expect(p.slide).toBe('right');
+    let guard = 0;
+    while (Math.abs(p.x - 4.5) > 0.05 && guard++ < 40) step(state, { 1: { move: null } });
+    const before = p.y;
+    step(state, { 1: { move: 'down' } }); // no centro da célula: sai para baixo
+    for (let i = 0; i < 6; i++) step(state, { 1: { move: 'down' } });
+    expect(p.y).toBeGreaterThan(before + 0.2);
   });
 
   it('a IA trata o buraco de gelo como obstáculo (não tenta atravessar)', () => {
@@ -316,6 +498,7 @@ describe('Gelo: a neve faz os blocos crescerem de novo', () => {
     state.hazards!.thinIce = [];
     state.round.phase = 'playing';
     state.hazards!.doors = [];
+    state.hazards!.penguinGate = undefined;
     const spots = state.hazards!.blockSpots!;
     expect(spots.length).toBeGreaterThan(20);
     for (const i of spots) state.arena.cells[i] = 'empty'; // tudo quebrado

@@ -17,7 +17,7 @@ import type { GameState, RoundOutcome, RoundState } from './types';
 // - Terminada ('over'), o estado fica congelado: ver o `step`.
 
 export function createRound(timeTicks: number = ROUND_TIME_TICKS): RoundState {
-  return { phase: 'playing', endsAtTick: null, outcome: null, ticksLeft: timeTicks, suddenDeath: false, closedCount: 0, nextCloseIn: SUDDEN_DEATH_INTERVAL_TICKS };
+  return { phase: 'playing', endsAtTick: null, outcome: null, ticksLeft: timeTicks, totalTicks: timeTicks, suddenDeath: false, closedCount: 0, nextCloseIn: SUDDEN_DEATH_INTERVAL_TICKS };
 }
 
 function aliveTeams(state: GameState): number {
