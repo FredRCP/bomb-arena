@@ -104,6 +104,10 @@ export function preloadThemes(scene: Phaser.Scene): void {
     if (theme.rollers) {
       add('snowball', 'snowball.png');
       add('dust', 'dust.png');
+      add('iceSlip', 'slippery.png');
+      add('iceCrack1', 'crack1.png');
+      add('iceCrack2', 'crack2.png');
+      add('iceBroken', 'brokenhole.png');
       for (let i = 1; i <= 3; i++) add(`hole${i}`, `hole${i}.png`);
       for (let i = 1; i <= 4; i++) add(`penguin${i}`, `penguin${i}.png`);
     }

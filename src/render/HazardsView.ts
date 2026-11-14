@@ -13,6 +13,7 @@ export class HazardsView {
   private readonly warn: Phaser.GameObjects.Text[] = [];
   /** Gelo fino (manchas, rachaduras e buracos): redesenhado só quando algo muda. */
   private readonly ice: Phaser.GameObjects.Graphics;
+  private readonly iceImages: Phaser.GameObjects.Image[] = [];
   private iceKey = '';
   /** Brilho de fogo por cima da pirâmide (para ninguém ser pego por uma chama escondida no túnel). */
   private readonly glow: Phaser.GameObjects.Graphics;
@@ -227,6 +228,17 @@ export class HazardsView {
     if (!strips || strips.length === 0) return;
     const arena = state.arena;
     const set = new Set(strips);
+    const iceTheme = themeById('ice');
+    if (this.scene.textures.exists(themeKey(iceTheme, 'iceSlip'))) {
+      // Arte: gelo liso brilhante (uma imagem por célula; as bordas encaixam e a pista parece uma peça só).
+      for (const index of strips) {
+        const x = (index % arena.cols) * TILE_SIZE;
+        const y = Math.floor(index / arena.cols) * TILE_SIZE;
+        const image = this.scene.add.image(x, y, themeKey(iceTheme, 'iceSlip')).setOrigin(0, 0).setDepth(0.6).setAlpha(0.92);
+        image.setDisplaySize(TILE_SIZE, TILE_SIZE);
+      }
+      return;
+    }
     const g = this.scene.add.graphics().setDepth(0.6);
     for (const index of strips) {
       const col = index % arena.cols;
@@ -261,9 +273,37 @@ export class HazardsView {
     this.iceKey = key;
     const g = this.ice;
     g.clear();
+    for (const image of this.iceImages) image.destroy();
+    this.iceImages.length = 0;
+    const iceTheme = themeById('ice');
+    const art = ['iceCrack1', 'iceCrack2', 'iceBroken'].every((name) => this.scene.textures.exists(themeKey(iceTheme, name)));
     for (const index of hz.thinIce) {
       const x = (index % arena.cols) * TILE_SIZE;
       const y = Math.floor(index / arena.cols) * TILE_SIZE;
+      if (art) {
+        // Arte: gelo com 1 rachadura (nível 1), várias (nível 2 e 3, o 3 mais escuro e com mais riscos) e o buraco de água escura.
+        const broken = arena.cells[index] === 'hole';
+        const level = hz.cracks[index] ?? 0;
+        if (!broken && level <= 0) {
+          // Gelo fino ainda inteiro: mancha clara com contorno (marca as células frágeis).
+          g.fillStyle(0xdff6ff, 0.45).fillRoundedRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4, 8);
+          g.lineStyle(2, 0xffffff, 0.8).strokeRoundedRect(x + 2, y + 2, TILE_SIZE - 4, TILE_SIZE - 4, 8);
+          continue;
+        }
+        const name = broken ? 'iceBroken' : level === 1 ? 'iceCrack1' : 'iceCrack2';
+        const image = this.scene.add.image(x, y, themeKey(iceTheme, name)).setOrigin(0, 0).setDepth(this.ice.depth);
+        image.setDisplaySize(TILE_SIZE, TILE_SIZE);
+        if (!broken && level >= 3) image.setTint(0xb8c8ee);
+        this.iceImages.push(image);
+        if (!broken && level >= 3) {
+          g.lineStyle(3, 0x1d4f86, 0.95);
+          g.lineBetween(x + 12, y + 14, x + 8, y + 4);
+          g.lineBetween(x + 52, y + 22, x + 58, y + 10);
+          g.lineBetween(x + 48, y + 46, x + 58, y + 56);
+          g.lineBetween(x + 14, y + 54, x + 6, y + 58);
+        }
+        continue;
+      }
       if (arena.cells[index] === 'hole') {
         g.fillStyle(0x0a1d3a, 1).fillRoundedRect(x + 3, y + 3, TILE_SIZE - 6, TILE_SIZE - 6, 10);
         g.fillStyle(0x03101f, 1).fillRoundedRect(x + 9, y + 9, TILE_SIZE - 18, TILE_SIZE - 18, 8);
