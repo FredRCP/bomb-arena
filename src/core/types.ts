@@ -107,7 +107,7 @@ export interface PlayerState {
 }
 
 /** Superpoderes que existem: o elefantinho da Ana. */
-export type PowerKind = 'elephant' | 'airplane' | 'shield' | 'freeze' | 'stork' | 'confuse' | 'ghost' | 'jump' | 'sprint' | 'slime' | 'invisible' | 'twinbombs' | 'fog' | 'chocolate';
+export type PowerKind = 'elephant' | 'airplane' | 'shield' | 'freeze' | 'stork' | 'confuse' | 'ghost' | 'jump' | 'sprint' | 'slime' | 'invisible' | 'twinbombs' | 'fog' | 'magnet';
 
 /** Elefantinho em disparada: o centro dele (em células) e a direção. */
 /** Porta de um iglu: de onde saem as bolas de neve e os pinguins, com os passos até a próxima saída e quantas já saíram. */
@@ -514,8 +514,6 @@ export interface GameState {
   planes?: PlaneState[];
   /** Gosma do Musgo no chão. */
   slime?: SlimeCell[];
-  /** Células (índices) de blocos de chocolate do Cacau (só para o desenho). */
-  chocolate?: number[];
   /** Neblina do Nimbo: passos que faltam e quem a criou (ele enxerga em volta). */
   fog?: { ticks: number; owner: PlayerId };
   /** Quem é eliminado pode jogar das laterais e tentar voltar (veja sideline.ts)? Ausente = sim. */

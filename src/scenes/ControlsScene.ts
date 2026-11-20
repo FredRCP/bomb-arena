@@ -6,6 +6,7 @@ import { PadNav } from '../input/padNav';
 import { TILE_SIZE } from '../render/ArenaRenderer';
 import { placeArena } from '../render/layout';
 import { addMenuBackground, addPanel } from '../render/menuBackground';
+import { bindPadHint } from '../input/padHints';
 
 const FONT = 'system-ui, "Segoe UI", Roboto, sans-serif';
 const WIDTH = ARENA_COLS * TILE_SIZE;
@@ -40,9 +41,9 @@ export class ControlsScene extends Phaser.Scene {
     addMenuBackground(this);
     addPanel(this, WIDTH / 2, 440, WIDTH - 60, 650);
     this.add.text(WIDTH / 2, 70, 'CONTROLES', { fontFamily: FONT, fontSize: '60px', fontStyle: 'bold', color: '#ffe66d', stroke: '#1b1f3b', strokeThickness: 8 }).setOrigin(0.5);
-    this.add
+    bindPadHint(this, this.add
       .text(WIDTH / 2, HEIGHT - 40, '← → trocar de página     Esc voltar     (ou use o controle)', { fontFamily: FONT, fontSize: '24px', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 4 })
-      .setOrigin(0.5);
+      .setOrigin(0.5), '← → trocar de página     Esc voltar', '◀ ▶ trocar de página     B voltar');
 
     const keyboard = this.input.keyboard;
     if (keyboard) {

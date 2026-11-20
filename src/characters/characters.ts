@@ -38,13 +38,13 @@ export const CHARACTERS: readonly CharacterDef[] = [
   { id: 'filippe', name: 'Filippe', color: 0x38d9a9, hat: 'headband', custom: true, sprites: true, spriteScale: 0.92, power: 'ghost' },
   { id: 'waleska', name: 'Wal', color: 0xe599f7, hat: 'crown', custom: true, sprites: true, power: 'stork' },
   { id: 'glaucio', name: 'Glauceste', color: 0xadb5bd, hat: 'cap', custom: true, sprites: true, power: 'confuse' },
-  { id: 'pipoca', name: 'Pipoca', color: 0xff5c8a, hat: 'antenna', custom: false, power: 'jump' },
-  { id: 'bolt', name: 'Bolt', color: 0xffd43b, hat: 'horns', custom: false, emblem: 'bolt', power: 'sprint' },
-  { id: 'musgo', name: 'Musgo', color: 0x7ed957, hat: 'leaf', custom: false, power: 'slime' },
-  { id: 'violeta', name: 'Violeta', color: 0xb388ff, hat: 'crown', custom: false, power: 'invisible' },
-  { id: 'fagulha', name: 'Fagulha', color: 0xff6b35, hat: 'star', custom: false, power: 'twinbombs' },
-  { id: 'nimbo', name: 'Nimbo', color: 0x5c7cfa, hat: 'ears', custom: false, power: 'fog' },
-  { id: 'cacau', name: 'Cacau', color: 0xa9744f, hat: 'tuft', custom: false, power: 'chocolate' },
+  { id: 'pipoca', name: 'Pipoca', color: 0xff5c8a, hat: 'antenna', custom: true, power: 'jump' },
+  { id: 'bolt', name: 'Bolt', color: 0xffd43b, hat: 'horns', custom: true, emblem: 'bolt', power: 'sprint' },
+  { id: 'musgo', name: 'Musgo', color: 0x7ed957, hat: 'leaf', custom: true, power: 'slime' },
+  { id: 'violeta', name: 'Violeta', color: 0xb388ff, hat: 'crown', custom: true, power: 'invisible' },
+  { id: 'fagulha', name: 'Fagulha', color: 0xff6b35, hat: 'star', custom: true, power: 'twinbombs' },
+  { id: 'nimbo', name: 'Nimbo', color: 0x5c7cfa, hat: 'ears', custom: true, power: 'fog' },
+  { id: 'tique', name: 'Tique', color: 0x66d9e8, hat: 'antenna', custom: true, power: 'magnet' },
 ];
 
 export function characterById(id: string | undefined): CharacterDef {

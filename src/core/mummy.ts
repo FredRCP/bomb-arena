@@ -6,7 +6,7 @@ import type { GameState, ItemKind, MummyBody, MummyState } from './types';
 
 // A múmia do Egito (só regras; o desenho está em render/MummyView.ts).
 // 1) O relógio chega a zero: um sarcófago aparece numa célula livre, longe dos jogadores, e avisa por 1,5 s.
-// 2) Ele abre e a múmia sai andando ao acaso (de célula em célula, sem pisar em bloco, parede, túnel da pirâmide nem bomba).
+// 2) Ele abre e a múmia sai caçando o jogador vulnerável mais próximo (de célula em célula; sem presa ao alcance, anda ao acaso), sem pisar em bloco, parede, túnel da pirâmide nem bomba).
 // 3) Quem encosta nela fica enfaixado (parado) por 3 s; escudo e super-herói protegem. O mesmo jogador só é enfaixado de novo depois de 5 s.
 // 4) Uma explosão na célula dela a desfaz e solta um item bom; o relógio recomeça para a próxima.
 
@@ -46,7 +46,50 @@ function pickCoffinCell(state: GameState, rng: () => number): { col: number; row
   return pool.length === 0 ? null : pool[Math.floor(rng() * pool.length)]!;
 }
 
-/** Escolhe o próximo passo da múmia: segue em frente com mais vontade, vira de lado, e só volta atrás se não houver outro caminho. */
+/** Quem a múmia caça: vivo, em campo (não nas laterais) e sem escudo nem super-herói. */
+function isPrey(state: GameState, mummy: MummyState, player: GameState['players'][number]): boolean {
+  if (!player.alive || player.sideline !== null || player.shieldTicks > 0 || player.heroTicks > 0) return false;
+  const last = mummy.wrappedAt[player.id];
+  return last === undefined || state.tick - last >= MUMMY_COOLDOWN_TICKS;
+}
+
+/**
+ * Primeiro passo do caminho mais curto até a presa mais próxima (busca em largura nas células por onde ela anda).
+ * Devolve null se ninguém está ao alcance (presas dentro do túnel, trancadas por blocos ou ninguém vulnerável).
+ */
+function huntStep(state: GameState, body: MummyBody): { dx: number; dy: number } | null {
+  const { arena } = state;
+  const mummy = state.hazards?.mummy;
+  if (!mummy) return null;
+  const targets = new Set<number>();
+  for (const p of state.players) if (isPrey(state, mummy, p)) targets.add(Math.floor(p.y) * arena.cols + Math.floor(p.x));
+  if (targets.size === 0) return null;
+  const start = body.row * arena.cols + body.col;
+  const first = new Map<number, { dx: number; dy: number }>();
+  const seen = new Set<number>([start]);
+  let queue = [start];
+  while (queue.length > 0) {
+    const next: number[] = [];
+    for (const at of queue) {
+      const col = at % arena.cols;
+      const row = Math.floor(at / arena.cols);
+      for (const [dx, dy] of DIRS) {
+        const c = col + dx;
+        const r = row + dy;
+        const index = r * arena.cols + c;
+        if (seen.has(index) || !walkable(state, c, r)) continue;
+        seen.add(index);
+        first.set(index, at === start ? { dx, dy } : first.get(at)!);
+        if (targets.has(index)) return first.get(index)!;
+        next.push(index);
+      }
+    }
+    queue = next;
+  }
+  return null;
+}
+
+/** Escolhe o próximo passo da múmia: caça a presa mais próxima (com um pouco de hesitação); sem presa ao alcance, anda ao acaso: segue em frente com mais vontade, vira de lado, e só volta atrás se não houver outro caminho. */
 function chooseStep(state: GameState, body: MummyBody): void {
   const rng = createRng(state.tick * 131 + body.col * 17 + body.row * 7 + 5);
   const options: Array<{ dx: number; dy: number; weight: number }> = [];
@@ -56,7 +99,17 @@ function chooseStep(state: GameState, body: MummyBody): void {
     const straight = dx === body.dx && dy === body.dy;
     options.push({ dx, dy, weight: straight ? 3 : back ? 0.5 : 2 });
   }
-  const pause = rng() < 0.12; // às vezes para um instante, como quem procura o caminho
+  const hunt = huntStep(state, body);
+  // Caçando ela quase não para; 8% das vezes hesita e escolhe ao acaso, para não ficar previsível demais.
+  const pause = rng() < (hunt ? 0.03 : 0.12);
+  if (hunt && !pause && rng() >= 0.08 && walkable(state, body.col + hunt.dx, body.row + hunt.dy)) {
+    body.tcol = body.col + hunt.dx;
+    body.trow = body.row + hunt.dy;
+    body.dx = hunt.dx;
+    body.dy = hunt.dy;
+    if (hunt.dx !== 0) body.facing = hunt.dx > 0 ? 1 : -1;
+    return;
+  }
   if (options.length === 0 || pause) {
     body.tcol = body.col;
     body.trow = body.row;

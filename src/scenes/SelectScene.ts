@@ -10,8 +10,11 @@ import { addCardArt } from '../render/CharacterView';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../render/layout';
 import { addMenuBackground } from '../render/menuBackground';
 import { needsTeamsScreen } from '../menu/teamsModel';
+import { bindPadHint } from '../input/padHints';
 
 const FONT = 'system-ui, "Segoe UI", Roboto, sans-serif';
+/** Ajuste do tamanho da arte na escolha (1 = padrão): Lucas -15%, Ana e Filippe -10%. */
+const CARD_ART_SCALE: Record<string, number> = { lucas: 0.85, 'ana-julia': 0.9, filippe: 0.9 };
 const CARD_W = 200;
 const CARD_H = 250;
 const GAP = 16;
@@ -66,13 +69,13 @@ export class SelectScene extends Phaser.Scene {
       const { x, y } = this.cardCenter(index);
       const hex = `#${character.color.toString(16).padStart(6, '0')}`;
       this.add.rectangle(x, y, CARD_W, CARD_H, 0x1b1f3b, 0.8).setStrokeStyle(3, 0x8d99ff);
-      addCardArt(this, character, x, y - 22, 54, 185);
+      addCardArt(this, character, x, y - 22, 54, 185 * (CARD_ART_SCALE[character.id] ?? 1));
       this.add.text(x, y + 82, character.name, { fontFamily: FONT, fontSize: '28px', fontStyle: 'bold', color: hex, stroke: '#0b0c1a', strokeThickness: 4 }).setOrigin(0.5);
     });
 
-    this.add
-      .text(SCREEN_WIDTH / 2, SCREEN_HEIGHT - 60, this.humans === 1 ? 'Setas ou W A S D mover     Espaço ou Enter confirmar     Esc voltar' : this.humans === 2 ? 'Jogador 1: W A S D + Espaço     Jogador 2: setas ou 2 4 8 6 + Enter     Esc/Backspace ou B: desfazer ou voltar' : 'Jogadores 1 e 2: teclado ou controles 1 e 2     Jogadores 3 em diante: controle de mesmo número     A confirma, B volta', { fontFamily: FONT, fontSize: '24px', color: '#ffffff' })
-      .setOrigin(0.5);
+    bindPadHint(this, this.add
+      .text(SCREEN_WIDTH / 2, SCREEN_HEIGHT - 60, '', { fontFamily: FONT, fontSize: '24px', color: '#ffffff' })
+      .setOrigin(0.5), (this.humans === 1 ? 'Setas ou W A S D mover     Espaço ou Enter confirmar     Esc voltar' : this.humans === 2 ? 'Jogador 1: W A S D + Espaço     Jogador 2: setas ou 2 4 8 6 + Enter     Esc/Backspace ou B: desfazer ou voltar' : 'Jogadores 1 e 2: teclado ou controles 1 e 2     Jogadores 3 em diante: controle de mesmo número     A confirma, B volta'), 'Direcional ou alavanca mover     A confirmar     B voltar');
 
     this.bindKeys();
     this.padNav = new PadNav(this);

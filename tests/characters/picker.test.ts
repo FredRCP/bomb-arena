@@ -11,7 +11,7 @@ describe('personagens', () => {
   });
 
   it('a família está na lista', () => {
-    const custom = CHARACTERS.filter((c) => c.custom).map((c) => c.name);
+    const custom = CHARACTERS.filter((c) => c.sprites).map((c) => c.name);
     expect(custom).toEqual(['Fred', 'Van', 'Ana', 'Lucas', 'Filippe', 'Wal', 'Glauceste']);
   });
 

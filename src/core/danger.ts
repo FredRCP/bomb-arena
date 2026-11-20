@@ -88,6 +88,20 @@ export function buildHazards(state: GameState, extraBomb?: BombState, selfId?: P
     for (const center of boulder.cols) for (let col = center - 1; col <= center + 1; col++) for (let row = 1; row < arena.rows - 1; row++) if (getCell(arena, col, row) !== 'wall') windows[cellIndex(arena, col, row)]!.push([from, to]);
   }
 
+  // Múmia: ela caça, então a IA trata a célula dela, a do próximo passo e as vizinhas como perigosas por um instante e se afasta.
+  const mummyBody = state.hazards?.mummy?.mummy;
+  if (mummyBody) {
+    const spots = [[mummyBody.col, mummyBody.row], [mummyBody.tcol, mummyBody.trow]] as const;
+    for (const [mc, mr] of spots) {
+      for (const [dc, dr] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        const col = mc + dc;
+        const row = mr + dr;
+        if (col < 0 || row < 0 || col >= arena.cols || row >= arena.rows || getCell(arena, col, row) === 'wall') continue;
+        windows[cellIndex(arena, col, row)]!.push([0, 40]);
+      }
+    }
+  }
+
   // Vulcão: a célula onde a bola vai cair é perigosa no instante da queda; a lava que vai escorrer logo também.
   const volcano = state.hazards?.volcano;
   if (volcano) for (const shot of volcano.shots) windows[cellIndex(arena, shot.col, shot.row)]!.push([Math.max(0, shot.ticks - 6), shot.ticks + 12]);

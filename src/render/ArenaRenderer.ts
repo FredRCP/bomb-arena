@@ -53,7 +53,7 @@ function addWallImage(scene: Phaser.Scene, theme: ThemeDef, col: number, row: nu
 
 /** Onde fica o busto da esfinge (Egito): centro, base e largura, em pixels da arena. Usado também pelo brilho dos olhos. */
 export function sphinxBustBox(cols: number): { cx: number; bottom: number; width: number } {
-  return { cx: (Math.floor(cols / 2) + 0.5) * TILE_SIZE, bottom: TILE_SIZE - 1, width: 84 };
+  return { cx: (Math.floor(cols / 2) + 0.5) * TILE_SIZE, bottom: TILE_SIZE - 1, width: 71 };
 }
 
 /**
@@ -160,7 +160,7 @@ export function drawArena(scene: Phaser.Scene, arena: Arena, themeId = 'classic'
     }
   }
 
-  if (hazards && theme.quicksand && has(scene, theme, 'quicksand')) {
+  if (hazards && theme.quicksand && has(scene, theme, 'quicksand') && !has(scene, theme, 'quicksand1')) {
     for (const index of hazards.quicksand) {
       const col = index % arena.cols;
       const row = Math.floor(index / arena.cols);
@@ -232,8 +232,7 @@ export function createBlocksView(scene: Phaser.Scene, arena: Arena, themeId = 'c
 }
 
 /** Atualiza os blocos: desenha os que ainda existem no estado do core e tira os que sumiram. */
-export function redrawBlocks(view: BlocksView, arena: Arena, chocolate: readonly number[] = []): void {
-  const choc = new Set(chocolate);
+export function redrawBlocks(view: BlocksView, arena: Arena): void {
   view.g.clear();
   for (let row = 0; row < arena.rows; row++) {
     for (let col = 0; col < arena.cols; col++) {
@@ -251,12 +250,10 @@ export function redrawBlocks(view: BlocksView, arena: Arena, chocolate: readonly
           const variant = 1 + ((col * 7 + row * 13) % view.variants);
           const made = view.scene.add.image((col + 0.5) * TILE_SIZE, (row + 1) * TILE_SIZE - 1, themeKey(view.theme, `block${variant}`)).setOrigin(0.5, 1).setDepth(1);
           made.setScale(view.theme.blockWidth / made.width);
-          if (choc.has(index)) made.setTint(0x8a4b25); // bloco de chocolate do Cacau
           view.images.set(index, made);
         }
       } else {
         drawBlock(view.g, col * TILE_SIZE, row * TILE_SIZE);
-        if (choc.has(index)) view.g.fillStyle(0x5a2e12, 0.7).fillRect(col * TILE_SIZE, row * TILE_SIZE, TILE_SIZE, TILE_SIZE);
       }
     }
   }
@@ -460,6 +457,9 @@ export function createEffectsView(scene: Phaser.Scene): Graphics {
   return g;
 }
 
+/** Raio da bomba em pixels (a casa tem 64): 20 deixa a bomba com cerca de 70% da casa, sobrando espaço ao redor do boneco. */
+const BOMB_RADIUS = 20;
+
 function drawBomb(g: Graphics, bomb: BombState, tick: number, offset: { x: number; y: number } = { x: 0, y: 0 }, mine = false, lift = 0): void {
   const cx = (bomb.col + 0.5 + offset.x) * TILE_SIZE;
   const groundY = (bomb.row + 0.5 + offset.y) * TILE_SIZE;
@@ -469,7 +469,7 @@ function drawBomb(g: Graphics, bomb: BombState, tick: number, offset: { x: numbe
   const frozen = (bomb.frozenTicks ?? 0) > 0;
   const urgency = bomb.ticksLeft < 60 ? 3 : 1;
   const pulse = frozen ? 1 : 1 + 0.07 * Math.sin((tick / 7) * urgency);
-  const r = 22 * pulse;
+  const r = BOMB_RADIUS * pulse;
 
   // A sombra fica no chão e encolhe com a altura do arco.
   g.fillStyle(COLORS.shadow, 0.25 * (1 - Math.min(0.6, lift / 2)));
@@ -687,7 +687,10 @@ export function drawEffects(g: Graphics, state: GameState, spriteFlames = false)
 }
 
 /** Qualquer coisa que se move e se esconde (o desenho do jogador é um Container). */
-type Movable = { setPosition(x: number, y: number): unknown; setVisible(value: boolean): unknown; setAlpha(value: number): unknown };
+type Movable = { setPosition(x: number, y: number): unknown; setVisible(value: boolean): unknown; setAlpha(value: number): unknown; setScale?(x: number, y?: number): unknown; setAngle?(degrees: number): unknown };
+
+/** Onde cada desenho estava no passo anterior (para saber se o personagem sem corpo inteiro está andando). */
+const lastSeen = new WeakMap<object, { x: number; y: number }>();
 
 /** Posiciona o desenho do jogador conforme o estado do core (que usa unidades de célula). */
 export function syncPlayerView(view: Movable, player: PlayerState, arena?: Arena, tick = 0, celebrate = false): void {
@@ -708,10 +711,49 @@ export function syncPlayerView(view: Movable, player: PlayerState, arena?: Arena
     view.setAlpha(playerAlpha(player, tick));
     return;
   }
+  // Personagem de uma imagem só (Pipoca, Bolt, Tique...): sem poses de corpo inteiro, então andando ele quica, achata e balança
+  // de leve (a imagem é a mesma para todas as direções); parado, volta ao normal.
+  const before = lastSeen.get(view);
+  const moving = !!before && (Math.abs(before.x - player.x) > 0.002 || Math.abs(before.y - player.y) > 0.002);
+  lastSeen.set(view, { x: player.x, y: player.y });
+  if (moving && player.alive) {
+    const wave = Math.sin(tick * 0.45);
+    view.setPosition(player.x * TILE_SIZE, player.y * TILE_SIZE - Math.abs(wave) * 5);
+    view.setScale?.(1 - 0.05 * Math.abs(wave), 1 + 0.07 * Math.abs(wave));
+    view.setAngle?.(wave * 5);
+  } else {
+    view.setScale?.(1, 1);
+    view.setAngle?.(0);
+  }
   // Quem foi atingido some; o resultado da rodada aparece pela tela de resultado.
   view.setVisible(player.alive);
   // Fantasma (atravessando blocos): meio transparente. Recém-voltado à arena (proteção): pisca.
   view.setAlpha(playerAlpha(player, tick));
+}
+
+/**
+ * Túnel (pirâmide e templo da ilha): a imagem do prédio fica acima dos jogadores, então quem entra sumiria já na porta.
+ * Aqui o jogador passa para cima da imagem e vai ficando transparente conforme se afasta da porta rumo ao centro:
+ * na porta ainda aparece inteiro, no meio do túnel desaparece.
+ */
+export function fadeInTunnel(view: { alpha: number; setAlpha(v: number): unknown; setDepth(v: number): unknown }, player: PlayerState, arena: Arena, tunnel: number[] | undefined): void {
+  const cell = Math.floor(player.y) * arena.cols + Math.floor(player.x);
+  if (!tunnel || !tunnel.includes(cell)) {
+    view.setDepth(10);
+    return;
+  }
+  let cx = 0;
+  let cy = 0;
+  for (const i of tunnel) {
+    cx += (i % arena.cols) + 0.5;
+    cy += Math.floor(i / arena.cols) + 0.5;
+  }
+  cx /= tunnel.length;
+  cy /= tunnel.length;
+  const d = Math.max(Math.abs(player.x - cx), Math.abs(player.y - cy));
+  const k = Math.min(1, Math.max(0, (d - 0.2) / 0.8));
+  view.setDepth(10.6);
+  view.setAlpha(view.alpha * k);
 }
 
 /** Transparência do jogador: invisível (Violeta) quase some; escudo pisca; fantasma fica meio transparente. */

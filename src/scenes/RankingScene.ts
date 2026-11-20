@@ -10,6 +10,7 @@ import { TILE_SIZE } from '../render/ArenaRenderer';
 import { placeArena } from '../render/layout';
 import { addMenuBackground, addPanel } from '../render/menuBackground';
 import type { AiDifficulty } from '../config/ai';
+import { bindPadHint } from '../input/padHints';
 
 const FONT = 'system-ui, "Segoe UI", Roboto, sans-serif';
 const WIDTH = ARENA_COLS * TILE_SIZE;
@@ -48,7 +49,7 @@ export class RankingScene extends Phaser.Scene {
       this.add.text(600, y, `${level} · ${entry.date}`, { ...style, fontSize: '20px', fontStyle: 'normal', color: '#e3e7ff' }).setOrigin(0, 0.5);
     });
 
-    this.add.text(WIDTH / 2, HEIGHT - 48, 'Qualquer tecla volta ao menu', { fontFamily: FONT, fontSize: '24px', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 4 }).setOrigin(0.5);
+    bindPadHint(this, this.add.text(WIDTH / 2, HEIGHT - 48, '', { fontFamily: FONT, fontSize: '24px', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 4 }).setOrigin(0.5), 'Qualquer tecla volta ao menu', 'Qualquer botão volta ao menu');
 
     this.padNav = new PadNav(this);
     // Um pequeno atraso evita que o Enter que abriu esta tela já a feche.

@@ -29,6 +29,8 @@ export class HazardsView {
   private readonly holes: Array<{ image: Phaser.GameObjects.Image; row: number; left: boolean }> = [];
   /** Poeira de neve atrás de cada pinguim. */
   private readonly dustImages = new Map<number, Phaser.GameObjects.Image>();
+  /** Imagens da areia movediça (uma por célula). */
+  private readonly sandImages = new Map<number, Phaser.GameObjects.Image>();
 
   constructor(private readonly scene: Phaser.Scene, state: GameState) {
     this.g = scene.add.graphics().setDepth(9);
@@ -438,6 +440,20 @@ export class HazardsView {
     if (!cells || cells.length === 0) return;
     const cols = state.arena.cols;
     const t = state.tick;
+    // Com a arte (3 quadros: calma, girando, afundando): cada célula alterna 1-2-3-2, defasada da vizinha.
+    const egypt = themeById('egypt');
+    if (this.scene.textures.exists(themeKey(egypt, 'quicksand1')) && this.scene.textures.exists(themeKey(egypt, 'quicksand3'))) {
+      const seq = [1, 2, 3, 2];
+      for (const index of cells) {
+        let image = this.sandImages.get(index);
+        if (!image) {
+          image = this.scene.add.image(((index % cols) + 0.5) * TILE_SIZE, (Math.floor(index / cols) + 0.5) * TILE_SIZE, themeKey(egypt, 'quicksand1')).setDisplaySize(TILE_SIZE, TILE_SIZE).setDepth(0.5);
+          this.sandImages.set(index, image);
+        }
+        image.setTexture(themeKey(egypt, `quicksand${seq[(Math.floor(t / 20) + index) % 4]}`));
+      }
+      return;
+    }
     for (const index of cells) {
       const cx = ((index % cols) + 0.5) * TILE_SIZE;
       const cy = (Math.floor(index / cols) + 0.5) * TILE_SIZE;

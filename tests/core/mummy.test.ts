@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { MUMMY_COOLDOWN_TICKS, MUMMY_FIRST_TICKS, MUMMY_OPEN_TICKS, MUMMY_RESPAWN_TICKS, MUMMY_SPEED, MUMMY_WARN_TICKS, MUMMY_WRAP_TICKS } from '../../src/config/hazards';
 import { stageById } from '../../src/config/stages';
 import { createGameState, drainEvents, getCell, step, updateMummy } from '../../src/core';
+import { buildHazards, hasHazard } from '../../src/core/danger';
 import type { GameEvent, GameState } from '../../src/core';
 
 const egypt = stageById('egypt');
@@ -189,5 +190,39 @@ describe('Egito: a múmia', () => {
     updateMummy(state, 1);
     expect(state.hazards!.mummy!.coffin).toBeNull();
     expect(state.hazards!.mummy!.timer).toBe(1);
+  });
+
+  it('a múmia caça: depois de andar um tempo, está mais perto do jogador do que no começo', () => {
+    const state = withMummy(5);
+    // Abre o caminho: sem blocos destrutíveis, toda célula livre se alcança.
+    state.arena.cells = state.arena.cells.map((c) => (c === 'block' ? 'empty' : c));
+    const body = state.hazards!.mummy!.mummy!;
+    const prey = state.players[0]!;
+    state.players[1]!.alive = false;
+    const dist = () => Math.abs(prey.x - body.x) + Math.abs(prey.y - body.y);
+    const before = dist();
+    for (let i = 0; i < 20 * 60 && !prey.frozenTicks; i++) {
+      updateMummy(state, 1);
+      state.tick += 1;
+    }
+    expect(prey.frozenTicks || dist() < before).toBeTruthy();
+  });
+
+  it('não caça quem tem escudo (anda ao acaso) e sempre fica em células livres', () => {
+    const state = withMummy(5);
+    const body = state.hazards!.mummy!.mummy!;
+    for (const p of state.players) p.shieldTicks = 99999;
+    for (let i = 0; i < 600; i++) {
+      updateMummy(state, 1);
+      state.tick += 1;
+      expect(getCell(state.arena, body.col, body.row)).toBe('empty');
+    }
+  });
+
+  it('a IA trata a múmia como perigo: a célula dela e as vizinhas ficam marcadas', () => {
+    const state = withMummy(5);
+    const body = state.hazards!.mummy!.mummy!;
+    const hazards = buildHazards(state);
+    expect(hasHazard(hazards, body.row * state.arena.cols + body.col)).toBe(true);
   });
 });

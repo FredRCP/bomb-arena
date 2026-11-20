@@ -11,6 +11,7 @@ import { addCharacter } from '../render/CharacterView';
 import { TILE_SIZE } from '../render/ArenaRenderer';
 import { placeArena } from '../render/layout';
 import { addMenuBackground, addPanel } from '../render/menuBackground';
+import { bindPadHint } from '../input/padHints';
 
 const FONT = 'system-ui, "Segoe UI", Roboto, sans-serif';
 const WIDTH = ARENA_COLS * TILE_SIZE;
@@ -111,7 +112,7 @@ export class PodiumScene extends Phaser.Scene {
       const name = characterById(characters[entry.id]).name;
       this.add.text(WIDTH / 2, 692 + i * 26, `${i + 4}º  ${name} · ${entry.points} pts`, { fontFamily: FONT, fontSize: '22px', color: '#e3e7ff' }).setOrigin(0.5).setDepth(3);
     });
-    this.add.text(WIDTH / 2, HEIGHT - 26, 'Enter: jogar de novo   ·   Esc: menu', { fontFamily: FONT, fontSize: '24px', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 4 }).setOrigin(0.5).setDepth(3);
+    bindPadHint(this, this.add.text(WIDTH / 2, HEIGHT - 26, '', { fontFamily: FONT, fontSize: '24px', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 4 }).setOrigin(0.5).setDepth(3), 'Enter: jogar de novo   ·   Esc: menu', 'A: jogar de novo   ·   B: menu');
 
     this.confetti();
     music.fadeOut(300);

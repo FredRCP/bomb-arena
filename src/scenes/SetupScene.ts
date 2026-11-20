@@ -15,6 +15,7 @@ import { TILE_SIZE } from '../render/ArenaRenderer';
 import { placeArena } from '../render/layout';
 import { addMenuBackground, addPanel, drawPill } from '../render/menuBackground';
 import type { GameSession } from './GameScene';
+import { bindPadHint } from '../input/padHints';
 
 const FONT = 'system-ui, "Segoe UI", Roboto, sans-serif';
 const WIDTH = ARENA_COLS * TILE_SIZE;
@@ -79,9 +80,9 @@ export class SetupScene extends Phaser.Scene {
     const step = stepNumber(this.menu.screen, this.menu.settings);
     const total = this.session ? totalSteps({ ...this.menu.settings, players: this.session.config.players, enemies: this.session.config.enemies }) : totalSteps(this.menu.settings);
     if (step) this.add.text(WIDTH / 2, 160, `Passo ${step} de ${total}`, { fontFamily: FONT, fontSize: '24px', color: '#e3e7ff' }).setOrigin(0.5);
-    this.add
-      .text(WIDTH / 2, HEIGHT - 50, this.menu.screen === 'stage' ? '← → trocar de fase     Enter jogar     Esc voltar     (ou use o controle)' : '↑ ↓ escolher     ← → mudar     Enter continuar     Esc voltar     (ou use o controle)', { fontFamily: FONT, fontSize: '20px', color: '#dfe4ff', stroke: '#1b1f3b', strokeThickness: 3 })
-      .setOrigin(0.5);
+    bindPadHint(this, this.add
+      .text(WIDTH / 2, HEIGHT - 50, '', { fontFamily: FONT, fontSize: '20px', color: '#dfe4ff', stroke: '#1b1f3b', strokeThickness: 3 })
+      .setOrigin(0.5), (this.menu.screen === 'stage' ? '← → trocar de fase     Enter jogar     Esc voltar' : '↑ ↓ escolher     ← → mudar     Enter continuar     Esc voltar'), (this.menu.screen === 'stage' ? '◀ ▶ trocar de fase     A jogar     B voltar' : '↑ ↓ escolher     ◀ ▶ mudar     A continuar     B voltar'));
 
     this.bindKeys();
     this.padNav = new PadNav(this);

@@ -11,6 +11,7 @@ import { addCharacter } from '../render/CharacterView';
 import { SCREEN_HEIGHT, SCREEN_WIDTH } from '../render/layout';
 import { addMenuBackground } from '../render/menuBackground';
 import type { GameSession } from './GameScene';
+import { bindPadHint } from '../input/padHints';
 
 const FONT = 'system-ui, "Segoe UI", Roboto, sans-serif';
 const COLUMN_W = 440;
@@ -73,9 +74,9 @@ export class TeamsScene extends Phaser.Scene {
       .text(SCREEN_WIDTH / 2, SCREEN_HEIGHT - 138, 'Quem fica no meio joga por conta própria.', { fontFamily: FONT, fontSize: '24px', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 4 })
       .setOrigin(0.5);
     this.warning = this.add.text(SCREEN_WIDTH / 2, SCREEN_HEIGHT - 102, '', { fontFamily: FONT, fontSize: '26px', fontStyle: 'bold', color: '#ffe66d', stroke: '#1b1f3b', strokeThickness: 4 }).setOrigin(0.5);
-    this.add
+    bindPadHint(this, this.add
       .text(SCREEN_WIDTH / 2, SCREEN_HEIGHT - 60, '↑ ↓ escolher jogador     ← → mandar para o time     Enter continuar     Esc voltar     (ou use o controle)', { fontFamily: FONT, fontSize: '24px', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 4 })
-      .setOrigin(0.5);
+      .setOrigin(0.5), '↑ ↓ escolher jogador     ← → mandar para o time     Enter continuar     Esc voltar', '↑ ↓ escolher jogador     ◀ ▶ mandar para o time     A continuar     B voltar');
 
     this.bindKeys();
     this.padNav = new PadNav(this);

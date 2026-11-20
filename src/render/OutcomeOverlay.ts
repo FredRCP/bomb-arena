@@ -65,7 +65,7 @@ export function showOutcomeOverlay(
     objects.push(scene.add.text(cx, rowY, content, { fontFamily: FONT, fontSize: '22px', fontStyle: 'bold', color: '#e3e7ff' }).setOrigin(0.5).setDepth(101));
   });
   y += linesH;
-  const hint = text.hint ?? 'Pressione R para jogar de novo';
+  const hint = text.hint ?? (scene.input.gamepad?.total ?? 0) > 0 ? 'Start: jogar de novo' : 'Pressione R para jogar de novo';
   g.fillStyle(0xffe66d, 1).fillRoundedRect(cx - 270, y + 16, 540, 50, 25);
   objects.push(scene.add.text(cx, y + 41, hint, { fontFamily: FONT, fontSize: '24px', fontStyle: 'bold', color: '#1b1f3b' }).setOrigin(0.5).setDepth(101));
   for (const object of objects) (object as Phaser.GameObjects.GameObject & { setAlpha?: (a: number) => unknown }).setAlpha?.(0);

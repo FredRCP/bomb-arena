@@ -1,11 +1,10 @@
-import { AIRPLANE_BOMBS, AIRPLANE_DROP_TICKS, AIRPLANE_END_SCALE, AIRPLANE_ENTRY_TICKS, AIRPLANE_FIRST_DROP, AIRPLANE_LAPS, AIRPLANE_LAP_TICKS, CONFUSE_POWER_TICKS, CHOCOLATE_BLOCKS, FOG_POWER_TICKS, GHOST_HALO_RADIUS, GHOST_HALO_TICKS, FREEZE_PLAYER_TICKS, STORK_SHIELD_TICKS, CHOCOLATE_EXTRA_BOMBS, INVISIBLE_POWER_TICKS, JUMP_CELLS, SLIME_CELLS, SLIME_TICKS, SPRINT_POWER_TICKS, TWIN_BOMB_RANGE, ELEPHANT_MAX_BLOCKS, ELEPHANT_SPEED, POWER_CHARGE_TICKS, SHIELD_POWER_TICKS, STORK_FAR_ITEMS, STORK_ITEMS, STORK_RADIUS, FREEZE_POWER_TICKS, GHOST_POWER_TICKS } from '../config/powers';
+import { AIRPLANE_BOMBS, AIRPLANE_DROP_TICKS, AIRPLANE_END_SCALE, AIRPLANE_ENTRY_TICKS, AIRPLANE_FIRST_DROP, AIRPLANE_LAPS, AIRPLANE_LAP_TICKS, CONFUSE_POWER_TICKS, FOG_POWER_TICKS, GHOST_HALO_RADIUS, GHOST_HALO_TICKS, FREEZE_PLAYER_TICKS, STORK_SHIELD_TICKS, INVISIBLE_POWER_TICKS, JUMP_CELLS, SLIME_CELLS, SLIME_TICKS, SPRINT_POWER_TICKS, TWIN_BOMB_RANGE, ELEPHANT_MAX_BLOCKS, ELEPHANT_SPEED, POWER_CHARGE_TICKS, SHIELD_POWER_TICKS, STORK_FAR_ITEMS, STORK_ITEMS, STORK_RADIUS, FREEZE_POWER_TICKS, GHOST_POWER_TICKS } from '../config/powers';
 import { BOMB_FUSE_TICKS } from '../config/bombs';
-import { MAX_BOMBS_CAP } from '../config/items';
 import { cellIndex, getCell, isTunnel } from './arena';
 import { dropBomb } from './bombs';
-import { bodyOverlapsCell, collidesAt } from './movement';
+import { collidesAt } from './movement';
 import { createRng } from './random';
-import { freeItemCells, revealItem } from './items';
+import { applyItem, freeItemCells, revealItem } from './items';
 import type { Direction, GameState, PlayerState, PowerKind } from './types';
 
 // Superpoderes. Cada jogador pode ter um poder (veja `givePower`) que carrega sozinho em POWER_CHARGE_TICKS e é
@@ -14,7 +13,7 @@ import type { Direction, GameState, PlayerState, PowerKind } from './types';
 // - shield (Fred): teletransporta para uma célula livre sorteada e fica invencível 10 s. freeze (Van): congela os outros jogadores por 5 s e as bombas deles por 10 s. stork (Wal): solta 4 itens bons (3 perto, 1 longe) e dá escudo de 5 s.
 //   confuse (Glauceste): todos os outros ficam com os controles invertidos por 10 s. ghost (Filippe): atravessa blocos por 10 s e cria um halo de 3 células de raio onde ninguém entra.
 // - pipoca: atira 4 bombas, uma em cada direção, a 4 células; bolt: velocidade máxima 10 s; musgo: gosma em 3 células em cada direção; violeta: invisível 10 s;
-//   fagulha: 2 bombas que varrem a linha e a coluna inteiras (imune); nimbo: neblina 10 s; cacau: 3 blocos de chocolate à frente e +2 bombas.
+//   fagulha: 2 bombas que varrem a linha e a coluna inteiras (imune); nimbo: neblina 10 s; tique: ímã que puxa todos os itens bons da arena e faz sumir os ruins.
 // - elephant (Ana): um elefantinho sai correndo na direção para onde o jogador olha, em linha reta, e quebra todos os
 //   blocos da fileira inteira (os itens escondidos aparecem) e empurra quem estiver no caminho. Ele não machuca ninguém e para ao bater numa parede.
 
@@ -178,21 +177,15 @@ function usePersonalPower(state: GameState, player: PlayerState, kind: Exclude<P
     player.heroTicks = Math.max(player.heroTicks, BOMB_FUSE_TICKS + 90); // ela é imune às chamas até as bombas passarem
   } else if (kind === 'fog') {
     state.fog = { ticks: FOG_POWER_TICKS, owner: player.id };
-  } else if (kind === 'chocolate') {
-    const { dx, dy } = VECTORS[player.facing];
-    player.maxBombs = Math.min(MAX_BOMBS_CAP, player.maxBombs + CHOCOLATE_EXTRA_BOMBS);
-    const choc = (state.chocolate ??= []);
-    for (let k = 1; k <= CHOCOLATE_BLOCKS; k++) {
-      const col = Math.floor(player.x) + dx * k;
-      const row = Math.floor(player.y) + dy * k;
-      if (getCell(arena, col, row) !== 'empty') break;
-      if (isTunnel(state.hazards?.tunnel, arena, col, row) || state.bombs.some((b) => b.col === col && b.row === row)) break;
-      if (state.players.some((p) => p.alive && bodyOverlapsCell(p.x, p.y, col, row))) break;
-      arena.cells[cellIndex(arena, col, row)] = 'block';
-      state.items = state.items.filter((item) => !(item.col === col && item.row === row));
-      choc.push(cellIndex(arena, col, row));
-      state.events.push({ type: 'blockGrown', col, row });
+  } else if (kind === 'magnet') {
+    // Ímã: os itens bons de toda a arena vão para ela na hora; os ruins somem.
+    for (const item of [...state.items]) {
+      if (item.kind === 'invert' || item.kind === 'slow') continue;
+      state.items.splice(state.items.indexOf(item), 1);
+      const changed = applyItem(player, item.kind);
+      state.events.push({ type: 'itemPicked', playerId: player.id, kind: item.kind, col: item.col, row: item.row, changed });
     }
+    state.items = state.items.filter((item) => item.kind !== 'invert' && item.kind !== 'slow');
   } else if (kind === 'confuse') {
     for (const other of state.players) if (other.alive && other.id !== player.id) other.invertTicks = Math.max(other.invertTicks, CONFUSE_POWER_TICKS);
   } else if (kind === 'freeze') {
@@ -332,7 +325,6 @@ function pushPlayersAhead(state: GameState, elephant: { x: number; y: number; di
 
 /** Gosma (quem pisa, menos o dono, fica lento) e neblina: contam o tempo. */
 function updateSlimeAndFog(state: GameState): void {
-  if (state.chocolate && state.chocolate.length > 0) state.chocolate = state.chocolate.filter((index) => state.arena.cells[index] === 'block');
   if (state.round.phase !== 'playing') return;
   const slime = state.slime;
   if (slime && slime.length > 0) {
@@ -430,8 +422,8 @@ export function aiShouldUsePower(state: GameState, player: PlayerState): boolean
       return enemies.some((p) => Math.abs(p.x - player.x) + Math.abs(p.y - player.y) <= 5);
     case 'fog':
       return enemies.some((p) => Math.abs(p.x - player.x) + Math.abs(p.y - player.y) <= 8);
-    case 'chocolate':
-      return danger;
+    case 'magnet':
+      return state.items.some((item) => item.kind !== 'invert' && item.kind !== 'slow');
     case 'freeze':
       return state.bombs.some((b) => b.owner !== player.id && !(b.frozenTicks && b.frozenTicks > 0)) || enemies.some((p) => Math.abs(p.x - player.x) + Math.abs(p.y - player.y) <= 4);
     default:

@@ -132,16 +132,15 @@ describe('Poderes: carga e personagens', () => {
     expect(state.fog).toBeUndefined();
   });
 
-  it('Cacau: põe 3 blocos de chocolate na frente, parando no que estiver no caminho', () => {
-    const { state, me } = setup('chocolate');
+  it('Tique: o ímã puxa os itens bons da arena e faz sumir os ruins', () => {
+    const { state, me } = setup('magnet');
+    state.items = [{ col: 7, row: 5, kind: 'range' }, { col: 9, row: 3, kind: 'bomb' }, { col: 3, row: 7, kind: 'invert' }];
+    const range = me.bombRange;
+    const bombs = me.maxBombs;
     use(state, me);
-    for (const col of [4, 5, 6]) expect(getCell(state.arena, col, 1)).toBe('block');
-    expect(state.chocolate).toHaveLength(3);
-    const t = setup('chocolate');
-    t.state.bombs.push({ owner: 2, col: 5, row: 1, ticksLeft: 5000, range: 1, walkThrough: [] });
-    use(t.state, t.me);
-    expect(getCell(t.state.arena, 4, 1)).toBe('block');
-    expect(getCell(t.state.arena, 5, 1)).toBe('empty');
+    expect(state.items).toHaveLength(0);
+    expect(me.bombRange).toBe(range + 1);
+    expect(me.maxBombs).toBe(bombs + 1);
   });
 });
 
@@ -225,14 +224,6 @@ describe('Poderes reformulados (lote 54)', () => {
     expect(state.items.length).toBe(4);
     expect(me.shieldTicks).toBeGreaterThan(5 * 60 - 5);
     expect(me.shieldTicks).toBeLessThanOrEqual(5 * 60);
-  });
-
-  it('Cacau: ganha +2 bombas e ainda constrói os blocos', () => {
-    const { state, me } = setup('chocolate');
-    const before = me.maxBombs;
-    use(state, me);
-    expect(me.maxBombs).toBe(before + 2);
-    expect(state.chocolate).toHaveLength(3);
   });
 
   it('Ana: o elefante quebra a fileira inteira e empurra quem está no caminho', () => {

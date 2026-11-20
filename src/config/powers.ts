@@ -56,9 +56,7 @@ export const INVISIBLE_POWER_TICKS = 10 * 60;
 export const TWIN_BOMB_RANGE = 99;
 /** Nimbo: neblina por 10 s (ele enxerga em volta de si). */
 export const FOG_POWER_TICKS = 10 * 60;
-/** Cacau: 3 blocos de chocolate na frente e +2 bombas simultâneas. */
-export const CHOCOLATE_BLOCKS = 3;
-export const CHOCOLATE_EXTRA_BOMBS = 2;
+/** Tique (o robozinho): o ímã puxa para ele todos os itens bons da arena e faz sumir os itens ruins. */
 
 /** Nome do poder, mostrado em cima do jogador quando ele o usa. */
 export const POWER_LABELS = {
@@ -75,5 +73,5 @@ export const POWER_LABELS = {
   invisible: 'INVISÍVEL!',
   twinbombs: 'DUAS BOMBAS!',
   fog: 'NEBLINA!',
-  chocolate: 'CHOCOLATE!',
+  magnet: 'ÍMÃ!',
 } as const;

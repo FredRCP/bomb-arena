@@ -118,10 +118,16 @@ export function preloadThemes(scene: Phaser.Scene): void {
     if (theme.sphinx) add('sphinx', 'sphinx_bust.png'); // busto da esfinge (sobre o bloco do meio da borda de cima)
     if (theme.mummy) {
       for (let i = 1; i <= 6; i++) add(`mummyWalk${i}`, `mummy_walk${i}.png`);
+      for (let i = 1; i <= 6; i++) {
+        add(`mummyFront${i}`, `mummy_front${i}.png`);
+        add(`mummyBack${i}`, `mummy_back${i}.png`);
+      }
       for (let i = 1; i <= 3; i++) add(`mummyAtk${i}`, `mummy_atk${i}.png`);
       for (let i = 1; i <= 4; i++) add(`mummyDie${i}`, `mummy_die${i}.png`);
       for (let i = 1; i <= 3; i++) add(`coffin${i}`, `coffin${i}.png`);
     }
+    if (theme.mummy) for (let i = 1; i <= 2; i++) add(`cocoon${i}`, `cocoon${i}.png`); // casulos que prendem o jogador
+    if (theme.braziers) for (let i = 1; i <= 3; i++) add(`brazier${i}`, `brazier${i}.png`);
     if (theme.scrolls) add('scroll', 'scroll.png');
     if (theme.island) {
       add('island', 'island.png');
@@ -134,7 +140,10 @@ export function preloadThemes(scene: Phaser.Scene): void {
     }
     if (theme.floorFull) add('floorFull', 'floor.jpg');
     if (theme.columns) add('column', 'column.png');
-    if (theme.quicksand) add('quicksand', 'quicksand.png');
+    if (theme.quicksand) {
+      add('quicksand', 'quicksand.png');
+      for (let i = 1; i <= 3; i++) add(`quicksand${i}`, `quicksand${i}.png`); // calma, girando, afundando
+    }
     if (theme.frameImages) {
       add('frame15', 'frame15.png');
       add('frame19', 'frame19.png');

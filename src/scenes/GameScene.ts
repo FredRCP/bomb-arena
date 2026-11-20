@@ -35,6 +35,7 @@ import {
   drawItems,
   redrawBlocks,
   syncPlayerView,
+  fadeInTunnel,
 } from '../render/ArenaRenderer';
 import { spriteDebug, triggerBombPose } from '../render/CharacterView';
 import { Effects } from '../render/Effects';
@@ -60,11 +61,13 @@ import { POWER_LABELS } from '../config/powers';
 import { addMenuBackground } from '../render/menuBackground';
 import { has, themeById, themeKey } from '../render/theme';
 import type { Hud } from '../render/Hud';
+import { IceBlockView } from '../render/IceBlockView';
 import { showOutcomeOverlay } from '../render/OutcomeOverlay';
 import { describeRoundEnd, rankingLines, setCpuNames } from '../render/outcomeText';
 import { addToRanking, rankingPosition } from '../menu/ranking';
 import { loadRanking, saveRanking } from '../menu/rankingStorage';
 import type { RankedPlayer } from '../core';
+import { padConnected, pickHint } from '../input/padHints';
 
 
 /** Volume da música durante a contagem regressiva (1 = normal). */
@@ -109,6 +112,7 @@ export class GameScene extends Phaser.Scene {
   private hazardsView!: HazardsView;
   private mummyView: MummyView | null = null;
   private braziersView: BraziersView | null = null;
+  private iceBlockView: IceBlockView | null = null;
   private elephantView!: ElephantView;
   private haloView!: HaloView;
   private trafficView!: TrafficView;
@@ -251,8 +255,9 @@ export class GameScene extends Phaser.Scene {
     this.itemSprites = new ItemSprites(this);
     this.closedView = createClosedView(this, theme.id);
     this.hazardsView = new HazardsView(this, this.gameState);
+    this.iceBlockView = new IceBlockView(this);
     this.mummyView = this.gameState.hazards?.mummy ? new MummyView(this, this.gameState) : null;
-    this.braziersView = theme.braziers ? new BraziersView(this, this.gameState.arena) : null;
+    this.braziersView = theme.braziers ? new BraziersView(this, this.gameState.arena, theme) : null;
     this.elephantView = new ElephantView(this);
     this.haloView = new HaloView(this);
     this.trafficView = new TrafficView(this, this.gameState);
@@ -494,7 +499,7 @@ export class GameScene extends Phaser.Scene {
       panel,
       this.pauseGfx,
       this.add.text(cx, top + 48, 'Pausado', { fontFamily: font, fontSize: '50px', fontStyle: 'bold', color: '#ffffff' }).setOrigin(0.5).setDepth(101),
-      this.add.text(cx, top + panelH - 30, '↑↓ escolher    ←→ ajustar    Enter ok    Esc continuar', { fontFamily: font, fontSize: '18px', color: '#9aa3d8' }).setOrigin(0.5).setDepth(101),
+      this.add.text(cx, top + panelH - 30, pickHint(this, '↑↓ escolher    ←→ ajustar    Enter ok    Esc continuar', '↑↓ escolher    ◀ ▶ ajustar    A ok    Start continuar'), { fontFamily: font, fontSize: '18px', color: '#9aa3d8' }).setOrigin(0.5).setDepth(101),
     ];
     this.pauseRow = 0;
     this.pauseTexts = GameScene.PAUSE_ITEMS.map((id, index) => {
@@ -686,7 +691,7 @@ export class GameScene extends Phaser.Scene {
     this.extraHazards.onEvents(events);
     this.fx.onEvents(events, this.gameState);
     this.flameSprites.onEvents(events, this.gameState, FLAME_TICKS);
-    if (blocksChanged) redrawBlocks(this.blocksView, this.gameState.arena, this.gameState.chocolate);
+    if (blocksChanged) redrawBlocks(this.blocksView, this.gameState.arena);
     if (heard.has('tick')) sfx.play('tick');
     if (heard.has('place')) sfx.play('place');
     if (heard.has('explode')) sfx.play('explode');
@@ -727,6 +732,7 @@ export class GameScene extends Phaser.Scene {
     }
     sfx.play(text.tone === 'good' ? 'fanfare' : text.tone === 'bad' ? 'sad' : 'lose');
     this.hud.update(this.gameState, match, this.session.scores);
+    if (padConnected(this) && text.hint) text.hint = text.hint.replace('R:', 'Start:').replace('Q:', 'Select:');
     showOutcomeOverlay(this, this.gameState.arena.cols * TILE_SIZE, this.gameState.arena.rows * TILE_SIZE, text);
     // Fim da partida: depois de um instante com o resultado da rodada na tela, vai sozinho para o pódio (sem apertar nada).
     // (a ida ao pódio é feita no update, veja a rede de segurança lá)
@@ -760,6 +766,7 @@ export class GameScene extends Phaser.Scene {
     this.hazardsView.update(this.gameState);
     this.mummyView?.update(this.gameState);
     this.braziersView?.update();
+    this.iceBlockView?.update(this.gameState);
     this.elephantView.update(this.gameState);
     this.haloView.update(this.gameState);
     this.trafficView.update(this.gameState);
@@ -781,6 +788,7 @@ export class GameScene extends Phaser.Scene {
       const winnerTeam = round.outcome ? teamOfOutcome(round.outcome, this.gameState.players) : null;
       const celebrate = round.phase !== 'playing' && player.alive && (round.outcome === null || winnerTeam === player.team);
       syncPlayerView(view, player, this.gameState.arena, this.gameState.tick, celebrate);
+      fadeInTunnel(view, player, this.gameState.arena, this.gameState.hazards?.tunnel);
     }
     this.hud.update(this.gameState, this.session.match, this.session.scores);
   }

@@ -18,6 +18,9 @@ export class ExtraHazardsView {
   /** Solta uma baforada de fumaça pela cratera do vulcão (nada acontece nas outras fases). */
   private spawnSmoke: (count?: number) => void = () => undefined;
 
+  /** Imagens das poças de gosma (chave "col,row"). */
+  private readonly slimeImages = new Map<string, Phaser.GameObjects.Image>();
+
   constructor(private readonly scene: Phaser.Scene, state: GameState, themeId: string) {
     this.g = scene.add.graphics().setDepth(0.85);
     this.top = scene.add.graphics().setDepth(12);
@@ -237,6 +240,26 @@ export class ExtraHazardsView {
 
   /** Gosma do Musgo: poças verdes brilhantes que somem aos poucos. */
   private drawSlime(g: Phaser.GameObjects.Graphics, state: GameState): void {
+    // Com a arte (slime1..3): uma imagem por poça, trocando de quadro (bolhas estourando) e sumindo no fim; senão, o desenho em código.
+    if (this.scene.textures.exists('slime1') && this.scene.textures.exists('slime3')) {
+      const live = new Set<string>();
+      for (const cell of state.slime ?? []) {
+        const id = `${cell.col},${cell.row}`;
+        live.add(id);
+        let image = this.slimeImages.get(id);
+        if (!image) {
+          image = this.scene.add.image((cell.col + 0.5) * TILE_SIZE, (cell.row + 0.5) * TILE_SIZE, 'slime1').setDisplaySize(TILE_SIZE - 4, TILE_SIZE - 4).setDepth(0.9);
+          this.slimeImages.set(id, image);
+        }
+        image.setTexture(`slime${1 + (Math.floor(state.tick / 14) + cell.col + cell.row) % 3}`).setAlpha(0.95 * Math.min(1, cell.ticks / 90));
+      }
+      for (const [id, image] of [...this.slimeImages]) {
+        if (live.has(id)) continue;
+        image.destroy();
+        this.slimeImages.delete(id);
+      }
+      return;
+    }
     for (const cell of state.slime ?? []) {
       const fade = Math.min(1, cell.ticks / 90);
       const x = (cell.col + 0.5) * TILE_SIZE;

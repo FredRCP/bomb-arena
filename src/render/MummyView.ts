@@ -1,5 +1,5 @@
 import Phaser from 'phaser';
-import { MUMMY_WARN_TICKS } from '../config/hazards';
+import { MUMMY_WARN_TICKS, MUMMY_WRAP_TICKS } from '../config/hazards';
 import type { GameState } from '../core';
 import { TILE_SIZE, sphinxBustBox } from './ArenaRenderer';
 import { has, themeById, themeKey } from './theme';
@@ -8,6 +8,8 @@ import { has, themeById, themeKey } from './theme';
 // o desfazer em ataduras quando uma explosão a pega e o brilho nos olhos da esfinge enquanto o evento está ativo.
 // Só desenho; as regras estão em core/mummy.ts. Sem as imagens, nada é desenhado (o evento continua valendo).
 
+const COCOON_HEIGHT = 92; // altura do casulo em pixels (cobre o boneco inteiro)
+const ACTION_BOOST = 1.22; // ataque e desmanche são desenhados menores que a caminhada
 const MUMMY_HEIGHT = 80; // altura da múmia em pixels (o desenho original é do tamanho de um boneco da arena)
 const COFFIN_HEIGHT = 84;
 const WALK_FRAME_TICKS = 8;
@@ -28,6 +30,9 @@ export class MummyView {
   private readonly eyes: Phaser.GameObjects.Graphics;
   private readonly deaths: Death[] = [];
   private readonly ready: boolean;
+  /** Última direção vertical da caminhada (a imagem de frente/costas continua enquanto ela só parou um instante). */
+  private vertical: 'Front' | 'Back' | null = null;
+  private readonly cocoons = new Map<number, Phaser.GameObjects.Image>();
   private lastPos: { x: number; y: number; flip: boolean } | null = null;
 
   constructor(private readonly scene: Phaser.Scene, state: GameState) {
@@ -48,6 +53,7 @@ export class MummyView {
     if (!mm) return;
     this.updateEyes(state);
     if (!this.ready) return;
+    this.updateCocoons(state);
     const t = this.theme;
     const tick = state.tick;
 
@@ -83,10 +89,17 @@ export class MummyView {
       const recent = Math.min(...Object.values(mm.wrappedAt).map((at) => tick - (at ?? -9999)), 9999);
       let key: string;
       if (recent < ATTACK_TICKS) key = `mummyAtk${recent < ATTACK_TICKS / 2 ? 2 : 3}`;
-      else key = `mummyWalk${moving ? 1 + (Math.floor(tick / WALK_FRAME_TICKS) % 6) : 1}`;
+      else {
+        // Andando para baixo aparece de frente, para cima de costas, para os lados de perfil (com as imagens que existirem).
+        const frame = moving ? 1 + (Math.floor(tick / WALK_FRAME_TICKS) % 6) : 1;
+        if (body.dy !== 0) this.vertical = body.dy > 0 ? 'Front' : 'Back';
+        else if (body.dx !== 0) this.vertical = null;
+        const hasVertical = this.vertical !== null && has(this.scene, t, `mummy${this.vertical}1`);
+        key = hasVertical ? `mummy${this.vertical}${frame}` : `mummyWalk${frame}`;
+      }
       const walkH = this.scene.textures.get(themeKey(t, 'mummyWalk1')).getSourceImage().height;
-      this.body.setTexture(themeKey(t, key)).setPosition(x, y).setFlipX(body.facing < 0).setVisible(true);
-      this.body.setScale(MUMMY_HEIGHT / walkH); // todos os quadros já saem na mesma escala (cabeça do mesmo tamanho)
+      this.body.setTexture(themeKey(t, key)).setPosition(x, y).setFlipX(body.facing < 0 && !key.startsWith('mummyFront') && !key.startsWith('mummyBack')).setVisible(true);
+      this.body.setScale((MUMMY_HEIGHT / walkH) * (key.startsWith('mummyAtk') ? ACTION_BOOST : 1)); // os quadros de ataque são menores no desenho: ampliados para a cabeça ficar do mesmo tamanho
       this.shadow.fillStyle(0x000000, 0.28).fillEllipse(x, y - 2, 40, 11);
       this.lastPos = { x, y, flip: body.facing < 0 };
     } else {
@@ -94,7 +107,7 @@ export class MummyView {
       if (this.lastPos) {
         // Desfeita: o desenho se desmancha em ataduras (4 quadros) no lugar em que estava.
         const image = this.scene.add.image(this.lastPos.x, this.lastPos.y, themeKey(t, 'mummyDie1')).setOrigin(0.5, 1).setDepth(9.3).setFlipX(this.lastPos.flip);
-        image.setScale(MUMMY_HEIGHT / this.scene.textures.get(themeKey(t, 'mummyWalk1')).getSourceImage().height);
+        image.setScale((MUMMY_HEIGHT / this.scene.textures.get(themeKey(t, 'mummyWalk1')).getSourceImage().height) * ACTION_BOOST);
         this.deaths.push({ image, start: this.scene.time.now, flip: this.lastPos.flip });
         this.lastPos = null;
       }
@@ -109,6 +122,33 @@ export class MummyView {
       }
       death.image.setTexture(themeKey(t, `mummyDie${1 + Math.min(3, Math.floor(age * 4))}`));
       death.image.setAlpha(age > 0.75 ? 1 - (age - 0.75) * 4 : 1);
+    }
+  }
+
+  /**
+   * Casulo sobre quem foi enfaixado: alterna entre o de ataduras e o de teia (pelo instante em que foi pego) e some quando
+   * o jogador se solta. Sem as imagens, o contorno de ataduras de Effects.ts continua valendo.
+   */
+  private updateCocoons(state: GameState): void {
+    const t = this.theme;
+    const mm = state.hazards?.mummy;
+    if (!mm || !has(this.scene, t, 'cocoon1') || !has(this.scene, t, 'cocoon2')) return;
+    for (const p of state.players) {
+      const wrapAt = mm.wrappedAt[p.id];
+      const on = p.alive && wrapAt !== undefined && state.tick - wrapAt <= MUMMY_WRAP_TICKS + 2 && (p.frozenTicks ?? 0) > 0;
+      let image = this.cocoons.get(p.id);
+      if (!on) {
+        image?.setVisible(false);
+        continue;
+      }
+      if (!image) {
+        image = this.scene.add.image(0, 0, themeKey(t, 'cocoon1')).setOrigin(0.5, 1).setDepth(10.4);
+        this.cocoons.set(p.id, image);
+      }
+      const key = themeKey(t, `cocoon${1 + (wrapAt! % 2)}`);
+      const tex = this.scene.textures.get(key).getSourceImage();
+      const shake = (p.frozenTicks ?? 0) < 40 ? Math.sin(state.tick * 1.6) * 2 : 0; // quase solto: o casulo treme
+      image.setTexture(key).setScale(COCOON_HEIGHT / tex.height).setPosition(p.x * TILE_SIZE + shake, p.y * TILE_SIZE + 32).setVisible(true);
     }
   }
 

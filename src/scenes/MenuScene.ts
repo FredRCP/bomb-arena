@@ -7,6 +7,7 @@ import { addCardArt, addCharacter } from '../render/CharacterView';
 import { hasItemIcon, itemTexture } from '../render/ItemSprites';
 import { placeArena, SCREEN_HEIGHT, SCREEN_WIDTH } from '../render/layout';
 import { addMenuBackground } from '../render/menuBackground';
+import { bindPadHint } from '../input/padHints';
 
 const FONT = 'system-ui, "Segoe UI", Roboto, sans-serif';
 
@@ -73,9 +74,9 @@ export class MenuScene extends Phaser.Scene {
       });
       return { box, bg, label, icon };
     });
-    this.add
+    bindPadHint(this, this.add
       .text(ox + SCREEN_WIDTH / 2, oy + SCREEN_HEIGHT - 50, '↑ ↓ escolher     Enter confirmar     (ou use o controle)', { fontFamily: FONT, fontSize: '24px', color: '#ffffff', stroke: '#1b1f3b', strokeThickness: 4 })
-      .setOrigin(0.5);
+      .setOrigin(0.5), '↑ ↓ escolher     Enter confirmar', '↑ ↓ escolher     A confirmar');
 
     // O primeiro toque ou tecla libera o áudio do navegador: a música do menu começa agora se ele a tinha segurado.
     this.input.once('pointerdown', () => music.sync());
@@ -101,13 +102,13 @@ export class MenuScene extends Phaser.Scene {
       ['lucas', 1100, 720],
     ];
     crew.forEach(([id, x, y], index) => {
-      const art = addCardArt(this, characterById(id), 0, 0, 52, id === 'lucas' ? 225 : id === 'ana-julia' || id === 'filippe' ? 255 : 330);
+      const art = addCardArt(this, characterById(id), 0, 0, 52, (id === 'lucas' ? 225 : id === 'ana-julia' || id === 'filippe' ? 255 : 330) * (id === 'fred' ? 0.9 : 1));
       art.setPosition(ox + x, oy + y).setDepth(-20).setAlpha(0);
       this.tweens.add({ targets: art, alpha: 1, duration: 400, delay: 150 + index * 110 });
       bob(art, 12, 800 + index * 90, 500 + index * 100);
     });
     // Os 7 virtuais, no alto dos dois lados.
-    const blobs = CHARACTERS.filter((c) => !c.custom);
+    const blobs = CHARACTERS.filter((c) => !c.sprites);
     const places: Array<[number, number]> = [[90, 110], [235, 215], [385, 95], [1215, 95], [1365, 215], [1510, 110], [1480, 330]];
     blobs.forEach((blob, index) => {
       const place = places[index];

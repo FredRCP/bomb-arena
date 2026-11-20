@@ -1,7 +1,7 @@
 // Sons provisórios, sintetizados na hora (sem arquivos de áudio, sem direitos autorais).
 // Ficam fora do core: som é apresentação, a regra do jogo não depende dele.
 
-export type PowerSfx = 'power-elephant' | 'power-airplane' | 'power-shield' | 'power-freeze' | 'power-stork' | 'power-confuse' | 'power-ghost' | 'power-jump' | 'power-sprint' | 'power-slime' | 'power-invisible' | 'power-twinbombs' | 'power-fog' | 'power-chocolate';
+export type PowerSfx = 'power-elephant' | 'power-airplane' | 'power-shield' | 'power-freeze' | 'power-stork' | 'power-confuse' | 'power-ghost' | 'power-jump' | 'power-sprint' | 'power-slime' | 'power-invisible' | 'power-twinbombs' | 'power-fog' | 'power-magnet';
 export type SfxKind = 'place' | 'explode' | 'hit' | 'win' | 'lose' | 'pickup' | 'tick' | 'confirm' | 'fanfare' | 'sad' | 'cannon' | 'horn' | PowerSfx;
 
 /**
@@ -388,13 +388,10 @@ export class Sfx {
         this.sweep(ctx, t, 'sine', 120, 90, 1, 0.05, [2, 6]);
         break;
       }
-      case 'power-chocolate': {
-        // Três "toc toc toc" de bloco aparecendo, com um brilhinho doce.
-        [0, 0.1, 0.2].forEach((d, i) => {
-          this.sweep(ctx, t + d, 'square', 280 + i * 60, 140, 0.08, 0.14);
-          this.hiss(ctx, t + d, 'bandpass', 900, 500, 0.08, 0.1, 3);
-        });
-        this.sweep(ctx, t + 0.35, 'triangle', 1175, 1568, 0.25, 0.07);
+      case 'power-magnet': {
+        // Zum de ímã puxando (som que sobe) e três "plin" de itens chegando.
+        this.sweep(ctx, t, 'sawtooth', 160, 640, 0.3, 0.08);
+        [0.3, 0.38, 0.46].forEach((d, i) => this.sweep(ctx, t + d, 'triangle', 988 + i * 220, 1318 + i * 220, 0.12, 0.09));
         break;
       }
       default:
