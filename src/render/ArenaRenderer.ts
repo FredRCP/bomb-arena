@@ -51,6 +51,11 @@ function addWallImage(scene: Phaser.Scene, theme: ThemeDef, col: number, row: nu
   return image;
 }
 
+/** Onde fica o busto da esfinge (Egito): centro, base e largura, em pixels da arena. Usado também pelo brilho dos olhos. */
+export function sphinxBustBox(cols: number): { cx: number; bottom: number; width: number } {
+  return { cx: (Math.floor(cols / 2) + 0.5) * TILE_SIZE, bottom: TILE_SIZE - 1, width: 84 };
+}
+
 /**
  * Desenha o piso e as paredes fixas (nada disso muda durante a partida). Com imagens da fase, o piso vira um tabuleiro
  * de duas imagens e cada parede uma imagem; sem elas, o desenho provisório em código.
@@ -95,8 +100,7 @@ export function drawArena(scene: Phaser.Scene, arena: Arena, themeId = 'classic'
         const pick = col * 5 + row * 11;
         const slot = (col + row) % 4; // 0 = hieróglifo, 2 = pergaminho, 1 e 3 = pedra lisa
         let key = themeKey(theme, 'wall');
-        if (sphinxOn && row === 0 && col === Math.floor(arena.cols / 2)) key = themeKey(theme, 'sphinx');
-        else if (slot === 0 || !wallImages || theme.borderAllGlyphs) key = themeKey(theme, `glyph${1 + (pick % glyphs)}`);
+        if (slot === 0 || !wallImages || theme.borderAllGlyphs) key = themeKey(theme, `glyph${1 + (pick % glyphs)}`);
         else if (slot === 2 && scrollOn) key = themeKey(theme, 'scroll');
         const image = scene.add.image((col + 0.5) * TILE_SIZE, (row + 1) * TILE_SIZE - 1, key).setOrigin(0.5, 1).setDepth(6);
         image.setScale(theme.wallWidth / image.width);
@@ -110,6 +114,13 @@ export function drawArena(scene: Phaser.Scene, arena: Arena, themeId = 'classic'
   }
 
   if (frameOn) scene.add.image(0, 0, themeKey(theme, frameKey)).setOrigin(0, 0).setDepth(6.2);
+
+  if (sphinxOn) {
+    // Busto da esfinge no meio da borda de cima, maior que o bloco: a base cobre o bloco e a cabeça sobe um pouco para a faixa de cima da tela.
+    const box = sphinxBustBox(arena.cols);
+    const image = scene.add.image(box.cx, box.bottom, themeKey(theme, 'sphinx')).setOrigin(0.5, 1).setDepth(6.6);
+    image.setScale(box.width / image.width);
+  }
   if (theme.frameFx) drawFrameFx(scene, arena);
 
   if (pyramidOn) {

@@ -44,6 +44,8 @@ import { FLAME_TICKS } from '../config/bombs';
 import { createHud } from '../render/Hud';
 import { TOP_HEIGHT, placeArena, sideWidthFor } from '../render/layout';
 import { HazardsView } from '../render/HazardsView';
+import { MummyView } from '../render/MummyView';
+import { BraziersView } from '../render/BraziersView';
 import { ElephantView } from '../render/ElephantView';
 import { HaloView } from '../render/HaloView';
 import { TrafficView } from '../render/TrafficView';
@@ -105,6 +107,8 @@ export class GameScene extends Phaser.Scene {
   private itemSprites!: ItemSprites;
   private closedView!: ClosedView;
   private hazardsView!: HazardsView;
+  private mummyView: MummyView | null = null;
+  private braziersView: BraziersView | null = null;
   private elephantView!: ElephantView;
   private haloView!: HaloView;
   private trafficView!: TrafficView;
@@ -247,6 +251,8 @@ export class GameScene extends Phaser.Scene {
     this.itemSprites = new ItemSprites(this);
     this.closedView = createClosedView(this, theme.id);
     this.hazardsView = new HazardsView(this, this.gameState);
+    this.mummyView = this.gameState.hazards?.mummy ? new MummyView(this, this.gameState) : null;
+    this.braziersView = theme.braziers ? new BraziersView(this, this.gameState.arena) : null;
     this.elephantView = new ElephantView(this);
     this.haloView = new HaloView(this);
     this.trafficView = new TrafficView(this, this.gameState);
@@ -662,6 +668,9 @@ export class GameScene extends Phaser.Scene {
         sfx.play(`power-${event.kind}`);
         this.showPowerLabel(event.playerId, POWER_LABELS[event.kind]);
       }
+      if (event.type === 'mummyWarn') heard.add('tick'); // o sarcófago treme
+      if (event.type === 'mummySpawned') heard.add('place');
+      if (event.type === 'mummyWrapped') heard.add('hit');
       if (event.type === 'iceCracked') heard.add('tick');
       if (event.type === 'iceBroken') heard.add('place');
       if (event.type === 'bombPlaced' || event.type === 'bombKicked' || event.type === 'bombThrown') heard.add('place');
@@ -749,6 +758,8 @@ export class GameScene extends Phaser.Scene {
       music.play(SUDDEN_DEATH_MUSIC);
     }
     this.hazardsView.update(this.gameState);
+    this.mummyView?.update(this.gameState);
+    this.braziersView?.update();
     this.elephantView.update(this.gameState);
     this.haloView.update(this.gameState);
     this.trafficView.update(this.gameState);

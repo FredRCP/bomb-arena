@@ -128,3 +128,18 @@ export const ROLLER_MAX_RATE = 3;
 
 /** A bola de neve da avalanche tem 3 colunas de largura (meia largura = 1,5 célula). */
 export const SNOWBALL_HALF_WIDTH = 1.5;
+
+// Múmia do Egito: sai de um sarcófago, anda ao acaso e enfaixa quem encosta, até uma explosão desfazê-la.
+/** Primeira múmia: 25 s depois do início; depois que uma é destruída, a próxima vem 25 s depois (os relógios aceleram no fim da rodada). */
+export const MUMMY_FIRST_TICKS = 25 * 60;
+export const MUMMY_RESPAWN_TICKS = 25 * 60;
+/** O sarcófago avisa (treme e brilha) por 1,5 s antes de abrir; depois fica aberto mais um instante. */
+export const MUMMY_WARN_TICKS = 90;
+export const MUMMY_OPEN_TICKS = 50;
+/** Células por passo: ~1,7 células por segundo (bem mais lenta que os jogadores). */
+export const MUMMY_SPEED = 0.028;
+/** Distância (em células, nos dois eixos) em que ela enfaixa. */
+export const MUMMY_TOUCH_HALF = 0.6;
+/** Enfaixado: parado por 3 s. O mesmo jogador não é enfaixado de novo por 5 s. */
+export const MUMMY_WRAP_TICKS = 3 * 60;
+export const MUMMY_COOLDOWN_TICKS = 5 * 60;

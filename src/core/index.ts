@@ -8,6 +8,7 @@ export * from './bombs';
 export * from './explosions';
 export * from './items';
 export * from './hazards';
+export * from './mummy';
 export * from './extraHazards';
 export * from './traffic';
 export * from './powers';

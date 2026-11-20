@@ -132,6 +132,33 @@ export interface RollerState {
   hit?: PlayerId[];
 }
 
+/** A múmia do Egito andando: (x, y) é o centro em células; anda de (col,row) até (tcol,trow) e `progress` (0 a 1) é o quanto já andou. */
+export interface MummyBody {
+  col: number;
+  row: number;
+  tcol: number;
+  trow: number;
+  progress: number;
+  x: number;
+  y: number;
+  /** Último passo dado (para preferir seguir em frente). */
+  dx: number;
+  dy: number;
+  /** Para onde olha (1 = direita, -1 = esquerda): só desenho. */
+  facing: 1 | -1;
+}
+
+/** Evento da múmia: o sarcófago avisa, abre e solta a múmia, que anda ao acaso até uma explosão. */
+export interface MummyState {
+  /** Passos até o próximo sarcófago (só conta sem sarcófago nem múmia em campo). */
+  timer: number;
+  /** `ticks` > 0: avisando; depois `open` conta o tempo em que ele fica aberto. */
+  coffin: { col: number; row: number; ticks: number; open: number } | null;
+  mummy: MummyBody | null;
+  /** Passo em que cada jogador foi tocado pela última vez (enfaixado ou protegido): serve de pausa e de desenho. */
+  wrappedAt: Partial<Record<PlayerId, number>>;
+}
+
 /** Entrada dos pinguins pelas laterais: o relógio, a fileira sorteada e o aviso (aceso nos últimos passos antes de sair). */
 export interface PenguinGate {
   timer: number;
@@ -269,6 +296,11 @@ export type GameEvent =
   | { type: 'rollerGone'; id: number; col: number; row: number }
   | { type: 'penguinWarn'; row: number; fromLeft: boolean }
   | { type: 'squashed'; playerId: PlayerId }
+  /** Múmia: o sarcófago avisa, a múmia saiu, enfaixou alguém ou foi desfeita por uma explosão. */
+  | { type: 'mummyWarn'; col: number; row: number }
+  | { type: 'mummySpawned'; col: number; row: number }
+  | { type: 'mummyWrapped'; playerId: PlayerId }
+  | { type: 'mummyDestroyed'; col: number; row: number }
   /** Tráfego: a faixa vai ser percorrida em instantes (aviso) e o veículo entrou nela. */
   | { type: 'trafficWarn'; kind: TrafficKind; axis: 'row' | 'col'; index: number }
   | { type: 'trafficGo'; kind: TrafficKind; axis: 'row' | 'col'; index: number }
@@ -351,6 +383,8 @@ export interface HazardsState {
   rollers?: RollerState[];
   /** Pinguins que entram pelas laterais, em fileiras sorteadas, com aviso antes. */
   penguinGate?: PenguinGate;
+  /** Egito: a múmia que sai do sarcófago. */
+  mummy?: MummyState;
   /** Células (índices) que começaram com bloco: é nelas que a neve faz blocos novos crescerem. */
   blockSpots?: number[];
   /** Passos até crescer o próximo bloco de neve. */

@@ -61,11 +61,15 @@ export interface ThemeDef {
   rollers?: boolean;
   /** Areia movediça em imagem (quicksand.png)? */
   quicksand?: boolean;
+  /** Múmia do Egito em imagens (mummy_walk1..6, mummy_atk1..3, mummy_die1..4, coffin1..3)? */
+  mummy?: boolean;
+  /** Braseiros com chamas animadas nos quatro cantos da arena (desenhados em código)? */
+  braziers?: boolean;
 }
 
 export const THEMES: Record<string, ThemeDef> = {
   classic: { id: 'classic', frameFx: true, frameImages: true, floors: false, wall: true, wallWidth: 62, blockVariants: 1, blockWidth: 62, rubble: false, background: true, chips: [0xd9822b, 0xa65a1c, 0x6e3a12] },
-  egypt: { id: 'egypt', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xf3d896, 0xe0b868, 0xb88f46], borderAllGlyphs: true, borderGlyphs: 22, pyramid: true, floorFull: true, columns: true, quicksand: true, sphinx: true, scrolls: true },
+  egypt: { id: 'egypt', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xf3d896, 0xe0b868, 0xb88f46], borderAllGlyphs: true, borderGlyphs: 22, pyramid: true, floorFull: true, quicksand: true, sphinx: true, scrolls: true, mummy: true, braziers: true },
   temple: { id: 'temple', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xc9965c, 0x9b6b3a, 0x5f8f3f], island: true },
   pirates: { id: 'pirates', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xb07a3c, 0x8a5a2a, 0xd9b36a] },
   sea: { id: 'sea', floors: true, wall: true, wallWidth: 62, blockVariants: 3, blockWidth: 62, rubble: false, background: true, chips: [0xbdeeff, 0x7fd0f0, 0xe8fbff], bubbles: true },
@@ -111,7 +115,13 @@ export function preloadThemes(scene: Phaser.Scene): void {
       for (let i = 1; i <= 3; i++) add(`hole${i}`, `hole${i}.png`);
       for (let i = 1; i <= 4; i++) add(`penguin${i}`, `penguin${i}.png`);
     }
-    if (theme.sphinx) add('sphinx', 'sphinx.png');
+    if (theme.sphinx) add('sphinx', 'sphinx_bust.png'); // busto da esfinge (sobre o bloco do meio da borda de cima)
+    if (theme.mummy) {
+      for (let i = 1; i <= 6; i++) add(`mummyWalk${i}`, `mummy_walk${i}.png`);
+      for (let i = 1; i <= 3; i++) add(`mummyAtk${i}`, `mummy_atk${i}.png`);
+      for (let i = 1; i <= 4; i++) add(`mummyDie${i}`, `mummy_die${i}.png`);
+      for (let i = 1; i <= 3; i++) add(`coffin${i}`, `coffin${i}.png`);
+    }
     if (theme.scrolls) add('scroll', 'scroll.png');
     if (theme.island) {
       add('island', 'island.png');

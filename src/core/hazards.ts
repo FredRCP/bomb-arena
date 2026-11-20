@@ -4,6 +4,7 @@ import { cellIndex, getCell, isTunnel } from './arena';
 import { applyExtraHazards, updateExtraHazards } from './extraHazards';
 import { dropPowerups, maybeHideItem, revealItem } from './items';
 import { bodyOverlapsCell, collidesAt } from './movement';
+import { createMummy, updateMummy } from './mummy';
 import { createRng } from './random';
 import type { Arena, Cell, GameState, HazardsState, PlayerState } from './types';
 
@@ -47,6 +48,8 @@ export interface HazardOptions {
   bridgeFall?: boolean;
   /** Tráfego de veículos nas faixas da arena (carros, trem, trator, bolas ou troncos). */
   traffic?: TrafficKind;
+  /** Egito: uma múmia sai de um sarcófago, anda ao acaso e enfaixa quem encosta; uma explosão a desfaz. */
+  mummy?: boolean;
   /** Vulcão de pedra 3 x 3 no meio da arena, que entra em erupção lançando bolas de lava. */
   volcano?: boolean;
   /** Templo 3 x 3 no meio do abismo, com um túnel (a ponte do meio passa por dentro dele). Precisa de `chasm`. */
@@ -339,6 +342,7 @@ export function createHazards(arena: Arena, options: HazardOptions | undefined, 
     });
     hazards.regrowTimer = BLOCK_REGROW_TICKS;
   }
+  if (options.mummy) hazards.mummy = createMummy();
   applyExtraHazards(arena, options, seed, hazards);
   return hazards;
 }
@@ -356,6 +360,7 @@ export function updateHazards(state: GameState): void {
   updateThinIce(state);
   updateDartTrap(state);
   updateRollers(state);
+  updateMummy(state, rollerRate(state));
   updateRegrow(state);
   updateBoulder(state);
   updateBridgeFall(state);

@@ -1,5 +1,6 @@
 import Phaser from 'phaser';
 import type { GameEvent, GameState } from '../core';
+import { MUMMY_WRAP_TICKS } from '../config/hazards';
 import { TILE_SIZE } from './ArenaRenderer';
 import { has, themeById, themeKey } from './theme';
 import type { ThemeDef } from './theme';
@@ -80,11 +81,22 @@ export class Effects {
       if (p.alive && (p.frozenTicks ?? 0) > 0 && ((p.frozenTicks ?? 0) > 60 || Math.floor(state.tick / 5) % 2 === 0)) {
         const fx = p.x * TILE_SIZE;
         const fy = p.y * TILE_SIZE - 6;
-        g.fillStyle(0x9fe3ff, 0.32).fillRoundedRect(fx - 27, fy - 32, 54, 66, 14);
-        g.lineStyle(5, 0x3aa0e0, 0.95).strokeRoundedRect(fx - 27, fy - 32, 54, 66, 14);
-        g.lineStyle(2.5, 0xeafaff, 1).strokeRoundedRect(fx - 24, fy - 29, 48, 60, 12);
-        g.fillStyle(0xffffff, 0.9).fillTriangle(fx - 19, fy - 24, fx - 8, fy - 24, fx - 19, fy - 10); // brilho
-        g.fillStyle(0xffffff, 0.8).fillTriangle(fx + 17, fy + 22, fx + 8, fy + 24, fx + 17, fy + 12);
+        const wrapAt = state.hazards?.mummy?.wrappedAt[p.id];
+        if (wrapAt !== undefined && state.tick - wrapAt <= MUMMY_WRAP_TICKS + 2) {
+          // Enfaixado pela múmia: ataduras em volta do corpo (em vez do gelo).
+          g.fillStyle(0xe9dcb4, 0.3).fillRoundedRect(fx - 27, fy - 32, 54, 66, 14);
+          g.lineStyle(5, 0x7a6638, 0.95).strokeRoundedRect(fx - 27, fy - 32, 54, 66, 14);
+          g.lineStyle(3, 0xf4ead0, 1);
+          for (let k = 0; k < 4; k++) g.lineBetween(fx - 26, fy - 24 + k * 15, fx + 26, fy - 10 + k * 15);
+          g.lineStyle(1.5, 0x7a6638, 0.9);
+          for (let k = 0; k < 4; k++) g.lineBetween(fx - 26, fy - 21 + k * 15, fx + 26, fy - 7 + k * 15);
+        } else {
+          g.fillStyle(0x9fe3ff, 0.32).fillRoundedRect(fx - 27, fy - 32, 54, 66, 14);
+          g.lineStyle(5, 0x3aa0e0, 0.95).strokeRoundedRect(fx - 27, fy - 32, 54, 66, 14);
+          g.lineStyle(2.5, 0xeafaff, 1).strokeRoundedRect(fx - 24, fy - 29, 48, 60, 12);
+          g.fillStyle(0xffffff, 0.9).fillTriangle(fx - 19, fy - 24, fx - 8, fy - 24, fx - 19, fy - 10); // brilho
+          g.fillStyle(0xffffff, 0.8).fillTriangle(fx + 17, fy + 22, fx + 8, fy + 24, fx + 17, fy + 12);
+        }
       }
       if (!p.alive || (p.invertTicks <= 0 && p.slowTicks <= 0)) continue;
       const cx = p.x * TILE_SIZE;
