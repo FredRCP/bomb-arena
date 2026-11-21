@@ -1,0 +1,4 @@
+LOTE 91 - novo icone (provisorio, montado com os rostos da familia + bomba)
+Copie a pasta public/icons por cima (5 arquivos: icon-192, icon-512, icon-512-maskable, apple-touch-icon, favicon-32).
+No celular, o icone antigo do PWA pode ficar em cache: remova o atalho da tela inicial e instale de novo.
+Quando tiver a arte do Gemini, me mande que eu gero os 5 tamanhos.
