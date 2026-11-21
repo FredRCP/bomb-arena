@@ -132,15 +132,49 @@ describe('Poderes: carga e personagens', () => {
     expect(state.fog).toBeUndefined();
   });
 
-  it('Tique: o ímã puxa os itens bons da arena e faz sumir os ruins', () => {
-    const { state, me } = setup('magnet');
-    state.items = [{ col: 7, row: 5, kind: 'range' }, { col: 9, row: 3, kind: 'bomb' }, { col: 3, row: 7, kind: 'invert' }];
-    const range = me.bombRange;
+  it('Tique: o ímã puxa quem está a até 5 células e arranca 1 powerup dos mais próximos', () => {
+    const { state, me, other } = setup('magnet');
+    other.x = 7.5;
+    other.y = 1.5; // 4 células de distância
+    other.maxBombs = 3;
+    const far = state.players[1]!;
+    expect(far).toBe(other);
     const bombs = me.maxBombs;
     use(state, me);
-    expect(state.items).toHaveLength(0);
-    expect(me.bombRange).toBe(range + 1);
+    expect(Math.hypot(other.x - me.x, other.y - me.y)).toBeLessThanOrEqual(3);
+    expect(other.maxBombs).toBe(2);
     expect(me.maxBombs).toBe(bombs + 1);
+  });
+
+  it('Tique: quem está além de 5 células, ou com escudo, não é puxado', () => {
+    const { state, me, other } = setup('magnet');
+    other.x = 11.5;
+    other.y = 1.5; // 8 células
+    use(state, me);
+    expect(other.x).toBe(11.5);
+    const second = setup('magnet');
+    second.other.x = 6.5;
+    second.other.y = 1.5;
+    second.other.shieldTicks = 600;
+    use(second.state, second.me);
+    expect(second.other.x).toBe(6.5);
+  });
+
+  it('Pipoca: aparecem 4 sósias que somem em 10 s; uma chama destrói a sósia e dá pontos sem eliminar ninguém', () => {
+    const { state, me } = setup('decoys');
+    use(state, me);
+    expect(state.decoys).toHaveLength(4);
+    const decoy = state.decoys![0]!;
+    state.flames.push({ col: Math.floor(decoy.x), row: Math.floor(decoy.y), ticksLeft: 30, owners: [2] });
+    const events = [] as string[];
+    step(state);
+    for (const e of drainEvents(state)) events.push(e.type);
+    expect(events).toContain('decoyKilled');
+    expect(state.decoys).toHaveLength(3);
+    expect(state.players.every((p) => p.alive)).toBe(true);
+    state.flames.length = 0;
+    for (let i = 0; i < 10 * 60 + 5; i++) step(state);
+    expect(state.decoys).toHaveLength(0);
   });
 });
 

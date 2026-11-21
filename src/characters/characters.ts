@@ -38,7 +38,7 @@ export const CHARACTERS: readonly CharacterDef[] = [
   { id: 'filippe', name: 'Filippe', color: 0x38d9a9, hat: 'headband', custom: true, sprites: true, spriteScale: 0.92, power: 'ghost' },
   { id: 'waleska', name: 'Wal', color: 0xe599f7, hat: 'crown', custom: true, sprites: true, power: 'stork' },
   { id: 'glaucio', name: 'Glauceste', color: 0xadb5bd, hat: 'cap', custom: true, sprites: true, power: 'confuse' },
-  { id: 'pipoca', name: 'Pipoca', color: 0xff5c8a, hat: 'antenna', custom: true, power: 'jump' },
+  { id: 'pipoca', name: 'Pipoca', color: 0xff5c8a, hat: 'antenna', custom: true, power: 'decoys' },
   { id: 'bolt', name: 'Bolt', color: 0xffd43b, hat: 'horns', custom: true, emblem: 'bolt', power: 'sprint' },
   { id: 'musgo', name: 'Musgo', color: 0x7ed957, hat: 'leaf', custom: true, power: 'slime' },
   { id: 'violeta', name: 'Violeta', color: 0xb388ff, hat: 'crown', custom: true, power: 'invisible' },

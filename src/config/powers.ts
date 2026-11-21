@@ -56,7 +56,6 @@ export const INVISIBLE_POWER_TICKS = 10 * 60;
 export const TWIN_BOMB_RANGE = 99;
 /** Nimbo: neblina por 10 s (ele enxerga em volta de si). */
 export const FOG_POWER_TICKS = 10 * 60;
-/** Tique (o robozinho): o ímã puxa para ele todos os itens bons da arena e faz sumir os itens ruins. */
 
 /** Nome do poder, mostrado em cima do jogador quando ele o usa. */
 export const POWER_LABELS = {
@@ -68,6 +67,7 @@ export const POWER_LABELS = {
   confuse: 'CONFUSÃO!',
   ghost: 'FANTASMA!',
   jump: 'PULO!',
+  decoys: 'SÓSIAS!',
   sprint: 'TURBO!',
   slime: 'GOSMA!',
   invisible: 'INVISÍVEL!',
@@ -75,3 +75,12 @@ export const POWER_LABELS = {
   fog: 'NEBLINA!',
   magnet: 'ÍMÃ!',
 } as const;
+
+/** Tique (o robozinho): o ímã puxa para perto dele os jogadores até este raio (em células) e arranca 1 powerup dos mais próximos. */
+export const MAGNET_RADIUS = 5;
+export const MAGNET_STEALS = 2;
+/** Pipoca: 4 sósias idênticas andam pela arena por 10 s. Matar uma não faz nada, só dá pontos. */
+export const DECOY_COUNT = 4;
+export const DECOY_TICKS = 10 * 60;
+/** Células por passo das sósias (um pouco mais devagar que um jogador normal). */
+export const DECOY_SPEED = 0.06;

@@ -130,6 +130,9 @@ function drawBolt(g: Phaser.GameObjects.Graphics, radius: number): void {
  * foi carregada; senão, o desenho provisório (cabeça redonda com olhos, acessório e, nos da família, a inicial).
  * Devolve um Container: dá para mover, esconder e trocar a profundidade como qualquer objeto.
  */
+/** Personagens de imagem única que pedem um desenho maior (a arte deles tem muito espaço vazio em volta). */
+const SIZE_BOOST: Record<string, number> = { fagulha: 1.2, musgo: 1.2, tique: 1.25 };
+
 export function addCharacter(scene: Phaser.Scene, character: CharacterDef, x: number, y: number, radius: number): Phaser.GameObjects.Container {
   const parts: Phaser.GameObjects.GameObject[] = [];
   const shadow = scene.add.graphics();
@@ -140,7 +143,7 @@ export function addCharacter(scene: Phaser.Scene, character: CharacterDef, x: nu
   const key = textureKey(character);
   if (character.custom && scene.textures.exists(key) && scene.textures.get(key).key !== '__MISSING') {
     const image = scene.add.image(0, -radius * 0.1, key);
-    image.setScale((radius * 2.4) / Math.max(image.width, image.height));
+    image.setScale(((radius * 2.4) / Math.max(image.width, image.height)) * (SIZE_BOOST[character.id] ?? 1));
     image.setData('faceBase', { width: image.width, height: image.height, scale: image.scaleX });
     parts.push(image);
   } else {

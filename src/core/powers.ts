@@ -1,10 +1,11 @@
-import { AIRPLANE_BOMBS, AIRPLANE_DROP_TICKS, AIRPLANE_END_SCALE, AIRPLANE_ENTRY_TICKS, AIRPLANE_FIRST_DROP, AIRPLANE_LAPS, AIRPLANE_LAP_TICKS, CONFUSE_POWER_TICKS, FOG_POWER_TICKS, GHOST_HALO_RADIUS, GHOST_HALO_TICKS, FREEZE_PLAYER_TICKS, STORK_SHIELD_TICKS, INVISIBLE_POWER_TICKS, JUMP_CELLS, SLIME_CELLS, SLIME_TICKS, SPRINT_POWER_TICKS, TWIN_BOMB_RANGE, ELEPHANT_MAX_BLOCKS, ELEPHANT_SPEED, POWER_CHARGE_TICKS, SHIELD_POWER_TICKS, STORK_FAR_ITEMS, STORK_ITEMS, STORK_RADIUS, FREEZE_POWER_TICKS, GHOST_POWER_TICKS } from '../config/powers';
+import { AIRPLANE_BOMBS, AIRPLANE_DROP_TICKS, AIRPLANE_END_SCALE, AIRPLANE_ENTRY_TICKS, AIRPLANE_FIRST_DROP, AIRPLANE_LAPS, AIRPLANE_LAP_TICKS, CONFUSE_POWER_TICKS, FOG_POWER_TICKS, GHOST_HALO_RADIUS, GHOST_HALO_TICKS, FREEZE_PLAYER_TICKS, STORK_SHIELD_TICKS, INVISIBLE_POWER_TICKS, JUMP_CELLS, SLIME_CELLS, SLIME_TICKS, SPRINT_POWER_TICKS, TWIN_BOMB_RANGE, ELEPHANT_MAX_BLOCKS, ELEPHANT_SPEED, POWER_CHARGE_TICKS, SHIELD_POWER_TICKS, STORK_FAR_ITEMS, STORK_ITEMS, STORK_RADIUS, FREEZE_POWER_TICKS, GHOST_POWER_TICKS, MAGNET_RADIUS, MAGNET_STEALS } from '../config/powers';
 import { BOMB_FUSE_TICKS } from '../config/bombs';
 import { cellIndex, getCell, isTunnel } from './arena';
 import { dropBomb } from './bombs';
 import { collidesAt } from './movement';
 import { createRng } from './random';
-import { applyItem, freeItemCells, revealItem } from './items';
+import { freeItemCells, revealItem, stealPowerup } from './items';
+import { spawnDecoys } from './decoys';
 import type { Direction, GameState, PlayerState, PowerKind } from './types';
 
 // Superpoderes. Cada jogador pode ter um poder (veja `givePower`) que carrega sozinho em POWER_CHARGE_TICKS e é
@@ -178,14 +179,40 @@ function usePersonalPower(state: GameState, player: PlayerState, kind: Exclude<P
   } else if (kind === 'fog') {
     state.fog = { ticks: FOG_POWER_TICKS, owner: player.id };
   } else if (kind === 'magnet') {
-    // Ímã: os itens bons de toda a arena vão para ela na hora; os ruins somem.
-    for (const item of [...state.items]) {
-      if (item.kind === 'invert' || item.kind === 'slow') continue;
-      state.items.splice(state.items.indexOf(item), 1);
-      const changed = applyItem(player, item.kind);
-      state.events.push({ type: 'itemPicked', playerId: player.id, kind: item.kind, col: item.col, row: item.row, changed });
+    // Ímã: puxa para perto dele quem está até MAGNET_RADIUS células (sem escudo/herói) e arranca 1 powerup dos MAGNET_STEALS mais próximos.
+    const near = state.players
+      .filter((o) => o.id !== player.id && o.alive && o.sideline === null && o.shieldTicks <= 0 && o.heroTicks <= 0)
+      .map((o) => ({ o, d: Math.hypot(o.x - player.x, o.y - player.y) }))
+      .filter((e) => e.d <= MAGNET_RADIUS)
+      .sort((a, b) => a.d - b.d);
+    const used = new Set<number>([cellIndex(arena, Math.floor(player.x), Math.floor(player.y))]);
+    const spots: Array<{ col: number; row: number; d: number }> = [];
+    for (let row = 1; row < arena.rows - 1; row++) {
+      for (let col = 1; col < arena.cols - 1; col++) {
+        if (getCell(arena, col, row) !== 'empty' || isTunnel(state.hazards?.tunnel, arena, col, row)) continue;
+        if (state.bombs.some((b) => b.col === col && b.row === row) || state.flames.some((f) => f.col === col && f.row === row)) continue;
+        const d = Math.hypot(col + 0.5 - player.x, row + 0.5 - player.y);
+        if (d <= 3) spots.push({ col, row, d });
+      }
     }
-    state.items = state.items.filter((item) => item.kind !== 'invert' && item.kind !== 'slow');
+    spots.sort((a, b) => a.d - b.d);
+    near.forEach(({ o }, rank) => {
+      const spot = spots.find((s) => !used.has(cellIndex(arena, s.col, s.row)));
+      if (spot) {
+        used.add(cellIndex(arena, spot.col, spot.row));
+        o.x = spot.col + 0.5;
+        o.y = spot.row + 0.5;
+        o.slide = null;
+        o.frozenTicks = Math.max(o.frozenTicks ?? 0, 30); // meio segundo para se ajeitar
+        state.events.push({ type: 'pulled', playerId: o.id, by: player.id });
+      }
+      if (rank < MAGNET_STEALS) {
+        const taken = stealPowerup(o, player, rng);
+        if (taken) state.events.push({ type: 'stolen', from: o.id, to: player.id, kind: taken });
+      }
+    });
+  } else if (kind === 'decoys') {
+    spawnDecoys(state, player, rng);
   } else if (kind === 'confuse') {
     for (const other of state.players) if (other.alive && other.id !== player.id) other.invertTicks = Math.max(other.invertTicks, CONFUSE_POWER_TICKS);
   } else if (kind === 'freeze') {
@@ -423,7 +450,9 @@ export function aiShouldUsePower(state: GameState, player: PlayerState): boolean
     case 'fog':
       return enemies.some((p) => Math.abs(p.x - player.x) + Math.abs(p.y - player.y) <= 8);
     case 'magnet':
-      return state.items.some((item) => item.kind !== 'invert' && item.kind !== 'slow');
+      return enemies.some((p) => Math.hypot(p.x - player.x, p.y - player.y) <= MAGNET_RADIUS);
+    case 'decoys':
+      return enemies.some((p) => Math.abs(p.x - player.x) + Math.abs(p.y - player.y) <= 8);
     case 'freeze':
       return state.bombs.some((b) => b.owner !== player.id && !(b.frozenTicks && b.frozenTicks > 0)) || enemies.some((p) => Math.abs(p.x - player.x) + Math.abs(p.y - player.y) <= 4);
     default:

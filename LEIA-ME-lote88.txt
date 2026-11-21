@@ -1,0 +1,9 @@
+LOTE 88 — veículos com efeitos novos, poderes da Tique e da Pipoca, ajustes dos personagens
+
+Veículos (core/traffic.ts, config/hazards.ts): tronco = atordoa+confunde+lento; carros = levam o jogador até a outra ponta e ele fica 3 s paralisado;
+  trator = 5 s paralisado + 8 s confuso; bola do parquinho = empurra jogadores e bombas até o fim da linha; trem continua matando.
+  Todos destroem blocos do caminho (40% dos blocos agora ficam nas faixas) e acionam bombas (menos a bola, que empurra).
+Tique: poder ÍMÃ puxa quem está a até 5 células e rouba 1 powerup dos 2 mais próximos (core/powers.ts, core/items.ts stealPowerup).
+Pipoca: poder SÓSIAS — 4 cópias idênticas por 10 s; destruir uma dá 25 pontos, ninguém sai do jogo (core/decoys.ts, render/DecoysView.ts).
+Personagens: Violeta, Nimbo e Tique sem quique; Violeta e Tique se inclinam para o lado em que andam; Fagulha, Musgo (+20%) e Tique (+25%) maiores.
+Arquivos novos: src/core/decoys.ts, src/render/DecoysView.ts, tests/core/decoyScore.test.ts

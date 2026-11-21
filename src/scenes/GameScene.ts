@@ -61,6 +61,7 @@ import { POWER_LABELS } from '../config/powers';
 import { addMenuBackground } from '../render/menuBackground';
 import { has, themeById, themeKey } from '../render/theme';
 import type { Hud } from '../render/Hud';
+import { DecoysView } from '../render/DecoysView';
 import { IceBlockView } from '../render/IceBlockView';
 import { showOutcomeOverlay } from '../render/OutcomeOverlay';
 import { describeRoundEnd, rankingLines, setCpuNames } from '../render/outcomeText';
@@ -113,6 +114,7 @@ export class GameScene extends Phaser.Scene {
   private mummyView: MummyView | null = null;
   private braziersView: BraziersView | null = null;
   private iceBlockView: IceBlockView | null = null;
+  private decoysView: DecoysView | null = null;
   private elephantView!: ElephantView;
   private haloView!: HaloView;
   private trafficView!: TrafficView;
@@ -256,6 +258,8 @@ export class GameScene extends Phaser.Scene {
     this.closedView = createClosedView(this, theme.id);
     this.hazardsView = new HazardsView(this, this.gameState);
     this.iceBlockView = new IceBlockView(this);
+    this.decoysView?.destroy();
+    this.decoysView = new DecoysView(this, this.characters);
     this.mummyView = this.gameState.hazards?.mummy ? new MummyView(this, this.gameState) : null;
     this.braziersView = theme.braziers ? new BraziersView(this, this.gameState.arena, theme) : null;
     this.elephantView = new ElephantView(this);
@@ -682,6 +686,8 @@ export class GameScene extends Phaser.Scene {
       if (event.type === 'bombPlaced') triggerBombPose(this.playerViews.get(event.owner), this.gameState.tick);
       if (event.type === 'bombExploded') heard.add('explode');
       if (event.type === 'playerHit' || event.type === 'thrownHit') heard.add('hit');
+      if (event.type === 'stolen') heard.add('pickup');
+      if (event.type === 'decoyKilled' || event.type === 'pulled') heard.add('hit');
       if (event.type === 'itemPicked' || event.type === 'vestBroken') heard.add('pickup');
       if (event.type === 'playerRevived') heard.add('pickup');
     }
@@ -767,6 +773,7 @@ export class GameScene extends Phaser.Scene {
     this.mummyView?.update(this.gameState);
     this.braziersView?.update();
     this.iceBlockView?.update(this.gameState);
+    this.decoysView?.update(this.gameState);
     this.elephantView.update(this.gameState);
     this.haloView.update(this.gameState);
     this.trafficView.update(this.gameState);

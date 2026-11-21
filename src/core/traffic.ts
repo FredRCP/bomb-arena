@@ -1,7 +1,7 @@
-import { TRAFFIC } from '../config/hazards';
+import { TRAFFIC, TRAFFIC_BLOCK_KEEP, TRAFFIC_EFFECTS } from '../config/hazards';
 import type { TrafficKind } from '../config/hazards';
 import { cellIndex, getCell } from './arena';
-import { dropPowerups } from './items';
+import { dropPowerups, revealItem } from './items';
 import { createRng } from './random';
 import type { Arena, GameState, TrafficLane, TrafficState } from './types';
 
@@ -36,7 +36,8 @@ export function createTraffic(arena: Arena, kind: TrafficKind, seed: number): Tr
     for (let k = 1; k < length - 1; k++) {
       const col = lane.axis === 'row' ? k : lane.index;
       const row = lane.axis === 'row' ? lane.index : k;
-      if (getCell(arena, col, row) === 'block') arena.cells[cellIndex(arena, col, row)] = 'empty';
+      // Parte dos blocos continua na faixa: o veículo os destrói ao passar (e pode revelar um item).
+      if (getCell(arena, col, row) === 'block' && rng() >= TRAFFIC_BLOCK_KEEP) arena.cells[cellIndex(arena, col, row)] = 'empty';
     }
     return {
       axis: lane.axis,
@@ -91,17 +92,82 @@ export function updateTraffic(state: GameState): void {
     }
     lane.pos += lane.dir * cfg.speed;
     const [from, to] = trafficSpan(traffic.kind, lane);
+    const effect = TRAFFIC_EFFECTS[traffic.kind];
+    // Frente do veículo, limitada às células livres da faixa (a 1ª e a última são parede).
+    const front = Math.min(size - 1.5, Math.max(1.5, lane.dir === 1 ? to : from));
+    const cellOf = (along: number, across: number) => (lane.axis === 'row' ? { col: along, row: across } : { col: across, row: along });
+
+    // 1) Blocos no caminho são destruídos.
+    for (let k = 1; k < size - 1; k++) {
+      if (k + 0.5 < from || k + 0.5 > to) continue;
+      const c = cellOf(k, lane.index);
+      if (getCell(arena, c.col, c.row) !== 'block') continue;
+      arena.cells[cellIndex(arena, c.col, c.row)] = 'empty';
+      state.events.push({ type: 'blockDestroyed', col: c.col, row: c.row });
+      revealItem(state, c.col, c.row);
+    }
+
+    // 2) Bombas: a bola do parquinho as empurra até o fim da linha; os outros veículos as acionam.
+    for (const bomb of state.bombs) {
+      const along = (lane.axis === 'row' ? bomb.col : bomb.row) + 0.5;
+      const across = lane.axis === 'row' ? bomb.row : bomb.col;
+      if (across !== lane.index || along < from || along > to) continue;
+      if (effect.pushBombs) {
+        const target = Math.floor(front);
+        const c = cellOf(target, lane.index);
+        const taken = state.bombs.some((other) => other !== bomb && other.col === c.col && other.row === c.row);
+        if (!taken) {
+          bomb.col = c.col;
+          bomb.row = c.row;
+          bomb.slide = null;
+          bomb.walkThrough = [];
+        }
+      } else if (bomb.ticksLeft > 1) {
+        bomb.ticksLeft = 1;
+      }
+    }
+
+    // 3) Jogadores.
+    const carried = (lane.carried ??= []);
     for (const player of state.players) {
       if (!player.alive || player.shieldTicks > 0 || player.heroTicks > 0) continue;
       const along = lane.axis === 'row' ? player.x : player.y;
       const across = lane.axis === 'row' ? player.y : player.x;
+      if (carried.includes(player.id)) {
+        // Levado na frente do veículo, parado, até o fim da pista.
+        if (lane.axis === 'row') {
+          player.x = front;
+          player.y = lane.index + 0.5;
+        } else {
+          player.y = front;
+          player.x = lane.index + 0.5;
+        }
+        player.frozenTicks = 9999;
+        player.slide = null;
+        continue;
+      }
       if (Math.floor(across) !== lane.index || along < from || along > to) continue;
-      player.alive = false;
-      state.events.push({ type: 'playerHit', playerId: player.id, killers: [], crushed: true });
-      dropPowerups(state, player);
+      if (effect.kill) {
+        player.alive = false;
+        state.events.push({ type: 'playerHit', playerId: player.id, killers: [], crushed: true });
+        dropPowerups(state, player);
+        continue;
+      }
+      if ((player.frozenTicks ?? 0) > 0 && !effect.carry) continue; // já atordoado por este veículo
+      if (effect.carry) carried.push(player.id);
+      else player.frozenTicks = Math.max(player.frozenTicks ?? 0, effect.freeze ?? 0);
+      if (effect.invert) player.invertTicks = Math.max(player.invertTicks, effect.invert);
+      if (effect.slow) player.slowTicks = Math.max(player.slowTicks, effect.slow);
+      player.slide = null;
+      state.events.push({ type: 'stunned', playerId: player.id });
     }
     const gone = lane.dir === 1 ? from > size : to < 0;
     if (gone) {
+      // Quem foi levado até o fim da pista é solto: paralisado pelo tempo do veículo (carros: 3 s; bola: solta na hora).
+      for (const player of state.players) {
+        if (lane.carried?.includes(player.id)) player.frozenTicks = effect.freeze ?? 0;
+      }
+      lane.carried = [];
       lane.phase = 'idle';
       const jitter = Math.floor((rng() - 0.5) * cfg.period * 0.3);
       lane.timer = Math.max(120, cfg.period * (traffic.lanes.length > 2 ? 2 : 1) - cfg.warn - trafficRunTicks(traffic.kind, size) + jitter);

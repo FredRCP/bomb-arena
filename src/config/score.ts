@@ -2,6 +2,8 @@
 
 /** Eliminar um jogador de outro time. */
 export const POINTS_KILL = 100;
+/** Destruir uma sósia da Pipoca (só pontos, ninguém sai do jogo). */
+export const POINTS_DECOY = 25;
 /** Eliminar um aliado (desconta; também não faz voltar das laterais). */
 export const POINTS_TEAMKILL = -100;
 /** Eliminar-se com a própria bomba (ou com a de um aliado, que conta como erro do aliado). */

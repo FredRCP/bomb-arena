@@ -18,7 +18,7 @@ const SMOKE_COLORS = [0x6c6f7a, 0x8a8d99, 0xa4a7b3] as const;
 const DUST_COLOR = 0xe8dcc0;
 
 /** Cor do brilho de cada superpoder. */
-const POWER_COLORS = { shield: 0x74c0fc, freeze: 0x9be7ff, stork: 0xe599f7, confuse: 0xb2f2bb, ghost: 0xced4da, jump: 0xffd43b, sprint: 0x2dc7ff, slime: 0x7ed957, invisible: 0xb388ff, twinbombs: 0xff6b35, fog: 0xdee2e6, magnet: 0xff6b6b } as const;
+const POWER_COLORS = { shield: 0x74c0fc, freeze: 0x9be7ff, stork: 0xe599f7, confuse: 0xb2f2bb, ghost: 0xced4da, jump: 0xffd43b, sprint: 0x2dc7ff, slime: 0x7ed957, invisible: 0xb388ff, twinbombs: 0xff6b35, fog: 0xdee2e6, magnet: 0xff6b6b, decoys: 0xffe066 } as const;
 
 export class Effects {
   private readonly particles = new ParticleSystem();

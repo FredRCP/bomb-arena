@@ -2,6 +2,7 @@ import { cellIndex } from './arena';
 import { advanceFlights, advanceSlidingBombs, blockedCellsFor, placeBomb, releaseBombs, tryKick, useSpecial, walkThroughCellsFor } from './bombs';
 import { advanceExplosions, applyFlameDamage } from './explosions';
 import { speedFactorAt, updateHazards } from './hazards';
+import { updateDecoys } from './decoys';
 import { updatePowers, usePower } from './powers';
 import { collectItems } from './items';
 import { collidesAt, movePlayer, stepDistanceOf } from './movement';
@@ -80,6 +81,7 @@ export function step(state: GameState, intents: Intents = {}): void {
   applyFlameDamage(state);
   updateHazards(state);
   updatePowers(state);
+  updateDecoys(state);
   updateRound(state);
   updateSidelines(state);
   state.tick += 1;

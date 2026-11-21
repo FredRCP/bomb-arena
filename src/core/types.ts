@@ -107,7 +107,7 @@ export interface PlayerState {
 }
 
 /** Superpoderes que existem: o elefantinho da Ana. */
-export type PowerKind = 'elephant' | 'airplane' | 'shield' | 'freeze' | 'stork' | 'confuse' | 'ghost' | 'jump' | 'sprint' | 'slime' | 'invisible' | 'twinbombs' | 'fog' | 'magnet';
+export type PowerKind = 'elephant' | 'airplane' | 'shield' | 'freeze' | 'stork' | 'confuse' | 'ghost' | 'jump' | 'sprint' | 'slime' | 'invisible' | 'twinbombs' | 'fog' | 'magnet' | 'decoys';
 
 /** Elefantinho em disparada: o centro dele (em células) e a direção. */
 /** Porta de um iglu: de onde saem as bolas de neve e os pinguins, com os passos até a próxima saída e quantas já saíram. */
@@ -244,6 +244,19 @@ export interface BombState {
 }
 
 /** Uma célula em chamas. Machuca quem estiver nela enquanto `ticksLeft` for maior que zero. */
+/** Sósia da Pipoca: parece o dono, anda de célula em célula e some quando o tempo acaba ou uma chama a pega. */
+export interface DecoyState {
+  id: number;
+  owner: PlayerId;
+  /** Posição em células (centro do corpo). */
+  x: number;
+  y: number;
+  /** Célula de destino do passo atual. */
+  tcol: number;
+  trow: number;
+  ticks: number;
+}
+
 export interface FlameState {
   col: number;
   row: number;
@@ -269,6 +282,11 @@ export type GameEvent =
   | { type: 'cannonShot'; col: number; row: number }
   | { type: 'cannonImpact'; col: number; row: number }
   | { type: 'stunned'; playerId: PlayerId }
+  | { type: 'pulled'; playerId: PlayerId; by: PlayerId }
+  | { type: 'stolen'; from: PlayerId; to: PlayerId; kind: ItemKind }
+  | { type: 'decoysSpawned'; owner: PlayerId }
+  | { type: 'decoyKilled'; id: number; owner: PlayerId; killers: PlayerId[] }
+  | { type: 'decoyGone'; id: number; owner: PlayerId }
   | { type: 'playerHit'; playerId: PlayerId; killers: PlayerId[]; crushed?: boolean; dart?: boolean }
   /** O colete aguentou uma explosão e se desfez (o jogador segue vivo). */
   | { type: 'vestBroken'; playerId: PlayerId }
@@ -432,6 +450,8 @@ export interface TrafficLane {
   pos: number;
   /** Cor/variação do veículo desta passagem. */
   look: number;
+  /** Jogadores que o veículo está levando na frente (carros e bola). */
+  carried?: PlayerId[];
 }
 
 export interface TrafficState {
@@ -514,6 +534,8 @@ export interface GameState {
   planes?: PlaneState[];
   /** Gosma do Musgo no chão. */
   slime?: SlimeCell[];
+  /** Sósias da Pipoca (poder): andam pela arena por um tempo. */
+  decoys?: DecoyState[];
   /** Neblina do Nimbo: passos que faltam e quem a criou (ele enxerga em volta). */
   fog?: { ticks: number; owner: PlayerId };
   /** Quem é eliminado pode jogar das laterais e tentar voltar (veja sideline.ts)? Ausente = sim. */

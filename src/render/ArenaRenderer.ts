@@ -687,10 +687,14 @@ export function drawEffects(g: Graphics, state: GameState, spriteFlames = false)
 }
 
 /** Qualquer coisa que se move e se esconde (o desenho do jogador é um Container). */
-type Movable = { setPosition(x: number, y: number): unknown; setVisible(value: boolean): unknown; setAlpha(value: number): unknown; setScale?(x: number, y?: number): unknown; setAngle?(degrees: number): unknown };
+type Movable = { setPosition(x: number, y: number): unknown; setVisible(value: boolean): unknown; setAlpha(value: number): unknown; setScale?(x: number, y?: number): unknown; setAngle?(degrees: number): unknown; getData?(key: string): unknown };
 
 /** Onde cada desenho estava no passo anterior (para saber se o personagem sem corpo inteiro está andando). */
-const lastSeen = new WeakMap<object, { x: number; y: number }>();
+const lastSeen = new WeakMap<object, { x: number; y: number; lean: number }>();
+/** Personagens que flutuam: andam sem quicar. */
+const FLOATERS = new Set(['violeta', 'nimbo', 'tique']);
+/** Personagens que se inclinam para o lado em que vão. */
+const LEANERS = new Set(['violeta', 'tique']);
 
 /** Posiciona o desenho do jogador conforme o estado do core (que usa unidades de célula). */
 export function syncPlayerView(view: Movable, player: PlayerState, arena?: Arena, tick = 0, celebrate = false): void {
@@ -714,16 +718,22 @@ export function syncPlayerView(view: Movable, player: PlayerState, arena?: Arena
   // Personagem de uma imagem só (Pipoca, Bolt, Tique...): sem poses de corpo inteiro, então andando ele quica, achata e balança
   // de leve (a imagem é a mesma para todas as direções); parado, volta ao normal.
   const before = lastSeen.get(view);
-  const moving = !!before && (Math.abs(before.x - player.x) > 0.002 || Math.abs(before.y - player.y) > 0.002);
-  lastSeen.set(view, { x: player.x, y: player.y });
-  if (moving && player.alive) {
+  const dxm = before ? player.x - before.x : 0;
+  const dym = before ? player.y - before.y : 0;
+  const moving = !!before && (Math.abs(dxm) > 0.002 || Math.abs(dym) > 0.002);
+  const id = String(view.getData?.('faceCharacter') ?? '');
+  // Inclinação: para o lado do movimento horizontal; parado ou subindo/descendo, volta ao centro aos poucos.
+  const leanTarget = LEANERS.has(id) && moving && Math.abs(dxm) >= Math.abs(dym) ? Math.sign(dxm) * 9 : 0;
+  const lean = (before?.lean ?? 0) + (leanTarget - (before?.lean ?? 0)) * 0.25;
+  lastSeen.set(view, { x: player.x, y: player.y, lean });
+  if (moving && player.alive && !FLOATERS.has(id)) {
     const wave = Math.sin(tick * 0.45);
     view.setPosition(player.x * TILE_SIZE, player.y * TILE_SIZE - Math.abs(wave) * 5);
     view.setScale?.(1 - 0.05 * Math.abs(wave), 1 + 0.07 * Math.abs(wave));
     view.setAngle?.(wave * 5);
   } else {
     view.setScale?.(1, 1);
-    view.setAngle?.(0);
+    view.setAngle?.(LEANERS.has(id) ? lean : 0);
   }
   // Quem foi atingido some; o resultado da rodada aparece pela tela de resultado.
   view.setVisible(player.alive);

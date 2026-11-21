@@ -121,6 +121,31 @@ export const TRAFFIC: Record<TrafficKind, TrafficCfg> = {
   log: { speed: 0.11, length: 1.3, warn: 110, first: 14 * 60, period: 12 * 60, fixedDir: false },
 };
 
+/**
+ * O que cada veículo faz com quem ele pega (só o trem mata). Todos eles destroem os blocos do caminho e acionam as bombas
+ * que encontram, menos a bola do parquinho, que empurra bombas e jogadores até o fim da linha.
+ * - kill: elimina; carry: leva o jogador na frente até o fim da pista; freeze/invert/slow: passos de paralisia, controles
+ *   invertidos (confuso) e lentidão.
+ */
+export interface TrafficEffect {
+  kill?: boolean;
+  carry?: boolean;
+  /** Empurra as bombas até o fim da linha em vez de acioná-las (só a bola do parquinho). */
+  pushBombs?: boolean;
+  freeze?: number;
+  invert?: number;
+  slow?: number;
+}
+export const TRAFFIC_EFFECTS: Record<TrafficKind, TrafficEffect> = {
+  train: { kill: true },
+  cars: { carry: true, freeze: 3 * 60 },
+  bulldozer: { freeze: 5 * 60, invert: 8 * 60 },
+  ball: { carry: true, pushBombs: true },
+  log: { freeze: 90, invert: 6 * 60, slow: 6 * 60 },
+};
+/** Chance de um bloco que já estava numa faixa de tráfego continuar lá (o veículo o destrói ao passar e pode revelar um item). */
+export const TRAFFIC_BLOCK_KEEP = 0.4;
+
 /** Bola de neve amassa (congela) quem ela atropela, por 4 s. */
 export const SNOWBALL_FREEZE_TICKS = 4 * 60;
 /** Perto do fim do tempo, iglus e pinguins ficam mais frequentes: de 1x no começo até 3x no fim (e na morte súbita). */

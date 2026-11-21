@@ -1,4 +1,4 @@
-import { POINTS_KILL, POINTS_MATCH_WIN, POINTS_ROUND_WIN, POINTS_SUICIDE, POINTS_TEAMKILL } from '../config/score';
+import { POINTS_DECOY, POINTS_KILL, POINTS_MATCH_WIN, POINTS_ROUND_WIN, POINTS_SUICIDE, POINTS_TEAMKILL } from '../config/score';
 import { teamOfOutcome } from './match';
 import type { MatchState } from './match';
 import type { GameEvent, PlayerId, PlayerState, RoundOutcome } from './types';
@@ -37,6 +37,11 @@ function lineOf(board: Scoreboard, id: PlayerId): ScoreLine {
 export function recordEvents(board: Scoreboard, events: readonly GameEvent[], players: readonly PlayerState[]): void {
   const teamOf = (id: PlayerId): number | undefined => players.find((p) => p.id === id)?.team;
   for (const event of events) {
+    if (event.type === 'decoyKilled') {
+      // Sósia destruída: pontos para quem a destruiu (se for de outro time que o da Pipoca); ninguém sai do jogo.
+      for (const killer of event.killers) if (teamOf(killer) !== teamOf(event.owner)) lineOf(board, killer).points += POINTS_DECOY;
+      continue;
+    }
     if (event.type !== 'playerHit') continue;
     lineOf(board, event.playerId).deaths += 1;
     if (event.killers.length === 0) {

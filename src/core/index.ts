@@ -20,3 +20,4 @@ export * from './danger';
 export * from './ai';
 export * from './step';
 export * from './clock';
+export * from './decoys';

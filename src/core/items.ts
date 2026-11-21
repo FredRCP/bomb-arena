@@ -114,6 +114,32 @@ export function applyItem(player: PlayerState, kind: ItemKind): boolean {
 }
 
 /**
+ * Tira 1 powerup (sorteado entre os que o jogador tem) de `from` e dá a `to`. Devolve o item levado ou null se não havia nenhum
+ * que `to` pudesse receber (limites e habilidades repetidas ficam com o dono).
+ */
+export function stealPowerup(from: PlayerState, to: PlayerState, rng: () => number): ItemKind | null {
+  const owned: ItemKind[] = [];
+  if (from.vest) owned.push('vest');
+  if (from.maxBombs > DEFAULT_MAX_BOMBS) owned.push('bomb');
+  if (from.bombRange > DEFAULT_BOMB_RANGE) owned.push('range');
+  if (from.speedBonus > 0) owned.push('speed');
+  for (const [kind, flag] of Object.entries(ABILITY_FLAG) as Array<[keyof typeof ABILITY_FLAG, (typeof ABILITY_FLAG)[keyof typeof ABILITY_FLAG]]>) {
+    if (from[flag]) owned.push(kind);
+  }
+  while (owned.length > 0) {
+    const kind = owned.splice(Math.floor(rng() * owned.length), 1)[0]!;
+    if (!applyItem(to, kind)) continue;
+    if (kind === 'vest') from.vest = false;
+    else if (kind === 'bomb') from.maxBombs -= 1;
+    else if (kind === 'range') from.bombRange -= 1;
+    else if (kind === 'speed') from.speedBonus -= 1;
+    else from[ABILITY_FLAG[kind as keyof typeof ABILITY_FLAG]] = false;
+    return kind;
+  }
+  return null;
+}
+
+/**
  * Jogador eliminado: todos os seus itens (bombas, alcance, velocidade e habilidades) voltam ao chão, espalhados em
  * casas livres sorteadas, e ele fica de novo "do zero" (quem voltar das laterais volta sem nada). Itens que acabam
  * sozinhos (fantasma, controles invertidos) e a pedra simplesmente somem. O sorteio usa só o passo e o id do jogador,
