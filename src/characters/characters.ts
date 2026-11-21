@@ -44,7 +44,7 @@ export const CHARACTERS: readonly CharacterDef[] = [
   { id: 'violeta', name: 'Violeta', color: 0xb388ff, hat: 'crown', custom: true, power: 'invisible' },
   { id: 'fagulha', name: 'Fagulha', color: 0xff6b35, hat: 'star', custom: true, power: 'twinbombs' },
   { id: 'nimbo', name: 'Nimbo', color: 0x5c7cfa, hat: 'ears', custom: true, power: 'fog' },
-  { id: 'tique', name: 'Tique', color: 0x66d9e8, hat: 'antenna', custom: true, power: 'magnet' },
+  { id: 'magnetron', name: 'Magnetron', color: 0x66d9e8, hat: 'antenna', custom: true, power: 'magnet' },
 ];
 
 export function characterById(id: string | undefined): CharacterDef {

@@ -28,7 +28,7 @@ export class IceBlockView {
       const left = p.frozenTicks ?? 0;
       const wrapped = wraps[p.id] !== undefined && left > 0 && state.tick - wraps[p.id]! <= 182; // enfaixado: é o casulo, não o gelo
       let image = this.images.get(p.id);
-      if (!p.alive || left <= 0 || wrapped) {
+      if (!p.alive || left <= 0 || wrapped || p.stunned) {
         image?.setVisible(false);
         continue;
       }

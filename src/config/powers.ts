@@ -47,6 +47,9 @@ export const STORK_SHIELD_TICKS = 5 * 60;
 export const JUMP_CELLS = 4;
 /** Bolt: corre na velocidade máxima do jogo por 10 s. */
 export const SPRINT_POWER_TICKS = 10 * 60;
+/** Bolt: ao disparar o turbo, quem está a até este raio (em células) leva um choque e fica paralisado este tempo. */
+export const SHOCK_RADIUS = 5;
+export const SHOCK_TICKS = 90;
 /** Musgo: gosma em 3 células em cada direção; quem pisa (menos ela) fica na velocidade mínima. Dura 10 s. */
 export const SLIME_CELLS = 3;
 export const SLIME_TICKS = 10 * 60;
@@ -76,9 +79,11 @@ export const POWER_LABELS = {
   magnet: 'ÍMÃ!',
 } as const;
 
-/** Tique (o robozinho): o ímã puxa para perto dele os jogadores até este raio (em células) e arranca 1 powerup dos mais próximos. */
+/** Magnetron (o robô ímã): puxa para perto dele os jogadores até este raio (em células) e arranca 1 powerup do mais próximo (cai no cenário). */
 export const MAGNET_RADIUS = 5;
-export const MAGNET_STEALS = 2;
+export const MAGNET_STEALS = 1;
+/** O powerup arrancado cai numa casa livre até este raio (em células) do Magnetron. */
+export const MAGNET_DROP_RADIUS = 4;
 /** Pipoca: 4 sósias idênticas andam pela arena por 10 s. Matar uma não faz nada, só dá pontos. */
 export const DECOY_COUNT = 4;
 export const DECOY_TICKS = 10 * 60;

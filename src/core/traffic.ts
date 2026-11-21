@@ -143,6 +143,7 @@ export function updateTraffic(state: GameState): void {
           player.x = lane.index + 0.5;
         }
         player.frozenTicks = 9999;
+        player.stunned = true;
         player.slide = null;
         continue;
       }
@@ -155,7 +156,10 @@ export function updateTraffic(state: GameState): void {
       }
       if ((player.frozenTicks ?? 0) > 0 && !effect.carry) continue; // já atordoado por este veículo
       if (effect.carry) carried.push(player.id);
-      else player.frozenTicks = Math.max(player.frozenTicks ?? 0, effect.freeze ?? 0);
+      else {
+        player.frozenTicks = Math.max(player.frozenTicks ?? 0, effect.freeze ?? 0);
+        player.stunned = true;
+      }
       if (effect.invert) player.invertTicks = Math.max(player.invertTicks, effect.invert);
       if (effect.slow) player.slowTicks = Math.max(player.slowTicks, effect.slow);
       player.slide = null;
@@ -165,7 +169,10 @@ export function updateTraffic(state: GameState): void {
     if (gone) {
       // Quem foi levado até o fim da pista é solto: paralisado pelo tempo do veículo (carros: 3 s; bola: solta na hora).
       for (const player of state.players) {
-        if (lane.carried?.includes(player.id)) player.frozenTicks = effect.freeze ?? 0;
+        if (lane.carried?.includes(player.id)) {
+          player.frozenTicks = effect.freeze ?? 0;
+          player.stunned = true;
+        }
       }
       lane.carried = [];
       lane.phase = 'idle';

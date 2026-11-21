@@ -440,17 +440,17 @@ export class HazardsView {
     if (!cells || cells.length === 0) return;
     const cols = state.arena.cols;
     const t = state.tick;
-    // Com a arte (3 quadros: calma, girando, afundando): cada célula alterna 1-2-3-2, defasada da vizinha.
+    // Com a arte (vortex.png): um redemoinho por célula, girando sem parar (cada um defasado e em sentido diferente do vizinho).
     const egypt = themeById('egypt');
-    if (this.scene.textures.exists(themeKey(egypt, 'quicksand1')) && this.scene.textures.exists(themeKey(egypt, 'quicksand3'))) {
-      const seq = [1, 2, 3, 2];
+    const vortexKey = themeKey(egypt, 'vortex');
+    if (this.scene.textures.exists(vortexKey)) {
       for (const index of cells) {
         let image = this.sandImages.get(index);
         if (!image) {
-          image = this.scene.add.image(((index % cols) + 0.5) * TILE_SIZE, (Math.floor(index / cols) + 0.5) * TILE_SIZE, themeKey(egypt, 'quicksand1')).setDisplaySize(TILE_SIZE, TILE_SIZE).setDepth(0.5);
+          image = this.scene.add.image(((index % cols) + 0.5) * TILE_SIZE, (Math.floor(index / cols) + 0.5) * TILE_SIZE, vortexKey).setDisplaySize(TILE_SIZE, TILE_SIZE).setDepth(0.5);
           this.sandImages.set(index, image);
         }
-        image.setTexture(themeKey(egypt, `quicksand${seq[(Math.floor(t / 20) + index) % 4]}`));
+        image.setAngle(-t * 2.4 + index * 37); // ~2,4° por passo: uma volta a cada 2,5 s
       }
       return;
     }

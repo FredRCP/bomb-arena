@@ -132,7 +132,7 @@ describe('Poderes: carga e personagens', () => {
     expect(state.fog).toBeUndefined();
   });
 
-  it('Tique: o ímã puxa quem está a até 5 células e arranca 1 powerup dos mais próximos', () => {
+  it('Magnetron: o ímã puxa quem está a até 5 células e derruba 1 powerup dele no cenário', () => {
     const { state, me, other } = setup('magnet');
     other.x = 7.5;
     other.y = 1.5; // 4 células de distância
@@ -143,10 +143,29 @@ describe('Poderes: carga e personagens', () => {
     use(state, me);
     expect(Math.hypot(other.x - me.x, other.y - me.y)).toBeLessThanOrEqual(3);
     expect(other.maxBombs).toBe(2);
-    expect(me.maxBombs).toBe(bombs + 1);
+    expect(me.maxBombs).toBe(bombs); // o item não vai para o Magnetron: cai no chão
+    expect(state.items.some((item) => item.kind === 'bomb')).toBe(true);
   });
 
-  it('Tique: quem está além de 5 células, ou com escudo, não é puxado', () => {
+  it('Bolt: o turbo dá choque em quem está a até 5 células (paralisa por 1,5 s, sem gelo)', () => {
+    const { state, me, other } = setup('sprint');
+    other.x = me.x + 3;
+    other.y = me.y;
+    use(state, me);
+    expect(other.frozenTicks ?? 0).toBeGreaterThan(80);
+    expect(other.stunned).toBe(true);
+    expect(me.sprintTicks ?? 0).toBeGreaterThan(0);
+  });
+
+  it('Bolt: quem está além de 5 células não leva choque', () => {
+    const { state, me, other } = setup('sprint');
+    other.x = me.x + 7;
+    other.y = me.y;
+    use(state, me);
+    expect(other.frozenTicks ?? 0).toBe(0);
+  });
+
+  it('Magnetron: quem está além de 5 células, ou com escudo, não é puxado', () => {
     const { state, me, other } = setup('magnet');
     other.x = 11.5;
     other.y = 1.5; // 8 células

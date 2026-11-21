@@ -542,6 +542,7 @@ function updateRollers(state: GameState): void {
           (roller.hit ??= []).push(player.id);
           if (player.shieldTicks > 0 || player.heroTicks > 0) continue;
           player.frozenTicks = Math.max(player.frozenTicks ?? 0, SNOWBALL_FREEZE_TICKS);
+          player.stunned = false;
           player.slide = null;
           state.events.push({ type: 'squashed', playerId: player.id });
         }

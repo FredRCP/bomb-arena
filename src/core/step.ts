@@ -112,6 +112,7 @@ function tickEffects(state: GameState): void {
     if ((player.sprintTicks ?? 0) > 0) player.sprintTicks! -= 1;
     if ((player.invisibleTicks ?? 0) > 0) player.invisibleTicks! -= 1;
     if ((player.frozenTicks ?? 0) > 0) player.frozenTicks! -= 1;
+    else if (player.stunned) player.stunned = false;
     if (player.shieldTicks > 0) player.shieldTicks -= 1;
     if (player.heroTicks > 0) player.heroTicks -= 1;
   }

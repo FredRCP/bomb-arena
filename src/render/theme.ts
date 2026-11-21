@@ -141,8 +141,7 @@ export function preloadThemes(scene: Phaser.Scene): void {
     if (theme.floorFull) add('floorFull', 'floor.jpg');
     if (theme.columns) add('column', 'column.png');
     if (theme.quicksand) {
-      add('quicksand', 'quicksand.png');
-      for (let i = 1; i <= 3; i++) add(`quicksand${i}`, `quicksand${i}.png`); // calma, girando, afundando
+      add('vortex', 'vortex.png'); // redemoinho visto de cima (1 imagem): o código gira constantemente. Sem a imagem, usa o espiral desenhado em código.
     }
     if (theme.frameImages) {
       add('frame15', 'frame15.png');

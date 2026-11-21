@@ -110,6 +110,7 @@ describe('Tráfego (arenas Selva, Pista, Obras, Parquinho e Trem)', () => {
     expect(p.x < 1.7 || p.x > state.arena.cols - 1.7).toBe(true);
     expect(p.frozenTicks).toBeGreaterThan(150);
     expect(p.frozenTicks).toBeLessThanOrEqual(180);
+    expect(p.stunned).toBe(true); // pancada: o desenho mostra estrelinhas, não gelo
   });
 
   it('trator paralisa por 5 s e deixa confuso por 8 s, sem matar', () => {

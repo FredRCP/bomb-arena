@@ -1,10 +1,10 @@
-import { AIRPLANE_BOMBS, AIRPLANE_DROP_TICKS, AIRPLANE_END_SCALE, AIRPLANE_ENTRY_TICKS, AIRPLANE_FIRST_DROP, AIRPLANE_LAPS, AIRPLANE_LAP_TICKS, CONFUSE_POWER_TICKS, FOG_POWER_TICKS, GHOST_HALO_RADIUS, GHOST_HALO_TICKS, FREEZE_PLAYER_TICKS, STORK_SHIELD_TICKS, INVISIBLE_POWER_TICKS, JUMP_CELLS, SLIME_CELLS, SLIME_TICKS, SPRINT_POWER_TICKS, TWIN_BOMB_RANGE, ELEPHANT_MAX_BLOCKS, ELEPHANT_SPEED, POWER_CHARGE_TICKS, SHIELD_POWER_TICKS, STORK_FAR_ITEMS, STORK_ITEMS, STORK_RADIUS, FREEZE_POWER_TICKS, GHOST_POWER_TICKS, MAGNET_RADIUS, MAGNET_STEALS } from '../config/powers';
+import { AIRPLANE_BOMBS, AIRPLANE_DROP_TICKS, AIRPLANE_END_SCALE, AIRPLANE_ENTRY_TICKS, AIRPLANE_FIRST_DROP, AIRPLANE_LAPS, AIRPLANE_LAP_TICKS, CONFUSE_POWER_TICKS, FOG_POWER_TICKS, GHOST_HALO_RADIUS, GHOST_HALO_TICKS, FREEZE_PLAYER_TICKS, STORK_SHIELD_TICKS, INVISIBLE_POWER_TICKS, JUMP_CELLS, SLIME_CELLS, SLIME_TICKS, SPRINT_POWER_TICKS, TWIN_BOMB_RANGE, ELEPHANT_MAX_BLOCKS, ELEPHANT_SPEED, POWER_CHARGE_TICKS, SHIELD_POWER_TICKS, STORK_FAR_ITEMS, STORK_ITEMS, STORK_RADIUS, FREEZE_POWER_TICKS, GHOST_POWER_TICKS, MAGNET_RADIUS, MAGNET_STEALS, MAGNET_DROP_RADIUS, SHOCK_RADIUS, SHOCK_TICKS } from '../config/powers';
 import { BOMB_FUSE_TICKS } from '../config/bombs';
 import { cellIndex, getCell, isTunnel } from './arena';
 import { dropBomb } from './bombs';
 import { collidesAt } from './movement';
 import { createRng } from './random';
-import { freeItemCells, revealItem, stealPowerup } from './items';
+import { freeItemCells, knockOutPowerup, revealItem } from './items';
 import { spawnDecoys } from './decoys';
 import type { Direction, GameState, PlayerState, PowerKind } from './types';
 
@@ -14,7 +14,7 @@ import type { Direction, GameState, PlayerState, PowerKind } from './types';
 // - shield (Fred): teletransporta para uma célula livre sorteada e fica invencível 10 s. freeze (Van): congela os outros jogadores por 5 s e as bombas deles por 10 s. stork (Wal): solta 4 itens bons (3 perto, 1 longe) e dá escudo de 5 s.
 //   confuse (Glauceste): todos os outros ficam com os controles invertidos por 10 s. ghost (Filippe): atravessa blocos por 10 s e cria um halo de 3 células de raio onde ninguém entra.
 // - pipoca: atira 4 bombas, uma em cada direção, a 4 células; bolt: velocidade máxima 10 s; musgo: gosma em 3 células em cada direção; violeta: invisível 10 s;
-//   fagulha: 2 bombas que varrem a linha e a coluna inteiras (imune); nimbo: neblina 10 s; tique: ímã que puxa todos os itens bons da arena e faz sumir os ruins.
+//   fagulha: 2 bombas que varrem a linha e a coluna inteiras (imune); nimbo: neblina 10 s; magnetron: ímã que puxa os jogadores num raio de 5 células e derruba 1 powerup no cenário.
 // - elephant (Ana): um elefantinho sai correndo na direção para onde o jogador olha, em linha reta, e quebra todos os
 //   blocos da fileira inteira (os itens escondidos aparecem) e empurra quem estiver no caminho. Ele não machuca ninguém e para ao bater numa parede.
 
@@ -144,6 +144,15 @@ function usePersonalPower(state: GameState, player: PlayerState, kind: Exclude<P
     for (const spot of jumpLandings(state, player)) dropBomb(state, player, spot.col, spot.row);
   } else if (kind === 'sprint') {
     player.sprintTicks = SPRINT_POWER_TICKS;
+    // Choque: quem está a até SHOCK_RADIUS células (sem escudo/herói) leva um choque e fica paralisado um instante.
+    for (const o of state.players) {
+      if (o.id === player.id || !o.alive || o.sideline !== null || o.shieldTicks > 0 || o.heroTicks > 0) continue;
+      if (Math.hypot(o.x - player.x, o.y - player.y) > SHOCK_RADIUS) continue;
+      o.frozenTicks = Math.max(o.frozenTicks ?? 0, SHOCK_TICKS);
+      o.stunned = true;
+      o.slide = null;
+      state.events.push({ type: 'shocked', playerId: o.id, by: player.id });
+    }
   } else if (kind === 'invisible') {
     player.invisibleTicks = INVISIBLE_POWER_TICKS;
   } else if (kind === 'slime') {
@@ -207,8 +216,9 @@ function usePersonalPower(state: GameState, player: PlayerState, kind: Exclude<P
         state.events.push({ type: 'pulled', playerId: o.id, by: player.id });
       }
       if (rank < MAGNET_STEALS) {
-        const taken = stealPowerup(o, player, rng);
-        if (taken) state.events.push({ type: 'stolen', from: o.id, to: player.id, kind: taken });
+        // O powerup arrancado cai no cenário (perto do Magnetron), para quem chegar primeiro.
+        const dropped = knockOutPowerup(state, o, player, MAGNET_DROP_RADIUS, rng);
+        if (dropped) state.events.push({ type: 'stolen', from: o.id, to: player.id, kind: dropped.kind });
       }
     });
   } else if (kind === 'decoys') {
@@ -221,6 +231,7 @@ function usePersonalPower(state: GameState, player: PlayerState, kind: Exclude<P
     for (const other of state.players) {
       if (!other.alive || other.id === player.id) continue;
       other.frozenTicks = Math.max(other.frozenTicks ?? 0, FREEZE_PLAYER_TICKS);
+      other.stunned = false;
       other.slide = null;
     }
   } else if (kind === 'stork') {

@@ -102,6 +102,8 @@ export interface PlayerState {
   invisibleTicks?: number;
   /** Congelado (poder da Van): não anda, não solta bomba nem usa poder enquanto for maior que zero. */
   frozenTicks?: number;
+  /** Parado por pancada (veículo, pedra...) e não por gelo: o desenho mostra estrelinhas em vez de bloco de gelo. */
+  stunned?: boolean;
   /** Superpoder do personagem e a carga dele (0 a POWER_CHARGE_TICKS). Ausente = sem poder. */
   power?: { kind: PowerKind; charge: number };
 }
@@ -283,6 +285,7 @@ export type GameEvent =
   | { type: 'cannonImpact'; col: number; row: number }
   | { type: 'stunned'; playerId: PlayerId }
   | { type: 'pulled'; playerId: PlayerId; by: PlayerId }
+  | { type: 'shocked'; playerId: PlayerId; by: PlayerId }
   | { type: 'stolen'; from: PlayerId; to: PlayerId; kind: ItemKind }
   | { type: 'decoysSpawned'; owner: PlayerId }
   | { type: 'decoyKilled'; id: number; owner: PlayerId; killers: PlayerId[] }

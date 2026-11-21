@@ -131,7 +131,7 @@ function drawBolt(g: Phaser.GameObjects.Graphics, radius: number): void {
  * Devolve um Container: dá para mover, esconder e trocar a profundidade como qualquer objeto.
  */
 /** Personagens de imagem única que pedem um desenho maior (a arte deles tem muito espaço vazio em volta). */
-const SIZE_BOOST: Record<string, number> = { fagulha: 1.2, musgo: 1.2, tique: 1.25 };
+const SIZE_BOOST: Record<string, number> = { fagulha: 1.2, musgo: 1.1, magnetron: 1.25 };
 
 export function addCharacter(scene: Phaser.Scene, character: CharacterDef, x: number, y: number, radius: number): Phaser.GameObjects.Container {
   const parts: Phaser.GameObjects.GameObject[] = [];

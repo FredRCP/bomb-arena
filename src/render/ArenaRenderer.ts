@@ -160,14 +160,6 @@ export function drawArena(scene: Phaser.Scene, arena: Arena, themeId = 'classic'
     }
   }
 
-  if (hazards && theme.quicksand && has(scene, theme, 'quicksand') && !has(scene, theme, 'quicksand1')) {
-    for (const index of hazards.quicksand) {
-      const col = index % arena.cols;
-      const row = Math.floor(index / arena.cols);
-      scene.add.image((col + 0.5) * TILE_SIZE, (row + 0.5) * TILE_SIZE, themeKey(theme, 'quicksand')).setDisplaySize(TILE_SIZE, TILE_SIZE).setDepth(0.5);
-    }
-  }
-
   g.setDepth(0);
   return g;
 }
@@ -692,9 +684,11 @@ type Movable = { setPosition(x: number, y: number): unknown; setVisible(value: b
 /** Onde cada desenho estava no passo anterior (para saber se o personagem sem corpo inteiro está andando). */
 const lastSeen = new WeakMap<object, { x: number; y: number; lean: number }>();
 /** Personagens que flutuam: andam sem quicar. */
-const FLOATERS = new Set(['violeta', 'nimbo', 'tique']);
+const FLOATERS = new Set(['violeta', 'nimbo', 'magnetron', 'bolt']);
+/** Personagens que gingam: balançam de um lado para o outro e sobem um pouco a cada passo, sem achatar. */
+const WADDLERS = new Set(['musgo', 'fagulha']);
 /** Personagens que se inclinam para o lado em que vão. */
-const LEANERS = new Set(['violeta', 'tique']);
+const LEANERS = new Set(['violeta', 'magnetron', 'bolt']);
 
 /** Posiciona o desenho do jogador conforme o estado do core (que usa unidades de célula). */
 export function syncPlayerView(view: Movable, player: PlayerState, arena?: Arena, tick = 0, celebrate = false): void {
@@ -726,7 +720,12 @@ export function syncPlayerView(view: Movable, player: PlayerState, arena?: Arena
   const leanTarget = LEANERS.has(id) && moving && Math.abs(dxm) >= Math.abs(dym) ? Math.sign(dxm) * 9 : 0;
   const lean = (before?.lean ?? 0) + (leanTarget - (before?.lean ?? 0)) * 0.25;
   lastSeen.set(view, { x: player.x, y: player.y, lean });
-  if (moving && player.alive && !FLOATERS.has(id)) {
+  if (moving && player.alive && WADDLERS.has(id)) {
+    const wave = Math.sin(tick * 0.3);
+    view.setPosition(player.x * TILE_SIZE, player.y * TILE_SIZE - Math.abs(wave) * 3);
+    view.setScale?.(1, 1);
+    view.setAngle?.(wave * 7);
+  } else if (moving && player.alive && !FLOATERS.has(id)) {
     const wave = Math.sin(tick * 0.45);
     view.setPosition(player.x * TILE_SIZE, player.y * TILE_SIZE - Math.abs(wave) * 5);
     view.setScale?.(1 - 0.05 * Math.abs(wave), 1 + 0.07 * Math.abs(wave));
@@ -743,25 +742,35 @@ export function syncPlayerView(view: Movable, player: PlayerState, arena?: Arena
 
 /**
  * Túnel (pirâmide e templo da ilha): a imagem do prédio fica acima dos jogadores, então quem entra sumiria já na porta.
- * Aqui o jogador passa para cima da imagem e vai ficando transparente conforme se afasta da porta rumo ao centro:
- * na porta ainda aparece inteiro, no meio do túnel desaparece.
+ * Aqui o jogador passa para cima da imagem: aparece inteiro só na célula da porta (somem na metade de dentro dela)
+ * e fica invisível em todo o resto do túnel.
  */
 export function fadeInTunnel(view: { alpha: number; setAlpha(v: number): unknown; setDepth(v: number): unknown }, player: PlayerState, arena: Arena, tunnel: number[] | undefined): void {
-  const cell = Math.floor(player.y) * arena.cols + Math.floor(player.x);
-  if (!tunnel || !tunnel.includes(cell)) {
+  const col = Math.floor(player.x);
+  const row = Math.floor(player.y);
+  if (!tunnel || !tunnel.includes(row * arena.cols + col)) {
     view.setDepth(10);
     return;
   }
-  let cx = 0;
-  let cy = 0;
+  // Portas = pontas do túnel (limites das colunas/linhas do túnel). Só ali o jogador aparece; dentro, some.
+  let minC = Infinity;
+  let maxC = -Infinity;
+  let minR = Infinity;
+  let maxR = -Infinity;
   for (const i of tunnel) {
-    cx += (i % arena.cols) + 0.5;
-    cy += Math.floor(i / arena.cols) + 0.5;
+    const c = i % arena.cols;
+    const r = Math.floor(i / arena.cols);
+    minC = Math.min(minC, c);
+    maxC = Math.max(maxC, c);
+    minR = Math.min(minR, r);
+    maxR = Math.max(maxR, r);
   }
-  cx /= tunnel.length;
-  cy /= tunnel.length;
-  const d = Math.max(Math.abs(player.x - cx), Math.abs(player.y - cy));
-  const k = Math.min(1, Math.max(0, (d - 0.2) / 0.8));
+  let inward: number | null = null; // 0 = borda de fora da porta, 1 = borda de dentro
+  if (col === minC) inward = player.x - col;
+  else if (col === maxC) inward = col + 1 - player.x;
+  else if (row === minR) inward = player.y - row;
+  else if (row === maxR) inward = row + 1 - player.y;
+  const k = inward === null ? 0 : 1 - Math.min(1, Math.max(0, (inward - 0.45) / 0.45));
   view.setDepth(10.6);
   view.setAlpha(view.alpha * k);
 }
@@ -769,7 +778,7 @@ export function fadeInTunnel(view: { alpha: number; setAlpha(v: number): unknown
 /** Transparência do jogador: invisível (Violeta) quase some; escudo pisca; fantasma fica meio transparente. */
 function playerAlpha(player: PlayerState, tick: number): number {
   if ((player.invisibleTicks ?? 0) > 0) return player.invisibleTicks! < 60 && tick % 8 < 4 ? 0.5 : 0.1;
-  if ((player.frozenTicks ?? 0) > 0) return 0.6;
+  if ((player.frozenTicks ?? 0) > 0 && !player.stunned) return 0.6;
   if (player.shieldTicks > 0) return tick % 10 < 5 ? 0.35 : 1;
   return player.ghostTicks > 0 ? 0.5 : 1;
 }

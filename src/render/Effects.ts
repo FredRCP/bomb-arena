@@ -28,6 +28,9 @@ export class Effects {
   private readonly dustClock = new Map<number, number>();
 
   private readonly theme: ThemeDef;
+  /** Raios do Bolt: de quem deu o choque até quem levou, valendo até o passo `until`. */
+  private readonly stunImages = new Map<number, Phaser.GameObjects.Image>();
+  private readonly arcs: Array<{ fromId: number; toId: number; until: number }> = [];
 
   constructor(private readonly scene: Phaser.Scene, themeId = 'classic') {
     this.theme = themeById(themeId);
@@ -53,6 +56,11 @@ export class Effects {
         if (p) this.powerBurst(p.x * TILE_SIZE, p.y * TILE_SIZE - 10, POWER_COLORS[event.kind]);
         if (event.kind === 'confuse') for (const q of state.players) if (q.alive && q.id !== event.playerId && q.invertTicks > 0) this.stars(q.x * TILE_SIZE, q.y * TILE_SIZE - 30);
       }
+      if (event.type === 'shocked') {
+        this.arcs.push({ fromId: event.by, toId: event.playerId, until: state.tick + 36 });
+        const q = state.players.find((o) => o.id === event.playerId);
+        if (q) this.powerBurst(q.x * TILE_SIZE, q.y * TILE_SIZE - 20, 0xffe94d);
+      }
       if (event.type === 'itemPicked' || event.type === 'playerRevived') {
         const p = state.players.find((q) => q.id === (event.type === 'itemPicked' ? event.playerId : event.playerId));
         if (p) this.sparkle(p.x * TILE_SIZE, p.y * TILE_SIZE - 20, event.type === 'itemPicked' ? 0xffe66d : 0x7ed957);
@@ -68,17 +76,87 @@ export class Effects {
   update(deltaMs: number, state: GameState): void {
     if (!this.enabled) return;
     this.spawnDust(deltaMs / 1000, state);
+    this.fagulhaSmoke(deltaMs / 1000, state);
     this.particles.update(deltaMs / 1000);
     this.draw();
     this.drawDizzy(state);
   }
 
   /** Confuso (controles trocados: poder do Glauceste, flechas, pedra...): estrelinhas piscando girando sobre a cabeça. */
+  /** Fagulha com as bombas gêmeas ativas: sai muita fumaça escura dela (ela também pisca vermelha, em drawDizzy). */
+  private fagulhaSmoke(dt: number, state: GameState): void {
+    for (const p of state.players) {
+      if (!p.alive || p.heroTicks <= 0 || !state.bombs.some((b) => b.owner === p.id && b.pierce)) continue;
+      const n = Math.max(1, Math.round(dt * 60 * 0.8));
+      for (let i = 0; i < n; i++) {
+        this.particles.spawn({ kind: 'smoke', x: p.x * TILE_SIZE + rand(-16, 16), y: p.y * TILE_SIZE - rand(10, 40), vx: rand(-22, 22), vy: rand(-70, -35), gravity: -14, life: rand(0.7, 1.2), size0: 9, size1: 34, color: pick([0x2b2b30, 0x4a4a52, 0x6b6b74]) });
+      }
+    }
+  }
+
+  /** Atordoado por pancada: a imagem de estrelinhas gira sobre a cabeça (se faltar a imagem, vale o desenho em código). */
+  private updateStun(state: GameState): boolean {
+    if (!this.scene.textures.exists('stun')) return false;
+    for (const p of state.players) {
+      let image = this.stunImages.get(p.id);
+      const on = p.alive && !!p.stunned && (p.frozenTicks ?? 0) > 0;
+      if (!on) {
+        image?.setVisible(false);
+        continue;
+      }
+      if (!image) {
+        image = this.scene.add.image(0, 0, 'stun').setDepth(11);
+        image.setScale(84 / image.width);
+        this.stunImages.set(p.id, image);
+      }
+      image.setPosition(p.x * TILE_SIZE, p.y * TILE_SIZE - 40).setAngle(state.tick * 4).setVisible(true).setAlpha((p.frozenTicks ?? 0) < 30 && Math.floor(state.tick / 4) % 2 === 0 ? 0.5 : 0.95);
+    }
+    return true;
+  }
+
   private drawDizzy(state: GameState): void {
     const g = this.g;
+    const stunImage = this.updateStun(state);
+    // Fagulha prestes a explodir: um clarão vermelho piscando em volta dela.
+    for (const p of state.players) {
+      if (!p.alive || p.heroTicks <= 0 || !state.bombs.some((b) => b.owner === p.id && b.pierce)) continue;
+      const on = Math.floor(state.tick / 8) % 2 === 0;
+      g.fillStyle(0xff2418, on ? 0.38 : 0.12).fillCircle(p.x * TILE_SIZE, p.y * TILE_SIZE - 22, on ? 46 : 38);
+    }
+    // Choque do Bolt: raios em zigue-zague até quem levou.
+    for (let i = this.arcs.length - 1; i >= 0; i--) {
+      const arc = this.arcs[i]!;
+      if (state.tick > arc.until) {
+        this.arcs.splice(i, 1);
+        continue;
+      }
+      const a = state.players.find((p) => p.id === arc.fromId);
+      const b = state.players.find((p) => p.id === arc.toId);
+      if (!a || !b) continue;
+      const x1 = a.x * TILE_SIZE;
+      const y1 = a.y * TILE_SIZE - 24;
+      const x2 = b.x * TILE_SIZE;
+      const y2 = b.y * TILE_SIZE - 24;
+      const len = Math.hypot(x2 - x1, y2 - y1) || 1;
+      const nx = -(y2 - y1) / len;
+      const ny = (x2 - x1) / len;
+      let px = x1;
+      let py = y1;
+      const steps = 7;
+      for (let k = 1; k <= steps; k++) {
+        const u = k / steps;
+        const jitter = k === steps ? 0 : Math.sin(state.tick * 2.3 + k * 5.1 + i) * 14;
+        const qx = x1 + (x2 - x1) * u + nx * jitter;
+        const qy = y1 + (y2 - y1) * u + ny * jitter;
+        g.lineStyle(6, 0xfff3a0, 0.55).lineBetween(px, py, qx, qy);
+        g.lineStyle(2.5, 0xffffff, 1).lineBetween(px, py, qx, qy);
+        px = qx;
+        py = qy;
+      }
+    }
     for (const p of state.players) {
       // Congelado (bola de neve, poder de gelo): contorno de gelo em volta do corpo, piscando perto de descongelar.
-      if (p.alive && (p.frozenTicks ?? 0) > 0 && !this.scene.textures.exists('ice1') && ((p.frozenTicks ?? 0) > 60 || Math.floor(state.tick / 5) % 2 === 0)) {
+      if (p.alive && (p.frozenTicks ?? 0) > 0 && !p.stunned && !this.scene.textures.exists('ice1') && ((p.frozenTicks ?? 0) > 60 || Math.floor(state.tick / 5) % 2 === 0)) {
         const fx = p.x * TILE_SIZE;
         const fy = p.y * TILE_SIZE - 6;
         const wrapAt = state.hazards?.mummy?.wrappedAt[p.id];
@@ -92,7 +170,7 @@ export class Effects {
           g.fillStyle(0xffffff, 0.8).fillTriangle(fx + 17, fy + 22, fx + 8, fy + 24, fx + 17, fy + 12);
         }
       }
-      if (!p.alive || (p.invertTicks <= 0 && p.slowTicks <= 0)) continue;
+      if (!p.alive || (p.invertTicks <= 0 && p.slowTicks <= 0 && (!p.stunned || stunImage))) continue;
       const cx = p.x * TILE_SIZE;
       const cy = p.y * TILE_SIZE - 44;
       for (let k = 0; k < 3; k++) {

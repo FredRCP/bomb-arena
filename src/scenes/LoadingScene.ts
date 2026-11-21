@@ -38,6 +38,7 @@ export class LoadingScene extends Phaser.Scene {
     preloadPlane(this);
     preloadItems(this);
     for (let i = 1; i <= 3; i++) this.load.image(`ice${i}`, `effects/ice${i}.png`); // bloco de gelo do congelado
+    this.load.image('stun', 'effects/stun.png'); // estrelinhas girando sobre quem está atordoado
     for (let i = 1; i <= 3; i++) this.load.image(`slime${i}`, `effects/slime${i}.png`); // gosma do Musgo
   }
 

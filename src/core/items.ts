@@ -140,6 +140,39 @@ export function stealPowerup(from: PlayerState, to: PlayerState, rng: () => numb
 }
 
 /**
+ * Ímã do Magnetron: tira 1 powerup (sorteado) de `from` e o derruba numa casa livre perto de `near` (até `radius` células;
+ * se não houver, em qualquer casa livre). Devolve o item e onde caiu, ou null se `from` não tinha nada.
+ */
+export function knockOutPowerup(state: GameState, from: PlayerState, near: { x: number; y: number }, radius: number, rng: () => number): { kind: ItemKind; col: number; row: number } | null {
+  const owned: ItemKind[] = [];
+  if (from.vest) owned.push('vest');
+  if (from.maxBombs > DEFAULT_MAX_BOMBS) owned.push('bomb');
+  if (from.bombRange > DEFAULT_BOMB_RANGE) owned.push('range');
+  if (from.speedBonus > 0) owned.push('speed');
+  for (const [kind, flag] of Object.entries(ABILITY_FLAG) as Array<[keyof typeof ABILITY_FLAG, (typeof ABILITY_FLAG)[keyof typeof ABILITY_FLAG]]>) {
+    if (from[flag]) owned.push(kind);
+  }
+  if (owned.length === 0) return null;
+  const free = freeItemCells(state);
+  if (free.length === 0) return null;
+  const { arena } = state;
+  const close = free.filter((index) => Math.hypot((index % arena.cols) + 0.5 - near.x, Math.floor(index / arena.cols) + 0.5 - near.y) <= radius);
+  const pool = close.length > 0 ? close : free;
+  const index = pool[Math.floor(rng() * pool.length)]!;
+  const kind = owned[Math.floor(rng() * owned.length)]!;
+  if (kind === 'vest') from.vest = false;
+  else if (kind === 'bomb') from.maxBombs -= 1;
+  else if (kind === 'range') from.bombRange -= 1;
+  else if (kind === 'speed') from.speedBonus -= 1;
+  else from[ABILITY_FLAG[kind as keyof typeof ABILITY_FLAG]] = false;
+  const col = index % arena.cols;
+  const row = Math.floor(index / arena.cols);
+  state.items.push({ col, row, kind });
+  state.events.push({ type: 'itemSpawned', col, row, kind });
+  return { kind, col, row };
+}
+
+/**
  * Jogador eliminado: todos os seus itens (bombas, alcance, velocidade e habilidades) voltam ao chão, espalhados em
  * casas livres sorteadas, e ele fica de novo "do zero" (quem voltar das laterais volta sem nada). Itens que acabam
  * sozinhos (fantasma, controles invertidos) e a pedra simplesmente somem. O sorteio usa só o passo e o id do jogador,
