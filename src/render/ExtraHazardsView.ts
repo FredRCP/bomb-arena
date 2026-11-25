@@ -274,10 +274,6 @@ export class ExtraHazardsView {
         g.fillStyle(0xff3b1a, on ? 0.45 : 0.12).fillRect(x, y + 4, TILE_SIZE, TILE_SIZE - 8);
         const shake = Math.sin(t * 1.7) * 2;
         g.lineStyle(3, 0xffe066, on ? 0.9 : 0.3).lineBetween(x, y + TILE_SIZE / 2 + shake, x + TILE_SIZE, y + TILE_SIZE / 2 - shake);
-      } else {
-        g.fillStyle(0x070816, 1).fillRect(x, y, TILE_SIZE, TILE_SIZE);
-        g.fillStyle(0x16103a, 0.4).fillRect(x, y, TILE_SIZE, TILE_SIZE);
-        g.fillStyle(0x8e9bff, 0.07).fillEllipse(x + 32, y + 32, 46, 20);
       }
     }
     // Ponte caída: sobram os postes, as cordas soltas e as tábuas quebradas das pontas (o meio é só abismo).

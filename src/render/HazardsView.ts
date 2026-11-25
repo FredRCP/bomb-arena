@@ -23,6 +23,8 @@ export class HazardsView {
   private readonly boulderG: Phaser.GameObjects.Graphics;
   /** Imagens da pedra (uma por coluna em queda), se o tema tiver boulder.png. */
   private readonly boulderImages: Phaser.GameObjects.Image[] = [];
+  /** Imagem da ponte inteira de cada fileira (some quando a ponte cai, deixando ver o abismo). */
+  private readonly bridgeImages = new Map<number, Phaser.GameObjects.Image>();
   /** Imagens da bola de neve e do pinguim (uma por rolo em campo). */
   private readonly rollerImages = new Map<number, Phaser.GameObjects.Image>();
   /** Buracos de gelo das laterais (por onde saem os pinguins). */
@@ -182,7 +184,7 @@ export class HazardsView {
       const bridgeKey = themeKey(themeById('temple'), 'bridge');
       if (this.scene.textures.exists(bridgeKey)) {
         // Ponte desenhada (bridge.png): 1 imagem sobre a ponte inteira, abaixo do aviso/queda (depth 0.95 em ExtraHazardsView).
-        this.scene.add.image((x0 + x1) / 2, y + TILE_SIZE / 2, bridgeKey).setDisplaySize(x1 - x0 + 14, TILE_SIZE - 2).setDepth(0.92);
+        this.bridgeImages.set(row, this.scene.add.image((x0 + x1) / 2, y + TILE_SIZE / 2, bridgeKey).setDisplaySize(x1 - x0 + 14, TILE_SIZE - 2).setDepth(0.92));
         continue;
       }
       for (let x = x0, k = 0; x < x1 - 4; x += 13, k++) {
@@ -550,6 +552,8 @@ export class HazardsView {
     this.drawQuicksand(state);
     this.drawIce(state);
     this.drawBoulder(state);
+    const fall = state.hazards?.bridgeFall;
+    for (const [row, image] of this.bridgeImages) image.setVisible(!(fall && fall.phase === 'down' && fall.row === row));
     this.updateIceStructures(state);
     const tunnel = state.hazards?.tunnel;
     if (tunnel) {

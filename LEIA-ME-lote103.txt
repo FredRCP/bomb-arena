@@ -1,0 +1,2 @@
+LOTE 103 - Ponte caida mostra o novo abismo
+Copie sobre o projeto: src/render/HazardsView.ts, src/render/ExtraHazardsView.ts, src/config/assetVersion.ts
