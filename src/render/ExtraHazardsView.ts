@@ -2,7 +2,7 @@ import Phaser from 'phaser';
 import type { GameEvent, GameState } from '../core';
 import { lavaRows } from '../core';
 import { FOG_POWER_TICKS } from '../config/powers';
-import { BRIDGE_WARN_TICKS, CANNON_FALL_TICKS, LAVA_WARN_TICKS, VOLCANO_FALL_TICKS } from '../config/hazards';
+import { SPROUT_TICKS, BRIDGE_WARN_TICKS, CANNON_FALL_TICKS, LAVA_WARN_TICKS, VOLCANO_FALL_TICKS } from '../config/hazards';
 import { TILE_SIZE } from './ArenaRenderer';
 import { has, themeById, themeKey } from './theme';
 
@@ -10,11 +10,18 @@ import { has, themeById, themeKey } from './theme';
 // (canhões), do Templo (queda das pontes) e dos poderes que mexem no chão (gosma do Musgo, neblina do Nimbo). Só desenho.
 
 const FOG_TOTAL = FOG_POWER_TICKS;
+/** Descargas elétricas na neblina: uma a cada FOG_BOLT_EVERY passos, visíveis por FOG_BOLT_LIFE passos. */
+const FOG_BOLT_EVERY = 85;
+const FOG_BOLT_LIFE = 16;
 
 export class ExtraHazardsView {
   private readonly g: Phaser.GameObjects.Graphics;
   private readonly top: Phaser.GameObjects.Graphics;
   private readonly bridgeG: Phaser.GameObjects.Graphics;
+  /** Cipós que crescem numa casa antes de o bloco fechar (Templo Perdido). */
+  private readonly sproutG: Phaser.GameObjects.Graphics;
+  /** Imagem da ponte caída (bridge_broken.png): uma só, movida para a fileira que caiu. */
+  private brokenBridge?: Phaser.GameObjects.Image;
   /** Solta uma baforada de fumaça pela cratera do vulcão (nada acontece nas outras fases). */
   private spawnSmoke: (count?: number) => void = () => undefined;
 
@@ -25,6 +32,7 @@ export class ExtraHazardsView {
     this.g = scene.add.graphics().setDepth(0.85);
     this.top = scene.add.graphics().setDepth(12);
     this.bridgeG = scene.add.graphics().setDepth(0.95);
+    this.sproutG = scene.add.graphics().setDepth(5);
     const theme = themeById(themeId);
     if (has(scene, theme, 'volcano') && state.hazards?.volcano) {
       const c = Math.floor(state.arena.cols / 2);
@@ -134,6 +142,7 @@ export class ExtraHazardsView {
     this.drawRiver(g, state, state.hazards?.lava);
     this.drawRiver(g, state, state.hazards?.lava2);
     this.drawBridges(state);
+    this.drawSprouts(state);
     this.drawSlime(g, state);
 
     // Bolas de lava: sombra crescendo desde o lançamento; a bola sobe (vinda do vulcão) e despenca sobre a sombra.
@@ -208,10 +217,46 @@ export class ExtraHazardsView {
     g.fillStyle(0xffe066, 0.9).fillEllipse(x + TILE_SIZE / 2, headY, TILE_SIZE - 8, 22);
   }
 
+  /** Cipós crescendo numa casa: seis pontas saem das bordas e se fecham para o centro, onde o bloco vai nascer. */
+  private drawSprouts(state: GameState): void {
+    const g = this.sproutG;
+    g.clear();
+    const sprouts = state.hazards?.sprouts;
+    if (!sprouts || sprouts.length === 0) return;
+    const t = state.tick;
+    for (const sprout of sprouts) {
+      const p = Math.min(1, Math.max(0.05, 1 - sprout.ticks / SPROUT_TICKS));
+      const cx = ((sprout.index % state.arena.cols) + 0.5) * TILE_SIZE;
+      const cy = (Math.floor(sprout.index / state.arena.cols) + 0.5) * TILE_SIZE;
+      g.fillStyle(0x6fcf3f, 0.12 + 0.18 * p).fillCircle(cx, cy, 26 + 6 * Math.sin(t * 0.2));
+      for (let i = 0; i < 6; i++) {
+        const a0 = (i / 6) * Math.PI * 2 + (sprout.index % 7) * 0.4;
+        const sx = cx + Math.cos(a0) * 34;
+        const sy = cy + Math.sin(a0) * 34;
+        const steps = 9;
+        const reach = Math.max(1, Math.round(steps * p));
+        let px = sx;
+        let py = sy;
+        for (let k = 1; k <= reach; k++) {
+          const u = k / steps;
+          const wob = Math.sin(u * 7 + i * 1.7 + t * 0.08) * 6;
+          const nx = sx + (cx - sx) * u * 0.9 + Math.cos(a0 + Math.PI / 2) * wob;
+          const ny = sy + (cy - sy) * u * 0.9 + Math.sin(a0 + Math.PI / 2) * wob;
+          g.lineStyle(6, 0x2c5e1c, 1).lineBetween(px, py, nx, ny);
+          g.lineStyle(3, 0x86cf45, 1).lineBetween(px, py, nx, ny);
+          if (k % 2 === 0) g.fillStyle(0x9be05a, 1).fillEllipse(nx + Math.cos(a0 + 1.2) * 5, ny + Math.sin(a0 + 1.2) * 5, 9, 5);
+          px = nx;
+          py = ny;
+        }
+      }
+    }
+  }
+
   /** Ponte do templo que cai: pisca e balança no aviso; some no abismo enquanto está caída. */
   private drawBridges(state: GameState): void {
     const g = this.bridgeG;
     g.clear();
+    this.brokenBridge?.setVisible(false);
     const fall = state.hazards?.bridgeFall;
     const bridges = state.hazards?.bridges;
     if (!fall || !bridges || fall.phase === 'idle') return;
@@ -233,6 +278,18 @@ export class ExtraHazardsView {
         g.fillStyle(0x070816, 1).fillRect(x, y, TILE_SIZE, TILE_SIZE);
         g.fillStyle(0x16103a, 0.4).fillRect(x, y, TILE_SIZE, TILE_SIZE);
         g.fillStyle(0x8e9bff, 0.07).fillEllipse(x + 32, y + 32, 46, 20);
+      }
+    }
+    // Ponte caída: sobram os postes, as cordas soltas e as tábuas quebradas das pontas (o meio é só abismo).
+    const brokenKey = themeKey(themeById('temple'), 'bridge_broken');
+    if (fall.phase !== 'warn' && this.scene.textures.exists(brokenKey)) {
+      const cols = bridges.filter((index) => Math.floor(index / arena.cols) === fall.row).map((index) => index % arena.cols);
+      if (cols.length > 0) {
+        const first = Math.min(...cols);
+        const last = Math.max(...cols);
+        const width = (last - first + 1) * TILE_SIZE + 26;
+        this.brokenBridge ??= this.scene.add.image(0, 0, brokenKey).setDepth(0.96);
+        this.brokenBridge.setVisible(true).setPosition(((first + last + 1) / 2) * TILE_SIZE, fall.row * TILE_SIZE + TILE_SIZE / 2).setDisplaySize(width, width / 3.04);
       }
     }
     void BRIDGE_WARN_TICKS;
@@ -376,6 +433,32 @@ export class ExtraHazardsView {
       const x = (((k * 197 + t * (0.6 + (k % 3) * 0.3)) % (arena.cols * TILE_SIZE + 300)) - 150);
       const y = ((k * 131) % (arena.rows * TILE_SIZE));
       top.fillStyle(0xffffff, 0.16 * Math.max(0, fade)).fillEllipse(x, y, 260, 90);
+    }
+    // Descargas elétricas na neblina (só enfeite, não machucam): a cada ~1,4 s um raio cai de cima em uma célula sorteada.
+    const elapsed = FOG_TOTAL - fog.ticks;
+    const slot = Math.floor(elapsed / FOG_BOLT_EVERY);
+    const age = elapsed - slot * FOG_BOLT_EVERY;
+    if (slot >= 1 && age < FOG_BOLT_LIFE && fade > 0.5) {
+      const hash = (n: number): number => (((n * 2654435761) >>> 0) % 1000) / 1000;
+      const col = 1 + Math.floor(hash(slot * 3 + 1) * (arena.cols - 2));
+      const row = 1 + Math.floor(hash(slot * 3 + 2) * (arena.rows - 2));
+      const k = 1 - age / FOG_BOLT_LIFE;
+      const tx = (col + 0.5) * TILE_SIZE;
+      const ty = (row + 0.5) * TILE_SIZE;
+      top.fillStyle(0xdbeaff, 0.22 * k * k).fillRect(0, 0, arena.cols * TILE_SIZE, arena.rows * TILE_SIZE); // clarão geral
+      top.fillStyle(0x9fd2ff, 0.55 * k).fillCircle(tx, ty, 18 + 34 * (1 - k));
+      let px = tx + (hash(slot * 5 + 3) - 0.5) * 120;
+      let py = -10;
+      const steps = 8;
+      for (let i = 1; i <= steps; i++) {
+        const u = i / steps;
+        const nx = i === steps ? tx : tx + (px - tx) * (1 - u) + (hash(slot * 11 + i) - 0.5) * 46;
+        const ny = -10 + (ty + 10) * u;
+        top.lineStyle(9, 0x8ec8ff, 0.5 * k).lineBetween(px, py, nx, ny);
+        top.lineStyle(3.5, 0xffffff, k).lineBetween(px, py, nx, ny);
+        px = nx;
+        py = ny;
+      }
     }
   }
 

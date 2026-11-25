@@ -1,3 +1,5 @@
+import { SHOCK_FADE_TICKS, SHOCK_GROW_TICKS } from '../config/powers';
+import { shockRadius } from '../core/shockwave';
 import Phaser from 'phaser';
 import type { GameEvent, GameState } from '../core';
 import { MUMMY_WRAP_TICKS } from '../config/hazards';
@@ -86,7 +88,7 @@ export class Effects {
   /** Fagulha com as bombas gêmeas ativas: sai muita fumaça escura dela (ela também pisca vermelha, em drawDizzy). */
   private fagulhaSmoke(dt: number, state: GameState): void {
     for (const p of state.players) {
-      if (!p.alive || p.heroTicks <= 0 || !state.bombs.some((b) => b.owner === p.id && b.pierce)) continue;
+      if (!p.alive || p.heroTicks <= 0 || !state.bombs.some((b) => b.owner === p.id && b.blazing)) continue;
       const n = Math.max(1, Math.round(dt * 60 * 0.8));
       for (let i = 0; i < n; i++) {
         this.particles.spawn({ kind: 'smoke', x: p.x * TILE_SIZE + rand(-16, 16), y: p.y * TILE_SIZE - rand(10, 40), vx: rand(-22, 22), vy: rand(-70, -35), gravity: -14, life: rand(0.7, 1.2), size0: 9, size1: 34, color: pick([0x2b2b30, 0x4a4a52, 0x6b6b74]) });
@@ -119,9 +121,33 @@ export class Effects {
     const stunImage = this.updateStun(state);
     // Fagulha prestes a explodir: um clarão vermelho piscando em volta dela.
     for (const p of state.players) {
-      if (!p.alive || p.heroTicks <= 0 || !state.bombs.some((b) => b.owner === p.id && b.pierce)) continue;
+      if (!p.alive || p.heroTicks <= 0 || !state.bombs.some((b) => b.owner === p.id && b.blazing)) continue;
       const on = Math.floor(state.tick / 8) % 2 === 0;
       g.fillStyle(0xff2418, on ? 0.38 : 0.12).fillCircle(p.x * TILE_SIZE, p.y * TILE_SIZE - 22, on ? 46 : 38);
+    }
+    // Círculo de choque do Bolt: um anel elétrico que cresce até 5 células, acompanhando-o.
+    for (const wave of state.shockwaves ?? []) {
+      const owner = state.players.find((p) => p.id === wave.owner);
+      if (!owner) continue;
+      const r = shockRadius(wave.ticks) * TILE_SIZE;
+      const fade = wave.ticks > SHOCK_GROW_TICKS ? 1 - (wave.ticks - SHOCK_GROW_TICKS) / SHOCK_FADE_TICKS : 1;
+      const cx = owner.x * TILE_SIZE;
+      const cy = owner.y * TILE_SIZE;
+      g.fillStyle(0x7fdcff, 0.16 * fade).fillCircle(cx, cy, r);
+      for (const [width, color, alpha] of [[9, 0x4fc3ff, 0.45], [3.5, 0xffffff, 1]] as const) {
+        g.lineStyle(width, color, alpha * fade);
+        g.beginPath();
+        const segs = 40;
+        for (let k = 0; k <= segs; k++) {
+          const a = (k / segs) * Math.PI * 2;
+          const rr = r + (k % 2 === 0 ? 1 : -1) * (5 + 4 * Math.sin(state.tick * 0.9 + k * 1.7));
+          const x = cx + Math.cos(a) * rr;
+          const y = cy + Math.sin(a) * rr;
+          if (k === 0) g.moveTo(x, y);
+          else g.lineTo(x, y);
+        }
+        g.strokePath();
+      }
     }
     // Choque do Bolt: raios em zigue-zague até quem levou.
     for (let i = this.arcs.length - 1; i >= 0; i--) {

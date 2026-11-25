@@ -1,4 +1,4 @@
-import { BOULDER_FIRST_DELAY_TICKS, BOULDER_HIT_HALF, BOULDER_STUN_TICKS, BOULDER_PERIOD_TICKS, BOULDER_SPEED, BOULDER_WARN_TICKS, CHASM_WIDTH, PYRAMID_SIZE, BLOCK_REGROW_TICKS, ROLLER_BREAKS_BLOCKS, ROLLER_PERIOD_TICKS, ROLLER_SPEED, ROLLER_MAX_RATE, SNOWBALL_FREEZE_TICKS, SNOWBALL_HALF_WIDTH, PENGUIN_FIRST_TICKS, PENGUIN_PERIOD_TICKS, PENGUIN_WARN_TICKS, ICE_CRACK_LEVELS, ICE_PATCHES, DART_FIRST_DELAY_TICKS, DART_HIT_HALF, DART_SLOW_TICKS, DART_PERIOD_TICKS, DART_SPEED, DART_WARN_TICKS, QUICKSAND_PATCHES, QUICKSAND_SPEED_FACTOR, BRIDGE_DOWN_TICKS, BRIDGE_FIRST_TICKS, BRIDGE_PERIOD_TICKS, BRIDGE_WARN_TICKS } from '../config/hazards';
+import { BOULDER_FIRST_DELAY_TICKS, BOULDER_HIT_HALF, BOULDER_STUN_TICKS, BOULDER_PERIOD_TICKS, BOULDER_SPEED, BOULDER_WARN_TICKS, CHASM_WIDTH, PYRAMID_SIZE, BLOCK_REGROW_TICKS, SPROUT_TICKS, ROLLER_BREAKS_BLOCKS, ROLLER_PERIOD_TICKS, ROLLER_SPEED, ROLLER_MAX_RATE, SNOWBALL_FREEZE_TICKS, SNOWBALL_HALF_WIDTH, PENGUIN_FIRST_TICKS, PENGUIN_PERIOD_TICKS, PENGUIN_WARN_TICKS, ICE_CRACK_LEVELS, ICE_PATCHES, DART_FIRST_DELAY_TICKS, DART_HIT_HALF, DART_SLOW_TICKS, DART_PERIOD_TICKS, DART_SPEED, DART_WARN_TICKS, QUICKSAND_PATCHES, QUICKSAND_SPEED_FACTOR, BRIDGE_DOWN_TICKS, BRIDGE_FIRST_TICKS, BRIDGE_PERIOD_TICKS, BRIDGE_WARN_TICKS } from '../config/hazards';
 import type { TrafficKind } from '../config/hazards';
 import { cellIndex, getCell, isTunnel } from './arena';
 import { applyExtraHazards, updateExtraHazards } from './extraHazards';
@@ -30,6 +30,10 @@ export interface HazardOptions {
   igloo?: boolean;
   /** A neve faz crescer de novo, aos poucos, os blocos destrutíveis que foram quebrados. */
   regrow?: boolean;
+  /** Passos entre um bloco novo e o seguinte (padrão: BLOCK_REGROW_TICKS). */
+  regrowTicks?: number;
+  /** O bloco novo é anunciado por cipós que crescem na casa antes (em vez de aparecer de repente). */
+  regrowSprout?: boolean;
   /** Faixas de gelo escorregadio (duas, de 4 células). */
   slippery?: boolean;
   /** Gelo fino: células que racham a cada passagem e viram buraco. */
@@ -340,7 +344,9 @@ export function createHazards(arena: Arena, options: HazardOptions | undefined, 
     arena.cells.forEach((cell, index) => {
       if (cell === 'block') hazards.blockSpots!.push(index);
     });
-    hazards.regrowTimer = BLOCK_REGROW_TICKS;
+    hazards.regrowEvery = options.regrowTicks ?? BLOCK_REGROW_TICKS;
+    hazards.regrowTimer = hazards.regrowEvery;
+    if (options.regrowSprout) hazards.sprouts = [];
   }
   if (options.mummy) hazards.mummy = createMummy();
   applyExtraHazards(arena, options, seed, hazards);
@@ -645,32 +651,61 @@ function updateBoulder(state: GameState): void {
   }
 }
 
-/** Neve: a cada BLOCK_REGROW_TICKS cresce um bloco numa casa sorteada entre as que começaram com bloco e hoje estão livres. */
+/** A casa pode receber um bloco novo? (livre, sem ninguém perto, sem bomba, fogo, item ou bola rolando.) */
+function canGrowBlock(state: GameState, index: number, margin: boolean): boolean {
+  const hz = state.hazards!;
+  const arena = state.arena;
+  if (arena.cells[index] !== 'empty') return false;
+  const col = index % arena.cols;
+  const row = Math.floor(index / arena.cols);
+  if (isTunnel(hz.tunnel, arena, col, row) || hz.slippery?.includes(index)) return false;
+  if (state.players.some((p) => bodyOverlapsCell(p.x, p.y, col, row) || (margin && p.alive && Math.abs(Math.floor(p.x) - col) + Math.abs(Math.floor(p.y) - row) <= 1))) return false;
+  if (state.bombs.some((b) => b.col === col && b.row === row)) return false;
+  if (state.flames.some((f) => f.col === col && f.row === row)) return false;
+  if (state.items.some((item) => item.col === col && item.row === row)) return false;
+  if (hz.rollers?.some((r) => Math.floor(r.x) === col && Math.abs(r.y - row - 0.5) < 1.5)) return false;
+  return true;
+}
+
+function growBlock(state: GameState, index: number, rng: () => number): void {
+  state.arena.cells[index] = 'block';
+  maybeHideItem(state, index % state.arena.cols, Math.floor(index / state.arena.cols), rng);
+  state.events.push({ type: 'blockGrown', col: index % state.arena.cols, row: Math.floor(index / state.arena.cols) });
+}
+
+/**
+ * Neve / cipós: a cada `regrowEvery` passos cresce um bloco numa casa sorteada entre as que começaram com bloco e hoje estão livres.
+ * Com `sprouts` (Templo), primeiro cipós crescem na casa por SPROUT_TICKS e só depois o bloco fecha (se alguém estiver em cima,
+ * o bloco espera um pouco).
+ */
 function updateRegrow(state: GameState): void {
   const hz = state.hazards;
   if (!hz?.blockSpots || state.round.phase !== 'playing') return;
+  if (hz.sprouts) {
+    for (const sprout of [...hz.sprouts]) {
+      sprout.ticks -= 1;
+      if (sprout.ticks > 0) continue;
+      if (!canGrowBlock(state, sprout.index, false)) {
+        sprout.ticks = 45; // tem alguém em cima: espera mais um pouco
+        continue;
+      }
+      hz.sprouts.splice(hz.sprouts.indexOf(sprout), 1);
+      growBlock(state, sprout.index, createRng(state.tick * 11 + sprout.index));
+    }
+  }
   hz.regrowTimer = (hz.regrowTimer ?? BLOCK_REGROW_TICKS) - 1;
   if (hz.regrowTimer > 0) return;
-  hz.regrowTimer = BLOCK_REGROW_TICKS;
-  const arena = state.arena;
-  const spots = hz.blockSpots.filter((index) => {
-    if (arena.cells[index] !== 'empty') return false;
-    const col = index % arena.cols;
-    const row = Math.floor(index / arena.cols);
-    if (isTunnel(hz.tunnel, arena, col, row) || hz.slippery?.includes(index)) return false;
-    if (state.players.some((p) => bodyOverlapsCell(p.x, p.y, col, row) || (p.alive && Math.abs(Math.floor(p.x) - col) + Math.abs(Math.floor(p.y) - row) <= 1))) return false;
-    if (state.bombs.some((b) => b.col === col && b.row === row)) return false;
-    if (state.flames.some((f) => f.col === col && f.row === row)) return false;
-    if (state.items.some((item) => item.col === col && item.row === row)) return false;
-    if (hz.rollers?.some((r) => Math.floor(r.x) === col && Math.abs(r.y - row - 0.5) < 1.5)) return false;
-    return true;
-  });
+  hz.regrowTimer = hz.regrowEvery ?? BLOCK_REGROW_TICKS;
+  const spots = hz.blockSpots.filter((index) => canGrowBlock(state, index, true) && !hz.sprouts?.some((s) => s.index === index));
   if (spots.length === 0) return;
   const rng = createRng(state.tick * 7 + spots.length);
   const index = spots[Math.floor(rng() * spots.length)]!;
-  arena.cells[index] = 'block';
-  maybeHideItem(state, index % arena.cols, Math.floor(index / arena.cols), rng);
-  state.events.push({ type: 'blockGrown', col: index % arena.cols, row: Math.floor(index / arena.cols) });
+  if (hz.sprouts) {
+    hz.sprouts.push({ index, ticks: SPROUT_TICKS });
+    state.events.push({ type: 'blockSprout', col: index % state.arena.cols, row: Math.floor(index / state.arena.cols) });
+    return;
+  }
+  growBlock(state, index, rng);
 }
 
 function updateDartTrap(state: GameState): void {

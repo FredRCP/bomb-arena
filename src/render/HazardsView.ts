@@ -94,28 +94,79 @@ export class HazardsView {
     const all = new Set([...hz.chasm, ...(hz.bridges ?? [])]);
     const g = this.scene.add.graphics().setDepth(0.9);
     const fogSeed = (n: number): number => ((n * 9301 + 49297) % 233280) / 233280;
+    // Abismo desenhado (chasm.png): uma imagem por trecho contínuo de linhas; sem ela, usa o desenho por código abaixo.
+    const chasmKey = themeKey(themeById('temple'), 'chasm');
+    const drawn = new Set<number>();
+    if (this.scene.textures.exists(chasmKey)) {
+      const rowsWith = new Map<number, number[]>();
+      for (const index of all) rowsWith.set(Math.floor(index / cols), [...(rowsWith.get(Math.floor(index / cols)) ?? []), index % cols]);
+      const rows = [...rowsWith.keys()].sort((a, b) => a - b);
+      let k = 0;
+      while (k < rows.length) {
+        let end = k;
+        while (end + 1 < rows.length && rows[end + 1] === rows[end]! + 1) end++;
+        const cs = Math.min(...rowsWith.get(rows[k]!)!);
+        const ce = Math.max(...rowsWith.get(rows[k]!)!);
+        const top = rows[k]! * TILE_SIZE;
+        const h = (rows[end]! - rows[k]! + 1) * TILE_SIZE;
+        this.scene.add.image(cs * TILE_SIZE, top, chasmKey).setOrigin(0, 0).setDisplaySize((ce - cs + 1) * TILE_SIZE, h).setDepth(0.9);
+        for (let r = rows[k]!; r <= rows[end]!; r++) for (let c = cs; c <= ce; c++) drawn.add(r * cols + c);
+        k = end + 1;
+      }
+    }
     for (const index of all) {
+      if (drawn.has(index)) continue;
       const col = index % cols;
       const row = Math.floor(index / cols);
       const x = col * TILE_SIZE;
       const y = row * TILE_SIZE;
-      // Profundidade: mais escuro no meio do abismo, um pouco mais claro perto das margens.
       const mid = Math.floor(cols / 2);
-      const edge = Math.min(Math.abs(col - (mid - 1)), Math.abs(col - (mid + 1))); // 0 nas margens
-      g.fillStyle(0x070816, 1).fillRect(x, y, TILE_SIZE, TILE_SIZE);
-      g.fillStyle(0x16103a, edge === 0 ? 0.55 : 0.25).fillRect(x, y, TILE_SIZE, TILE_SIZE);
+      const here = (c: number, r: number): boolean => all.has(r * cols + c);
+      const nl = !here(col - 1, row);
+      const nr = !here(col + 1, row);
+      // Fundo sem fim: quase preto no centro e azul-arroxeado só perto das paredes de rocha.
+      const dist = Math.abs(col - mid); // 0 no meio
+      g.fillStyle(0x03030a, 1).fillRect(x, y, TILE_SIZE, TILE_SIZE);
+      g.fillStyle(0x1a1438, dist === 0 ? 0.25 : 0.55).fillRect(x, y, TILE_SIZE, TILE_SIZE);
+      // Camadas de profundidade: faixas horizontais cada vez mais escuras.
+      for (let k = 0; k < 4; k++) g.fillStyle(0x000000, 0.1 + k * 0.05).fillRect(x, y + k * 16, TILE_SIZE, 16);
+      // Rochas lá no fundo (silhuetas) e nevoa subindo.
+      for (let k = 0; k < 3; k++) {
+        const rx = x + fogSeed(index * 7 + k) * 48 + 6;
+        const ry = y + fogSeed(index * 11 + k) * 48 + 6;
+        g.fillStyle(0x0b0a1c, 0.9).fillTriangle(rx, ry + 14, rx + 12, ry - 6, rx + 26, ry + 14);
+      }
       for (let k = 0; k < 2; k++) {
         const fx = x + fogSeed(index * 3 + k) * 54 + 5;
         const fy = y + fogSeed(index * 5 + k + 1) * 54 + 5;
-        g.fillStyle(0x8e9bff, 0.07).fillEllipse(fx, fy, 46, 20);
+        g.fillStyle(0x8e9bff, 0.06).fillEllipse(fx, fy, 50, 16);
       }
-      // Beira de pedra onde o abismo encontra o chão (esquerda, direita, cima e baixo).
-      const here = (c: number, r: number): boolean => all.has(r * cols + c);
-      g.fillStyle(0x6d5a3a, 1);
-      if (!here(col - 1, row)) g.fillRect(x, y, 7, TILE_SIZE).fillStyle(0x3a2d18, 1).fillRect(x + 7, y, 4, TILE_SIZE).fillStyle(0x6d5a3a, 1);
-      if (!here(col + 1, row)) g.fillRect(x + TILE_SIZE - 7, y, 7, TILE_SIZE).fillStyle(0x3a2d18, 1).fillRect(x + TILE_SIZE - 11, y, 4, TILE_SIZE).fillStyle(0x6d5a3a, 1);
-      if (!here(col, row - 1)) g.fillRect(x, y, TILE_SIZE, 7).fillStyle(0x3a2d18, 1).fillRect(x, y + 7, TILE_SIZE, 4).fillStyle(0x6d5a3a, 1);
-      if (!here(col, row + 1)) g.fillRect(x, y + TILE_SIZE - 7, TILE_SIZE, 7);
+      // Paredão de rocha nas margens: camadas irregulares, rachaduras e o lábio iluminado em cima.
+      const cliff = (left: boolean): void => {
+        const w = 18;
+        const x0 = left ? x : x + TILE_SIZE - w;
+        for (let k = 0; k < 8; k++) {
+          const jag = Math.floor(fogSeed(index * 13 + k + (left ? 0 : 50)) * 9);
+          const cw = w - 6 + jag;
+          const cx = left ? x : x + TILE_SIZE - cw;
+          const shade = [0x4a3d28, 0x3c3120, 0x55462e, 0x2d2417][k % 4]!;
+          g.fillStyle(shade, 1).fillRect(cx, y + k * 8, cw, 8);
+          g.fillStyle(0x15100a, 0.85).fillRect(cx, y + k * 8 + 7, cw, 1);
+        }
+        // Sombra que escurece o paredão para dentro do abismo.
+        for (let k = 0; k < 3; k++) g.fillStyle(0x000000, 0.18 - k * 0.05).fillRect(left ? x0 + w - 2 + k * 4 : x0 - 4 - k * 4, y, 6, TILE_SIZE);
+        // Rachadura.
+        const crack = x0 + (left ? 6 : 4) + Math.floor(fogSeed(index * 17) * 6);
+        g.lineStyle(2, 0x0a0705, 0.9).lineBetween(crack, y + 4, crack + 4, y + 26).lineBetween(crack + 4, y + 26, crack - 1, y + 50);
+        // Lábio de pedra claro na borda do chão.
+        g.fillStyle(0x8a7a58, 1).fillRect(left ? x : x + TILE_SIZE - 5, y, 5, TILE_SIZE);
+        g.fillStyle(0xb8a67c, 0.8).fillRect(left ? x : x + TILE_SIZE - 2, y, 2, TILE_SIZE);
+      };
+      if (nl) cliff(true);
+      if (nr) cliff(false);
+      // Em cima e embaixo do abismo: boca de rocha.
+      if (!here(col, row - 1)) g.fillStyle(0x6d5a3a, 1).fillRect(x, y, TILE_SIZE, 6).fillStyle(0x15100a, 0.9).fillRect(x, y + 6, TILE_SIZE, 3);
+      if (!here(col, row + 1)) g.fillStyle(0x6d5a3a, 1).fillRect(x, y + TILE_SIZE - 6, TILE_SIZE, 6);
     }
     // Pontes: tábuas de madeira com duas cordas e postes nas pontas.
     const bridges = [...(hz.bridges ?? [])];
@@ -128,6 +179,12 @@ export class HazardsView {
       const x1 = (last + 1) * TILE_SIZE + 6;
       const y = row * TILE_SIZE;
       g.fillStyle(0x0a0a18, 0.55).fillRect(x0, y + 10, x1 - x0, TILE_SIZE - 14); // sombra no abismo
+      const bridgeKey = themeKey(themeById('temple'), 'bridge');
+      if (this.scene.textures.exists(bridgeKey)) {
+        // Ponte desenhada (bridge.png): 1 imagem sobre a ponte inteira, abaixo do aviso/queda (depth 0.95 em ExtraHazardsView).
+        this.scene.add.image((x0 + x1) / 2, y + TILE_SIZE / 2, bridgeKey).setDisplaySize(x1 - x0 + 14, TILE_SIZE - 2).setDepth(0.92);
+        continue;
+      }
       for (let x = x0, k = 0; x < x1 - 4; x += 13, k++) {
         g.fillStyle(k % 2 === 0 ? 0xa8743a : 0x935f2b, 1).fillRect(x, y + 8, 11, TILE_SIZE - 16);
         g.fillStyle(0x5c3a17, 1).fillRect(x, y + 8, 11, 2).fillRect(x, y + TILE_SIZE - 10, 11, 2);
@@ -177,8 +234,20 @@ export class HazardsView {
         const fall = ((state.tick * 3 + k * 37) % 60) / 60;
         g.fillStyle(0xb9a98a, 0.8).fillCircle(x + Math.sin(k * 2.3) * 70, TILE_SIZE * 0.4 + fall * TILE_SIZE * 1.3, 2 + (k % 3));
       }
-      g.fillStyle(0x7d7364, 0.9).fillCircle(x, TILE_SIZE * 0.1, 28 + progress * 40); // a pedra espiando por cima
-      g.lineStyle(3, 0x2b261c, 1).strokeCircle(x, TILE_SIZE * 0.1, 28 + progress * 40);
+      const warnKey = themeKey(themeById('temple'), 'boulder');
+      const size = 2 * (28 + progress * 40) * 1.1;
+      if (this.scene.textures.exists(warnKey)) {
+        let image = this.boulderImages[index];
+        if (!image) {
+          image = this.scene.add.image(0, 0, warnKey).setDepth(10.25);
+          this.boulderImages[index] = image;
+        }
+        const shake = Math.sin(state.tick * 1.7) * (1 + progress * 3);
+        image.setVisible(true).setPosition(x + shake, TILE_SIZE * 0.1).setDisplaySize(size, size).setRotation(Math.sin(state.tick * 0.3) * 0.08);
+      } else {
+        g.fillStyle(0x7d7364, 0.9).fillCircle(x, TILE_SIZE * 0.1, 28 + progress * 40);
+        g.lineStyle(3, 0x2b261c, 1).strokeCircle(x, TILE_SIZE * 0.1, 28 + progress * 40);
+      }
       return;
     }
     // Pedra de 3 colunas de largura (raio 96).

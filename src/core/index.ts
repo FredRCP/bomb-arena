@@ -21,3 +21,4 @@ export * from './ai';
 export * from './step';
 export * from './clock';
 export * from './decoys';
+export * from './shockwave';

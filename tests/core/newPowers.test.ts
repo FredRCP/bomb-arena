@@ -115,12 +115,14 @@ describe('Poderes: carga e personagens', () => {
     expect(me.invisibleTicks).toBeGreaterThan(9 * 60);
   });
 
-  it('Fagulha: põe 2 bombas que varrem a linha e a coluna inteiras e fica imune às chamas', () => {
+  it('Fagulha: joga 7 bombas em casas livres perto dela, com pavios diferentes, e fica imune às chamas', () => {
     const { state, me } = setup('twinbombs');
     use(state, me);
-    expect(state.bombs).toHaveLength(2);
-    expect(state.bombs.every((b) => b.range >= 20 && b.pierce)).toBe(true);
-    for (let i = 0; i < 300; i++) step(state);
+    expect(state.bombs).toHaveLength(7);
+    expect(new Set(state.bombs.map((b) => `${b.col},${b.row}`)).size).toBe(7);
+    expect(new Set(state.bombs.map((b) => b.ticksLeft)).size).toBeGreaterThan(1);
+    expect(state.bombs.every((b) => b.blazing && Math.hypot(b.col + 0.5 - me.x, b.row + 0.5 - me.y) <= 6.01)).toBe(true);
+    for (let i = 0; i < 400; i++) step(state);
     expect(me.alive).toBe(true);
   });
 
@@ -147,13 +149,15 @@ describe('Poderes: carga e personagens', () => {
     expect(state.items.some((item) => item.kind === 'bomb')).toBe(true);
   });
 
-  it('Bolt: o turbo dá choque em quem está a até 5 células (paralisa por 1,5 s, sem gelo)', () => {
+  it('Bolt: o círculo de choque cresce até 5 células e imobiliza por 3 s quem alcança', () => {
     const { state, me, other } = setup('sprint');
-    other.x = me.x + 3;
+    other.x = me.x + 4;
     other.y = me.y;
     use(state, me);
-    expect(other.frozenTicks ?? 0).toBeGreaterThan(80);
+    expect(other.frozenTicks ?? 0).toBe(0); // o círculo ainda não chegou lá
+    for (let i = 0; i < 80; i++) step(state);
     expect(other.stunned).toBe(true);
+    expect(other.frozenTicks ?? 0).toBeGreaterThan(90);
     expect(me.sprintTicks ?? 0).toBeGreaterThan(0);
   });
 
@@ -162,6 +166,7 @@ describe('Poderes: carga e personagens', () => {
     other.x = me.x + 7;
     other.y = me.y;
     use(state, me);
+    for (let i = 0; i < 100; i++) step(state);
     expect(other.frozenTicks ?? 0).toBe(0);
   });
 
@@ -247,16 +252,6 @@ describe('Egito: dardos', () => {
 });
 
 describe('Poderes reformulados (lote 54)', () => {
-  it('Fagulha: o fogo atravessa blocos e vai até a parede em toda a linha', () => {
-    const { state, me } = setup('twinbombs');
-    state.arena.cells[cellIndex(state.arena, 8, 1)] = 'block';
-    state.arena.cells[cellIndex(state.arena, 11, 1)] = 'block';
-    use(state, me);
-    for (let i = 0; i < 200 && state.bombs.length > 0; i++) step(state);
-    expect(getCell(state.arena, 8, 1)).toBe('empty');
-    expect(getCell(state.arena, 11, 1)).toBe('empty');
-  });
-
   it('Van: congela os outros jogadores por 5 s (não andam nem soltam bomba) e depois voltam', () => {
     const { state, me, other } = setup('freeze');
     use(state, me);

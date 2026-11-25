@@ -658,3 +658,46 @@ describe('superpoderes dos outros personagens', () => {
     expect(aiShouldUsePower(state, p)).toBe(true);
   });
 });
+
+describe('Templo: blocos que voltam com cipós', () => {
+  const temple = () => {
+    const def = stageById('temple');
+    const state = createGameState({ cols: def.cols, rows: def.rows, hazards: def.hazards!, players: 1, seed: 3, sideline: false });
+    state.round.phase = 'playing';
+    return state;
+  };
+
+  it('cipós crescem primeiro e o bloco só fecha depois, numa casa que começou com bloco', () => {
+    const state = temple();
+    const hz = state.hazards!;
+    expect(hz.sprouts).toEqual([]);
+    const spots = hz.blockSpots!;
+    for (const i of spots) state.arena.cells[i] = 'empty';
+    state.players[0]!.x = 1.5;
+    state.players[0]!.y = 1.5;
+    hz.regrowTimer = 1;
+    step(state);
+    expect(hz.sprouts).toHaveLength(1);
+    const index = hz.sprouts![0]!.index;
+    expect(spots.includes(index)).toBe(true);
+    expect(state.arena.cells[index]).toBe('empty');
+    hz.sprouts![0]!.ticks = 1;
+    step(state);
+    expect(state.arena.cells[index]).toBe('block');
+    expect(hz.sprouts).toHaveLength(0);
+  });
+
+  it('bloco espera se alguém estiver em cima dos cipós', () => {
+    const state = temple();
+    const hz = state.hazards!;
+    const index = hz.blockSpots![0]!;
+    state.arena.cells[index] = 'empty';
+    const p = state.players[0]!;
+    p.x = (index % state.arena.cols) + 0.5;
+    p.y = Math.floor(index / state.arena.cols) + 0.5;
+    hz.sprouts = [{ index, ticks: 1 }];
+    step(state);
+    expect(state.arena.cells[index]).toBe('empty');
+    expect(hz.sprouts).toHaveLength(1);
+  });
+});

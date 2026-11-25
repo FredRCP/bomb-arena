@@ -35,6 +35,9 @@ export const PENGUIN_WARN_TICKS = 90;
 
 /** A neve faz crescer, aos poucos e em lugares sorteados, os blocos que tinham sido quebrados: um a cada 8 s. */
 export const BLOCK_REGROW_TICKS = 8 * 60;
+/** Templo Perdido: um bloco novo a cada 10 s, anunciado por cipós que crescem na casa durante 2,5 s antes de o bloco fechar. */
+export const TEMPLE_REGROW_TICKS = 10 * 60;
+export const SPROUT_TICKS = 150;
 /** Velocidade em células por passo: bola de neve 0,07 (4,2 células/s) e pinguim 0,11 (6,6 células/s). */
 export const ROLLER_SPEED = { snowball: 0.07, penguin: 0.11 } as const;
 

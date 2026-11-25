@@ -49,14 +49,22 @@ export const JUMP_CELLS = 4;
 export const SPRINT_POWER_TICKS = 10 * 60;
 /** Bolt: ao disparar o turbo, quem está a até este raio (em células) leva um choque e fica paralisado este tempo. */
 export const SHOCK_RADIUS = 5;
-export const SHOCK_TICKS = 90;
+/** O círculo de choque cresce de 0 até SHOCK_RADIUS neste tempo (1,2 s) e fica um instante na borda antes de sumir. */
+export const SHOCK_GROW_TICKS = 72;
+export const SHOCK_FADE_TICKS = 12;
+/** Quem o círculo alcança fica imobilizado por 3 s. */
+export const SHOCK_TICKS = 180;
 /** Musgo: gosma em 3 células em cada direção; quem pisa (menos ela) fica na velocidade mínima. Dura 10 s. */
 export const SLIME_CELLS = 3;
 export const SLIME_TICKS = 10 * 60;
 /** Violeta: invisível por 10 s. */
 export const INVISIBLE_POWER_TICKS = 10 * 60;
-/** Fagulha: 2 bombas cujo fogo varre a linha e a coluna inteiras (ela fica imune às chamas até elas acabarem). */
-export const TWIN_BOMB_RANGE = 99;
+/** Fagulha: espalha várias bombas (ela fica imune às chamas até todas acabarem). */
+/** Fagulha: joga FAGULHA_BOMBS bombas em casas livres sorteadas até FAGULHA_RADIUS células dela, cada uma com um pavio diferente. */
+export const FAGULHA_BOMBS = 7;
+export const FAGULHA_RADIUS = 6;
+export const FAGULHA_FUSE_MIN = 90;
+export const FAGULHA_FUSE_MAX = 200;
 /** Nimbo: neblina por 10 s (ele enxerga em volta de si). */
 export const FOG_POWER_TICKS = 10 * 60;
 
@@ -74,7 +82,7 @@ export const POWER_LABELS = {
   sprint: 'TURBO!',
   slime: 'GOSMA!',
   invisible: 'INVISÍVEL!',
-  twinbombs: 'DUAS BOMBAS!',
+  twinbombs: 'CHUVA DE BOMBAS!',
   fog: 'NEBLINA!',
   magnet: 'ÍMÃ!',
 } as const;

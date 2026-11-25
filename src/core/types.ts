@@ -235,6 +235,8 @@ export interface BombState {
   walkThrough: PlayerId[];
   /** Explosão perfurante: atravessa (e destrói) todos os blocos dentro do alcance. */
   pierce?: boolean;
+  /** Bomba da chuva da Fagulha (só desenho: a Fagulha pisca vermelha e solta fumaça enquanto houver uma). */
+  blazing?: boolean;
   /** Bomba-relógio: só explode quando o dono detona (ou quando o pavio longo de segurança acaba). */
   remote?: boolean;
   /** Bomba chutada deslizando: direção e passos desde o último deslize. null/ausente = parada. */
@@ -246,6 +248,15 @@ export interface BombState {
 }
 
 /** Uma célula em chamas. Machuca quem estiver nela enquanto `ticksLeft` for maior que zero. */
+/** Círculo de choque do Bolt: nasce nele, cresce até SHOCK_RADIUS acompanhando-o e imobiliza uma vez quem encosta. */
+export interface ShockwaveState {
+  owner: PlayerId;
+  /** Passos desde que nasceu. */
+  ticks: number;
+  /** Quem já levou o choque deste círculo. */
+  hit: PlayerId[];
+}
+
 /** Sósia da Pipoca: parece o dono, anda de célula em célula e some quando o tempo acaba ou uma chama a pega. */
 export interface DecoyState {
   id: number;
@@ -314,6 +325,7 @@ export type GameEvent =
   | { type: 'rollerSpawned'; id: number; kind: RollerKind; col: number; row: number }
   /** A neve fez crescer um bloco destrutível. */
   | { type: 'blockGrown'; col: number; row: number }
+  | { type: 'blockSprout'; col: number; row: number }
   | { type: 'rollerGone'; id: number; col: number; row: number }
   | { type: 'penguinWarn'; row: number; fromLeft: boolean }
   | { type: 'squashed'; playerId: PlayerId }
@@ -410,6 +422,10 @@ export interface HazardsState {
   blockSpots?: number[];
   /** Passos até crescer o próximo bloco de neve. */
   regrowTimer?: number;
+  /** Passos entre um bloco novo e o seguinte. */
+  regrowEvery?: number;
+  /** Templo: casas onde cipós estão crescendo e o bloco vai fechar quando `ticks` chegar a 0. */
+  sprouts?: Array<{ index: number; ticks: number }>;
   /** Células (índices) do abismo (são `hole` na arena): ninguém anda nelas, mas o fogo passa. */
   chasm?: number[];
   /** Células (índices) das pontes de corda sobre o abismo (livres, onde se anda). */
@@ -539,6 +555,8 @@ export interface GameState {
   slime?: SlimeCell[];
   /** Sósias da Pipoca (poder): andam pela arena por um tempo. */
   decoys?: DecoyState[];
+  /** Círculos de choque do Bolt em andamento. */
+  shockwaves?: ShockwaveState[];
   /** Neblina do Nimbo: passos que faltam e quem a criou (ele enxerga em volta). */
   fog?: { ticks: number; owner: PlayerId };
   /** Quem é eliminado pode jogar das laterais e tentar voltar (veja sideline.ts)? Ausente = sim. */

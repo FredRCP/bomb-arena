@@ -1,5 +1,6 @@
-import { AIRPLANE_BOMBS, AIRPLANE_DROP_TICKS, AIRPLANE_END_SCALE, AIRPLANE_ENTRY_TICKS, AIRPLANE_FIRST_DROP, AIRPLANE_LAPS, AIRPLANE_LAP_TICKS, CONFUSE_POWER_TICKS, FOG_POWER_TICKS, GHOST_HALO_RADIUS, GHOST_HALO_TICKS, FREEZE_PLAYER_TICKS, STORK_SHIELD_TICKS, INVISIBLE_POWER_TICKS, JUMP_CELLS, SLIME_CELLS, SLIME_TICKS, SPRINT_POWER_TICKS, TWIN_BOMB_RANGE, ELEPHANT_MAX_BLOCKS, ELEPHANT_SPEED, POWER_CHARGE_TICKS, SHIELD_POWER_TICKS, STORK_FAR_ITEMS, STORK_ITEMS, STORK_RADIUS, FREEZE_POWER_TICKS, GHOST_POWER_TICKS, MAGNET_RADIUS, MAGNET_STEALS, MAGNET_DROP_RADIUS, SHOCK_RADIUS, SHOCK_TICKS } from '../config/powers';
-import { BOMB_FUSE_TICKS } from '../config/bombs';
+import { AIRPLANE_BOMBS, AIRPLANE_DROP_TICKS, AIRPLANE_END_SCALE, AIRPLANE_ENTRY_TICKS, AIRPLANE_FIRST_DROP, AIRPLANE_LAPS, AIRPLANE_LAP_TICKS, CONFUSE_POWER_TICKS, FOG_POWER_TICKS, GHOST_HALO_RADIUS, GHOST_HALO_TICKS, FREEZE_PLAYER_TICKS, STORK_SHIELD_TICKS, INVISIBLE_POWER_TICKS, JUMP_CELLS, SLIME_CELLS, SLIME_TICKS, SPRINT_POWER_TICKS, FAGULHA_BOMBS, FAGULHA_FUSE_MAX, FAGULHA_FUSE_MIN, FAGULHA_RADIUS, ELEPHANT_MAX_BLOCKS, ELEPHANT_SPEED, POWER_CHARGE_TICKS, SHIELD_POWER_TICKS, STORK_FAR_ITEMS, STORK_ITEMS, STORK_RADIUS, FREEZE_POWER_TICKS, GHOST_POWER_TICKS, MAGNET_RADIUS, MAGNET_STEALS, MAGNET_DROP_RADIUS, } from '../config/powers';
+import { THROW_FLIGHT_TICKS } from '../config/bombs';
+import { spawnShockwave } from './shockwave';
 import { cellIndex, getCell, isTunnel } from './arena';
 import { dropBomb } from './bombs';
 import { collidesAt } from './movement';
@@ -144,15 +145,7 @@ function usePersonalPower(state: GameState, player: PlayerState, kind: Exclude<P
     for (const spot of jumpLandings(state, player)) dropBomb(state, player, spot.col, spot.row);
   } else if (kind === 'sprint') {
     player.sprintTicks = SPRINT_POWER_TICKS;
-    // Choque: quem está a até SHOCK_RADIUS células (sem escudo/herói) leva um choque e fica paralisado um instante.
-    for (const o of state.players) {
-      if (o.id === player.id || !o.alive || o.sideline !== null || o.shieldTicks > 0 || o.heroTicks > 0) continue;
-      if (Math.hypot(o.x - player.x, o.y - player.y) > SHOCK_RADIUS) continue;
-      o.frozenTicks = Math.max(o.frozenTicks ?? 0, SHOCK_TICKS);
-      o.stunned = true;
-      o.slide = null;
-      state.events.push({ type: 'shocked', playerId: o.id, by: player.id });
-    }
+    spawnShockwave(state, player); // círculo de choque que cresce até 5 células e imobiliza 3 s quem alcança
   } else if (kind === 'invisible') {
     player.invisibleTicks = INVISIBLE_POWER_TICKS;
   } else if (kind === 'slime') {
@@ -172,19 +165,30 @@ function usePersonalPower(state: GameState, player: PlayerState, kind: Exclude<P
       }
     }
   } else if (kind === 'twinbombs') {
-    const col0 = Math.floor(player.x);
-    const row0 = Math.floor(player.y);
-    const { dx, dy } = VECTORS[player.facing];
-    const spots = [{ col: col0, row: row0 }, { col: col0 - dx, row: row0 - dy }, { col: col0 + dx, row: row0 + dy }];
+    // Chuva de bombas: FAGULHA_BOMBS bombas em casas livres sorteadas perto dela, cada uma com um pavio diferente.
+    const free: Array<{ col: number; row: number }> = [];
+    const all: Array<{ col: number; row: number }> = [];
+    for (let row = 1; row < arena.rows - 1; row++) {
+      for (let col = 1; col < arena.cols - 1; col++) {
+        if (getCell(arena, col, row) !== 'empty' || isTunnel(state.hazards?.tunnel, arena, col, row)) continue;
+        if (state.bombs.some((b) => b.col === col && b.row === row) || state.flames.some((f) => f.col === col && f.row === row)) continue;
+        all.push({ col, row });
+        if (Math.hypot(col + 0.5 - player.x, row + 0.5 - player.y) <= FAGULHA_RADIUS) free.push({ col, row });
+      }
+    }
+    const pool = free.length >= FAGULHA_BOMBS ? free : all;
     let placed = 0;
-    for (const spot of spots) {
-      if (placed >= 2 || !dropBomb(state, player, spot.col, spot.row)) continue;
+    while (placed < FAGULHA_BOMBS && pool.length > 0) {
+      const spot = pool.splice(Math.floor(rng() * pool.length), 1)[0]!;
+      if (!dropBomb(state, player, spot.col, spot.row)) continue;
       const bomb = state.bombs[state.bombs.length - 1]!;
-      bomb.range = TWIN_BOMB_RANGE;
-      bomb.pierce = true; // o fogo varre a linha e a coluna inteiras, blocos incluídos
+      bomb.ticksLeft = FAGULHA_FUSE_MIN + Math.floor(rng() * (FAGULHA_FUSE_MAX - FAGULHA_FUSE_MIN));
+      bomb.blazing = true;
+      bomb.walkThrough = []; // elas caem do ar: não é preciso "sair de cima"
+      bomb.flight = { fromCol: Math.floor(player.x), fromRow: Math.floor(player.y), ticks: THROW_FLIGHT_TICKS };
       placed += 1;
     }
-    player.heroTicks = Math.max(player.heroTicks, BOMB_FUSE_TICKS + 90); // ela é imune às chamas até as bombas passarem
+    player.heroTicks = Math.max(player.heroTicks, FAGULHA_FUSE_MAX + 90); // ela é imune às chamas até as bombas passarem
   } else if (kind === 'fog') {
     state.fog = { ticks: FOG_POWER_TICKS, owner: player.id };
   } else if (kind === 'magnet') {

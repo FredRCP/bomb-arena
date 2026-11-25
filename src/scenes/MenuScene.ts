@@ -102,7 +102,7 @@ export class MenuScene extends Phaser.Scene {
       ['lucas', 1100, 720],
     ];
     crew.forEach(([id, x, y], index) => {
-      const art = addCardArt(this, characterById(id), 0, 0, 52, (id === 'lucas' ? 225 : id === 'ana-julia' || id === 'filippe' ? 255 : 330) * (id === 'fred' ? 0.9 : 1));
+      const art = addCardArt(this, characterById(id), 0, 0, 52, (id === 'lucas' ? 225 : id === 'ana-julia' || id === 'filippe' ? 255 : 330) * (id === 'fred' ? 0.9 : id === 'vanessa' ? 0.81 : id === 'waleska' ? 0.855 : id === 'ana-julia' || id === 'filippe' ? 0.9 : 1));
       art.setPosition(ox + x, oy + y).setDepth(-20).setAlpha(0);
       this.tweens.add({ targets: art, alpha: 1, duration: 400, delay: 150 + index * 110 });
       bob(art, 12, 800 + index * 90, 500 + index * 100);

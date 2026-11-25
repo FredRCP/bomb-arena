@@ -14,7 +14,7 @@ import { bindPadHint } from '../input/padHints';
 
 const FONT = 'system-ui, "Segoe UI", Roboto, sans-serif';
 /** Ajuste do tamanho da arte na escolha (1 = padrão): Lucas -15%, Ana e Filippe -10%. */
-const CARD_ART_SCALE: Record<string, number> = { lucas: 0.85, 'ana-julia': 0.9, filippe: 0.9 };
+const CARD_ART_SCALE: Record<string, number> = { lucas: 0.85, 'ana-julia': 0.9, filippe: 0.9, vanessa: 0.95, waleska: 0.9 };
 const CARD_W = 200;
 const CARD_H = 250;
 const GAP = 16;

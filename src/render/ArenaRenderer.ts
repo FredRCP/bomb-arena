@@ -770,7 +770,8 @@ export function fadeInTunnel(view: { alpha: number; setAlpha(v: number): unknown
   else if (col === maxC) inward = col + 1 - player.x;
   else if (row === minR) inward = player.y - row;
   else if (row === maxR) inward = row + 1 - player.y;
-  const k = inward === null ? 0 : 1 - Math.min(1, Math.max(0, (inward - 0.45) / 0.45));
+  // A entrada desenhada tem ~0,57 célula de fundo: o jogador some logo depois de passar pelo arco, antes de pisar no telhado.
+  const k = inward === null ? 0 : 1 - Math.min(1, Math.max(0, (inward - 0.1) / 0.35));
   view.setDepth(10.6);
   view.setAlpha(view.alpha * k);
 }

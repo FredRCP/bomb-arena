@@ -4,6 +4,7 @@
 // Para ativar uma fase: `available: true`, o tema dela em render/theme.ts e as imagens em public/themes/<tema>/.
 
 import type { HazardOptions } from '../core/hazards';
+import { TEMPLE_REGROW_TICKS } from './hazards';
 
 export interface StageDef {
   id: string;
@@ -46,12 +47,12 @@ const STAGES_BASE: readonly StageDef[] = [
     id: 'temple',
     name: 'Templo Perdido',
     available: true,
-    tagline: 'Abismo com templo no meio, pontes de corda que desabam (avisam antes!) e pedras gigantes que descem atordoando tudo. Atenção ao tremor!',
+    tagline: 'Abismo com templo no meio, pontes de corda que desabam (avisam antes!) pedras gigantes que descem atordoando tudo e cipós que fazem os blocos crescerem de novo. Atenção ao tremor!',
     cols: 17,
     rows: 13,
     maxPlayers: 4,
     mobileOk: true,
-    hazards: { chasm: true, boulder: true, island: true, bridgeFall: true },
+    hazards: { chasm: true, boulder: true, island: true, bridgeFall: true, regrow: true, regrowTicks: TEMPLE_REGROW_TICKS, regrowSprout: true },
     music: ['audio/temple_a.ogg', 'audio/temple_b.ogg', 'audio/sinister_abode.ogg'],
   },
   {
