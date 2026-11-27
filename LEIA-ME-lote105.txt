@@ -1,0 +1,3 @@
+LOTE 105 - Arte dos escorpioes (Gemini)
+Copie sobre o projeto: src/render/ScorpionView.ts, src/render/theme.ts, src/config/assetVersion.ts, public/themes/temple/scorpion1.png, scorpion2.png, scorpion3.png
+Requer o lote 104.

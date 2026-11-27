@@ -132,6 +132,9 @@ export function preloadThemes(scene: Phaser.Scene): void {
     if (theme.island) {
       add('island', 'island.png');
       add('boulder', 'boulder.png');
+      add('scorpion1', 'scorpion1.png'); // escorpião andando A / B e ataque (cabeça para baixo)
+      add('scorpion2', 'scorpion2.png');
+      add('scorpion3', 'scorpion3.png');
       add('chasm', 'chasm.png'); // abismo (um trecho de 3 x 4 casas)
       add('bridge_broken', 'bridge_broken.png'); // ponte caída (mostrada enquanto a ponte está caída)
       add('bridge', 'bridge.png'); // ponte de corda (1 imagem esticada sobre a ponte inteira)
