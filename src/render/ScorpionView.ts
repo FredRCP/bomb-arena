@@ -2,17 +2,27 @@ import Phaser from 'phaser';
 import { SCORPION_WARN_TICKS } from '../config/hazards';
 import type { GameState } from '../core';
 import { TILE_SIZE } from './ArenaRenderer';
+import { themeById, themeKey } from './theme';
 
-// Desenho provisório dos escorpiões do Templo (feito em código, vista de cima): corpo, pinças, cauda com ferrão e oito patas que mexem.
+const SPRITE_HEIGHT = 88; // altura do desenho em pixels (cauda incluída)
+const FRAME_TICKS = 10;
+
+// Escorpiões do Templo: usa as imagens scorpion1/2 (andando) e scorpion3 (ataque, quando há alguém perto); sem elas, desenha em código (vista de cima): corpo, pinças, cauda com ferrão e oito patas que mexem.
 // Só desenho; as regras estão em core/scorpion.ts.
 
 export class ScorpionView {
   private readonly g: Phaser.GameObjects.Graphics;
   /** Direção em que cada escorpião olha (radianos), guardada para ele não girar de volta ao parar. */
   private readonly angles = new Map<number, number>();
+  private readonly images = new Map<number, Phaser.GameObjects.Image>();
+  private readonly keys: string[];
+  private readonly ready: boolean;
 
-  constructor(scene: Phaser.Scene) {
+  constructor(private readonly scene: Phaser.Scene) {
     this.g = scene.add.graphics().setDepth(9.1);
+    const theme = themeById('temple');
+    this.keys = ['scorpion1', 'scorpion2', 'scorpion3'].map((n) => themeKey(theme, n));
+    this.ready = this.keys.every((k) => scene.textures.exists(k));
   }
 
   update(state: GameState): void {
@@ -37,9 +47,27 @@ export class ScorpionView {
       live.add(body.id);
       if (body.dx !== 0 || body.dy !== 0) this.angles.set(body.id, Math.atan2(body.dy, body.dx));
       const angle = this.angles.get(body.id) ?? Math.PI / 2;
+      if (this.ready) {
+        let image = this.images.get(body.id);
+        if (!image) {
+          image = this.scene.add.image(0, 0, this.keys[0]!).setOrigin(0.5, 0.62).setDepth(9.1);
+          this.images.set(body.id, image);
+        }
+        const moving = body.dx !== 0 || body.dy !== 0;
+        const near = state.players.some((p) => p.alive && Math.hypot(p.x - body.x, p.y - body.y) < 0.9);
+        const frame = near ? 2 : moving ? Math.floor(t / FRAME_TICKS) % 2 : 0;
+        g.fillStyle(0x000000, 0.25).fillEllipse(body.x * TILE_SIZE + 2, body.y * TILE_SIZE + 8, 46, 24);
+        image.setTexture(this.keys[frame]!).setScale(SPRITE_HEIGHT / 160).setPosition(body.x * TILE_SIZE, body.y * TILE_SIZE).setRotation(angle - Math.PI / 2 + (moving ? Math.sin(t * 0.35) * 0.06 : 0));
+        continue;
+      }
       this.drawOne(g, body.x * TILE_SIZE, body.y * TILE_SIZE, angle, (body.id * 13 + t) * 0.35, body.dx !== 0 || body.dy !== 0 ? 1 : 0.3);
     }
     for (const id of this.angles.keys()) if (!live.has(id)) this.angles.delete(id);
+    for (const [id, image] of this.images) {
+      if (live.has(id)) continue;
+      image.destroy();
+      this.images.delete(id);
+    }
   }
 
   /** Desenha um escorpião em (cx, cy) olhando para `angle`; `walk` é a fase das patas e `amount` o tamanho do movimento delas. */
