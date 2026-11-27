@@ -46,6 +46,7 @@ import { createHud } from '../render/Hud';
 import { TOP_HEIGHT, placeArena, sideWidthFor } from '../render/layout';
 import { HazardsView } from '../render/HazardsView';
 import { MummyView } from '../render/MummyView';
+import { ScorpionView } from '../render/ScorpionView';
 import { BraziersView } from '../render/BraziersView';
 import { ElephantView } from '../render/ElephantView';
 import { HaloView } from '../render/HaloView';
@@ -112,6 +113,7 @@ export class GameScene extends Phaser.Scene {
   private closedView!: ClosedView;
   private hazardsView!: HazardsView;
   private mummyView: MummyView | null = null;
+  private scorpionView: ScorpionView | null = null;
   private braziersView: BraziersView | null = null;
   private iceBlockView: IceBlockView | null = null;
   private decoysView: DecoysView | null = null;
@@ -261,6 +263,7 @@ export class GameScene extends Phaser.Scene {
     this.decoysView?.destroy();
     this.decoysView = new DecoysView(this, this.characters);
     this.mummyView = this.gameState.hazards?.mummy ? new MummyView(this, this.gameState) : null;
+    this.scorpionView = this.gameState.hazards?.scorpions ? new ScorpionView(this) : null;
     this.braziersView = theme.braziers ? new BraziersView(this, this.gameState.arena, theme) : null;
     this.elephantView = new ElephantView(this);
     this.haloView = new HaloView(this);
@@ -677,6 +680,8 @@ export class GameScene extends Phaser.Scene {
         sfx.play(`power-${event.kind}`);
         this.showPowerLabel(event.playerId, POWER_LABELS[event.kind]);
       }
+      if (event.type === 'scorpionWarn') heard.add('tick'); // a terra treme
+      if (event.type === 'scorpionSpawned') heard.add('place');
       if (event.type === 'mummyWarn') heard.add('tick'); // o sarcófago treme
       if (event.type === 'mummySpawned') heard.add('place');
       if (event.type === 'mummyWrapped') heard.add('hit');
@@ -771,6 +776,7 @@ export class GameScene extends Phaser.Scene {
     }
     this.hazardsView.update(this.gameState);
     this.mummyView?.update(this.gameState);
+    this.scorpionView?.update(this.gameState);
     this.braziersView?.update();
     this.iceBlockView?.update(this.gameState);
     this.decoysView?.update(this.gameState);

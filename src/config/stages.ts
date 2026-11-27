@@ -52,7 +52,7 @@ const STAGES_BASE: readonly StageDef[] = [
     rows: 13,
     maxPlayers: 4,
     mobileOk: true,
-    hazards: { chasm: true, boulder: true, island: true, bridgeFall: true, regrow: true, regrowTicks: TEMPLE_REGROW_TICKS, regrowSprout: true },
+    hazards: { chasm: true, boulder: true, island: true, bridgeFall: true, regrow: true, regrowTicks: TEMPLE_REGROW_TICKS, regrowSprout: true, scorpions: true },
     music: ['audio/temple_a.ogg', 'audio/temple_b.ogg', 'audio/sinister_abode.ogg'],
   },
   {

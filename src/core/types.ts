@@ -161,6 +161,31 @@ export interface MummyState {
   wrappedAt: Partial<Record<PlayerId, number>>;
 }
 
+/** Escorpião do Templo andando (mesma ideia da múmia: de (col,row) até (tcol,trow), `progress` de 0 a 1). */
+export interface ScorpionBody {
+  id: number;
+  col: number;
+  row: number;
+  tcol: number;
+  trow: number;
+  progress: number;
+  x: number;
+  y: number;
+  dx: number;
+  dy: number;
+}
+
+export interface ScorpionState {
+  /** Passos até o próximo escorpião sair da terra. */
+  timer: number;
+  list: ScorpionBody[];
+  /** A terra tremendo na casa onde o próximo vai sair. */
+  warning?: { col: number; row: number; ticks: number } | null;
+  nextId?: number;
+  /** Passo em que cada jogador foi picado (ou protegido) pela última vez. */
+  stungAt: Partial<Record<PlayerId, number>>;
+}
+
 /** Entrada dos pinguins pelas laterais: o relógio, a fileira sorteada e o aviso (aceso nos últimos passos antes de sair). */
 export interface PenguinGate {
   timer: number;
@@ -330,6 +355,9 @@ export type GameEvent =
   | { type: 'penguinWarn'; row: number; fromLeft: boolean }
   | { type: 'squashed'; playerId: PlayerId }
   /** Múmia: o sarcófago avisa, a múmia saiu, enfaixou alguém ou foi desfeita por uma explosão. */
+  | { type: 'scorpionWarn'; col: number; row: number }
+  | { type: 'scorpionSpawned'; col: number; row: number }
+  | { type: 'scorpionKilled'; col: number; row: number }
   | { type: 'mummyWarn'; col: number; row: number }
   | { type: 'mummySpawned'; col: number; row: number }
   | { type: 'mummyWrapped'; playerId: PlayerId }
@@ -418,6 +446,8 @@ export interface HazardsState {
   penguinGate?: PenguinGate;
   /** Egito: a múmia que sai do sarcófago. */
   mummy?: MummyState;
+  /** Templo Perdido: os escorpiões. */
+  scorpions?: ScorpionState;
   /** Células (índices) que começaram com bloco: é nelas que a neve faz blocos novos crescerem. */
   blockSpots?: number[];
   /** Passos até crescer o próximo bloco de neve. */

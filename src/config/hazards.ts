@@ -171,3 +171,17 @@ export const MUMMY_TOUCH_HALF = 0.6;
 /** Enfaixado: parado por 3 s. O mesmo jogador não é enfaixado de novo por 5 s. */
 export const MUMMY_WRAP_TICKS = 3 * 60;
 export const MUMMY_COOLDOWN_TICKS = 5 * 60;
+
+// Escorpiões do Templo Perdido: saem do chão, andam devagar e atordoam (não matam) quem encosta; uma explosão os mata.
+export const SCORPION_MAX = 2;
+/** O primeiro aparece 20 s depois do início; quando um morre, o próximo vem 25 s depois. */
+export const SCORPION_FIRST_TICKS = 20 * 60;
+export const SCORPION_RESPAWN_TICKS = 25 * 60;
+/** Sai da terra: avisa (poeira e tremor) por 1 s antes de andar. */
+export const SCORPION_WARN_TICKS = 60;
+/** Células por passo (~1,3 células por segundo). */
+export const SCORPION_SPEED = 0.022;
+export const SCORPION_TOUCH_HALF = 0.55;
+/** Atordoado por 1,5 s; o mesmo jogador só é picado de novo depois de 4 s. */
+export const SCORPION_STUN_TICKS = 90;
+export const SCORPION_COOLDOWN_TICKS = 4 * 60;

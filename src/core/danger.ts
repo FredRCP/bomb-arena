@@ -102,6 +102,18 @@ export function buildHazards(state: GameState, extraBomb?: BombState, selfId?: P
     }
   }
 
+  // Escorpiões: a IA se afasta da casa deles, da próxima e das vizinhas.
+  for (const body of state.hazards?.scorpions?.list ?? []) {
+    for (const [mc, mr] of [[body.col, body.row], [body.tcol, body.trow]] as const) {
+      for (const [dc, dr] of [[0, 0], [1, 0], [-1, 0], [0, 1], [0, -1]] as const) {
+        const col = mc + dc;
+        const row = mr + dr;
+        if (col < 0 || row < 0 || col >= arena.cols || row >= arena.rows || getCell(arena, col, row) === 'wall') continue;
+        windows[cellIndex(arena, col, row)]!.push([0, 40]);
+      }
+    }
+  }
+
   // Vulcão: a célula onde a bola vai cair é perigosa no instante da queda; a lava que vai escorrer logo também.
   const volcano = state.hazards?.volcano;
   if (volcano) for (const shot of volcano.shots) windows[cellIndex(arena, shot.col, shot.row)]!.push([Math.max(0, shot.ticks - 6), shot.ticks + 12]);

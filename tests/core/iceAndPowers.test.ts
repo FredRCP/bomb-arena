@@ -701,3 +701,65 @@ describe('Templo: blocos que voltam com cipós', () => {
     expect(hz.sprouts).toHaveLength(1);
   });
 });
+
+describe('Templo: escorpiões', () => {
+  const temple = () => {
+    const def = stageById('temple');
+    const state = createGameState({ cols: def.cols, rows: def.rows, hazards: def.hazards!, players: 2, seed: 3, sideline: false });
+    state.round.phase = 'playing';
+    state.hazards!.regrowTimer = 999999;
+    return state;
+  };
+
+  it('treme a terra por 1 s e então sai um escorpião, longe dos jogadores e fora da ponte', () => {
+    const state = temple();
+    const sc = state.hazards!.scorpions!;
+    sc.timer = 1;
+    step(state);
+    expect(sc.warning).toBeTruthy();
+    const { col, row } = sc.warning!;
+    for (const p of state.players) expect(Math.abs(Math.floor(p.x) - col) + Math.abs(Math.floor(p.y) - row)).toBeGreaterThanOrEqual(4);
+    expect(state.hazards!.bridges!.includes(row * state.arena.cols + col)).toBe(false);
+    for (let i = 0; i < 70; i++) step(state);
+    expect(sc.list).toHaveLength(1);
+  });
+
+  it('não passa de 2 em campo e nunca pisa em ponte, bloco ou abismo ao andar', () => {
+    const state = temple();
+    const sc = state.hazards!.scorpions!;
+    for (let i = 0; i < 4; i++) {
+      sc.timer = 1;
+      for (let k = 0; k < 80; k++) step(state);
+    }
+    expect(sc.list.length).toBeLessThanOrEqual(2);
+    for (let k = 0; k < 1500; k++) {
+      step(state);
+      for (const b of sc.list) {
+        const cell = state.arena.cells[Math.floor(b.y) * state.arena.cols + Math.floor(b.x)];
+        expect(cell).toBe('empty');
+        expect(state.hazards!.bridges!.includes(Math.floor(b.y) * state.arena.cols + Math.floor(b.x))).toBe(false);
+      }
+    }
+  });
+
+  it('quem encosta fica atordoado 1,5 s (estrelas); escudo protege; a explosão mata o bicho', () => {
+    const state = temple();
+    const sc = state.hazards!.scorpions!;
+    const p = state.players[0]!;
+    sc.list.push({ id: 1, col: 3, row: 1, tcol: 3, trow: 1, progress: 0, x: 3.5, y: 1.5, dx: 0, dy: 0 });
+    p.x = 3.5;
+    p.y = 1.5;
+    step(state);
+    expect(p.stunned).toBe(true);
+    expect(p.frozenTicks).toBeGreaterThan(60);
+    const q = state.players[1]!;
+    q.shieldTicks = 300;
+    q.x = 3.5;
+    q.y = 1.5;
+    step(state);
+    expect(q.frozenTicks ?? 0).toBe(0);
+    state.flames.push({ col: 3, row: 1, ticksLeft: 10 } as never);
+    step(state);
+    expect(sc.list).toHaveLength(0);
+  });
+});

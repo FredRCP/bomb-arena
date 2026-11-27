@@ -5,6 +5,7 @@ import { applyExtraHazards, updateExtraHazards } from './extraHazards';
 import { dropPowerups, maybeHideItem, revealItem } from './items';
 import { bodyOverlapsCell, collidesAt } from './movement';
 import { createMummy, updateMummy } from './mummy';
+import { createScorpions, updateScorpions } from './scorpion';
 import { createRng } from './random';
 import type { Arena, Cell, GameState, HazardsState, PlayerState } from './types';
 
@@ -54,6 +55,8 @@ export interface HazardOptions {
   traffic?: TrafficKind;
   /** Egito: uma múmia sai de um sarcófago, anda ao acaso e enfaixa quem encosta; uma explosão a desfaz. */
   mummy?: boolean;
+  /** Escorpiões que saem do chão e atordoam. */
+  scorpions?: boolean;
   /** Vulcão de pedra 3 x 3 no meio da arena, que entra em erupção lançando bolas de lava. */
   volcano?: boolean;
   /** Templo 3 x 3 no meio do abismo, com um túnel (a ponte do meio passa por dentro dele). Precisa de `chasm`. */
@@ -349,6 +352,7 @@ export function createHazards(arena: Arena, options: HazardOptions | undefined, 
     if (options.regrowSprout) hazards.sprouts = [];
   }
   if (options.mummy) hazards.mummy = createMummy();
+  if (options.scorpions) hazards.scorpions = createScorpions();
   applyExtraHazards(arena, options, seed, hazards);
   return hazards;
 }
@@ -367,6 +371,7 @@ export function updateHazards(state: GameState): void {
   updateDartTrap(state);
   updateRollers(state);
   updateMummy(state, rollerRate(state));
+  updateScorpions(state, rollerRate(state));
   updateRegrow(state);
   updateBoulder(state);
   updateBridgeFall(state);
